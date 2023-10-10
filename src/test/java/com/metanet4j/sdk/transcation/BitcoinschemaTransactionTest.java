@@ -79,7 +79,7 @@ public class BitcoinschemaTransactionTest extends TransactionContextTest {
     public void testBsocialPostTransaction(){
         try {
             B b = new B();
-            b.setContent("BAP、BitcoinSchema、1sat ordinals、sigma protocol support for java");
+            b.setContent("metanet4j-sdk has published,view it on https://github.com/metanet4j/metanet4j-sdk ");
             b.setByteBuffer(ByteBuffer.wrap(b.getContent().getBytes(Charsets.UTF_8)));
             b.setContentType("text/markdown");
             b.setEncoding("UTF-8");
