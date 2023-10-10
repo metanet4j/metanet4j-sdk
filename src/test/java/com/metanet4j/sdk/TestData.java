@@ -58,6 +58,7 @@ public class TestData {
 
         String mimeType = FileUtil.getMimeType("bsv1.jpeg");
         System.out.println(mimeType);
+        System.out.println(mimeType);
     }
 
 
