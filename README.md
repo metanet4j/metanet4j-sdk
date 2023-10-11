@@ -115,9 +115,9 @@ Please review the test case.
 
 ## Building from source
 
-git clone https://github.com/metanet4j/metanet4j-parent.git
+git clone https://github.com/metanet4j/metanet4j-parent
 
-git clone https://github.com/metanet4j/metanet4j-base.git
+git clone https://github.com/metanet4j/metanet4j-base
 
 git clone https://github.com/metanet4j/metanet4j-sdk
 
