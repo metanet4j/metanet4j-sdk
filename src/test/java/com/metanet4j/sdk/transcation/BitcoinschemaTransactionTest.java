@@ -182,7 +182,7 @@ public class BitcoinschemaTransactionTest extends TransactionContextTest {
                         new BitailsUtxoProvider())
 
                 .withFeeKb(Coin.valueOf(500L))
-                .changeAddress(Address.fromBase58(MainNetParams.get(), bapBase.getRootAddress()))
+                .changeAddress(changeAddress)
                 .completeAndSignTx(transactionBuilder.getKeyBag(), true);
 
         correctlySpends(transaction);
@@ -202,7 +202,7 @@ public class BitcoinschemaTransactionTest extends TransactionContextTest {
                 .addOutput(Coin.valueOf(777L), Address.fromBase58(MainNetParams.get(), bapBase.getRootAddress()))
                 .addOutput(Coin.valueOf(888L), Address.fromBase58(MainNetParams.get(), bapBase.getRootAddress()))
                 .addOutput(Coin.valueOf(999L), Address.fromBase58(MainNetParams.get(), bapBase.getRootAddress()))
-                .changeAddress(Address.fromBase58(MainNetParams.get(), bapBase.getRootAddress()))
+                .changeAddress(changeAddress)
                 .completeAndSignTx(transactionBuilder.getKeyBag(), true);
         correctlySpends(transaction);
         broadcast(transaction);
@@ -218,7 +218,7 @@ public class BitcoinschemaTransactionTest extends TransactionContextTest {
                         new BitailsUtxoProvider())
                 .addDataOutput(dataLockBuilder)
                 .withFeeKb(Coin.valueOf(500L))
-                .changeAddress(Address.fromBase58(MainNetParams.get(), bapBase.getRootAddress()))
+                .changeAddress(changeAddress)
                 .completeAndSignTx(transactionBuilder.getKeyBag(), true);
         correctlySpends(transaction);
         broadcast(transaction);

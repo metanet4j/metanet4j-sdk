@@ -79,6 +79,10 @@ public interface BapBaseCore {
         return AddressEnhance.fromECkeyLite(getCurrentPrivateKey());
     }
 
+    default AddressEnhance getPayAccountAddress() {
+        return AddressEnhance.fromECkeyLite(getPayAccountKey());
+    }
+
     default Address getOrdAddress() {
         return new Address(MainNetParams.get(), getOrdPrivateKey().getPubKeyHash());
     }

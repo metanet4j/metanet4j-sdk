@@ -321,7 +321,7 @@ public class BapBase extends BapBaseAbstract {
 
     @Override
     public ECKeyLite getOrdPrivateKey() {
-        return ECKeyLite.fromPrivate(getKeyBaseRoot(HDUtils.parsePath(this.bapBaseConfig.getDefaultOrdPath())).getPrivKey());
+        return ECKeyLite.fromPrivate(getKeyBasePath(HDUtils.parsePath(this.bapBaseConfig.getDefaultOrdPath())).getPrivKey());
     }
 
     @Override
@@ -331,7 +331,7 @@ public class BapBase extends BapBaseAbstract {
 
 
     public ECKeyLite getPayAccountKey() {
-        return ECKeyLite.fromPrivate(getKeyBaseRoot(HDUtils.parsePath(this.bapBaseConfig.getDefaultPayAccountPath())).getPrivKeyBytes());
+        return ECKeyLite.fromPrivate(getKeyBasePath(HDUtils.parsePath(this.bapBaseConfig.getDefaultPayAccountPath())).getPrivKeyBytes());
     }
 
     private DeterministicKey getEncryptKey(List<ChildNumber> encryptChildNumberList) {
@@ -352,6 +352,13 @@ public class BapBase extends BapBaseAbstract {
         return dh.deriveChild(childNumbers.subList(0, childNumbers.size() - 1), false, true,
                 childNumbers.get(childNumbers.size() - 1));
     }
+
+    private DeterministicKey getKeyBasePath(List<ChildNumber> childNumberList) {
+        DeterministicHierarchy dh = new DeterministicHierarchy(masterPrivateKey.getMasterDeterministicKey());
+        return dh.deriveChild(childNumberList.subList(0, childNumberList.size() - 1), false, true,
+                childNumberList.get(childNumberList.size() - 1));
+    }
+
 
     @Override
     public String getAppName() {

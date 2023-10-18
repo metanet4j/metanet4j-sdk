@@ -36,7 +36,7 @@ public class OrdTransactionTest extends TransactionContextTest {
                 changeAddress,
                 feePerKb,
                 OrdScriptBuilder.Inscription.builder().contentType("text/markdown")
-                        .dataB64(Base64.encode("test send oridinals 1007-1 from metanet-sdk".getBytes())).build(),
+                        .dataB64(Base64.encode("test send oridinals 1017-1 from metanet-sdk".getBytes())).build(),
                 ordMap,
                 bapBase,
                 keyBag
@@ -74,7 +74,7 @@ public class OrdTransactionTest extends TransactionContextTest {
      */
     @Test
     public void testSendOrdinalByCreateUtxo() {
-        String origin = "your original origin";
+        String origin = "bfecea1badb93875db09852e819efc848c65a18d1156290de090231021fc2e83_0";
 
         List<UTXO> originUtxoList = new OrdinalsOriginGorillaUtxoProvider().listUxtos(Lists.newArrayList(origin));
         List<UTXO> paymentUtxoList = new BitailsUtxoProvider().listUxtos(Lists.newArrayList(paymentAddress));
@@ -106,6 +106,16 @@ public class OrdTransactionTest extends TransactionContextTest {
     @Test
     public void testTransactionOrdReInscriptionby2ndkeyDeserialize() {
         String ordTx = FileUtil.readString("ord/8e8378.hex", Charsets.UTF_8);
+        parseTx(ordTx);
+
+    }
+
+    /**
+     * see https://docs.1satordinals.com/readme/test-vectors
+     */
+    @Test
+    public void testOpns() {
+        String ordTx = FileUtil.readString("ord/opns_0b8704.hex", Charsets.UTF_8);
         parseTx(ordTx);
 
     }

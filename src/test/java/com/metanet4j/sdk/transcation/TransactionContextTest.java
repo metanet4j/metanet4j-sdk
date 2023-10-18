@@ -4,7 +4,6 @@ import cn.hutool.core.util.HexUtil;
 import com.metanet4j.sdk.BobHelper;
 import com.metanet4j.sdk.TestData;
 import com.metanet4j.sdk.TxoHelper;
-import com.metanet4j.sdk.address.AddressEnhance;
 import com.metanet4j.sdk.bap.BapBase;
 import com.metanet4j.sdk.utxo.impl.bitails.BitailsClient;
 import io.bitcoinsv.bitcoinjsv.core.Address;
@@ -14,7 +13,6 @@ import io.bitcoinsv.bitcoinjsv.msg.protocol.Transaction;
 import io.bitcoinsv.bitcoinjsv.msg.protocol.TransactionInput;
 import io.bitcoinsv.bitcoinjsv.msg.protocol.TransactionOutput;
 import io.bitcoinsv.bitcoinjsv.msg.protocol.TxHelper;
-import io.bitcoinsv.bitcoinjsv.params.MainNetParams;
 import io.bitcoinsv.bitcoinjsv.params.Net;
 import io.bitcoinsv.bitcoinjsv.script.Script;
 import io.bitcoinsv.bitcoinjsv.script.ScriptChunk;
@@ -42,9 +40,9 @@ public class TransactionContextTest {
     @Before
     public void before() {
         bapBase = BapBase.fromOnlyMasterPrivateKey(TestData.masterPrivateKey);
-        paymentAddress = AddressEnhance.fromBase58(MainNetParams.get(), bapBase.getRootAddress());
+        paymentAddress = bapBase.getPayAccountAddress();
         ordAddress = bapBase.getOrdAddress();
-        changeAddress = Address.fromBase58(MainNetParams.get(), bapBase.getRootAddress());
+        changeAddress = new Address(paymentAddress);
         keyBag = new BapBase.BapProviderKeyBag(bapBase);
     }
 

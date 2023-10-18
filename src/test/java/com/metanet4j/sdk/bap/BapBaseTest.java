@@ -39,6 +39,7 @@ public class BapBaseTest {
         System.out.println(bapBase.getRootAddress());
         System.out.println(bapBase.getCurrentAddress());
         System.out.println(bapBase.getOrdAddress());
+        System.out.println(bapBase.getPayAccountAddress());
         System.out.println(AddressEnhance.fromPubKeyHash(bapBase.getEncryptKey().getPubKeyHash()).toBase58());
     }
 
