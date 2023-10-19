@@ -36,7 +36,7 @@ public class OrdTransactionTest extends TransactionContextTest {
                 changeAddress,
                 feePerKb,
                 OrdScriptBuilder.Inscription.builder().contentType("text/markdown")
-                        .dataB64(Base64.encode("test send oridinals 1017-1 from metanet-sdk".getBytes())).build(),
+                        .dataB64(Base64.encode("test send oridinals 1019-1 from metanet-sdk".getBytes())).build(),
                 ordMap,
                 bapBase,
                 keyBag
@@ -74,7 +74,7 @@ public class OrdTransactionTest extends TransactionContextTest {
      */
     @Test
     public void testSendOrdinalByCreateUtxo() {
-        String origin = "bfecea1badb93875db09852e819efc848c65a18d1156290de090231021fc2e83_0";
+        String origin = "17227b7ebbb77fe988fcb4175ec56fa79534baf1e947e059c2d154db5f10befb_0";
 
         List<UTXO> originUtxoList = new OrdinalsOriginGorillaUtxoProvider().listUxtos(Lists.newArrayList(origin));
         List<UTXO> paymentUtxoList = new BitailsUtxoProvider().listUxtos(Lists.newArrayList(paymentAddress));

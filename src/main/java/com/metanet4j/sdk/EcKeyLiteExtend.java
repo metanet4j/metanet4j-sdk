@@ -5,6 +5,7 @@ import io.bitcoinsv.bitcoinjsv.core.ECKeyLite;
 import io.bitcoinsv.bitcoinjsv.core.Sha256Hash;
 import io.bitcoinsv.bitcoinjsv.core.Utils;
 import io.bitcoinsv.bitcoinjsv.crypto.KeyCrypterException;
+import io.bitcoinsv.bitcoinjsv.ecc.ECDSA;
 import io.bitcoinsv.bitcoinjsv.ecc.ECDSASignature;
 import org.spongycastle.crypto.params.KeyParameter;
 import org.spongycastle.math.ec.ECPoint;
@@ -28,7 +29,16 @@ public class EcKeyLiteExtend extends ECKeyLite {
 
     public static EcKeyLiteExtend fromPrivate(BigInteger privKey) {
         ECPoint point = publicPointFromPrivate(privKey);
-        return new EcKeyLiteExtend(privKey, point);
+        return new EcKeyLiteExtend(privKey, getPointWithCompression(point, true));
+    }
+
+    private static ECPoint getPointWithCompression(ECPoint point, boolean compressed) {
+        if (point.isCompressed() == compressed)
+            return point;
+        point = point.normalize();
+        BigInteger x = point.getAffineXCoord().toBigInteger();
+        BigInteger y = point.getAffineYCoord().toBigInteger();
+        return ECDSA.CURVE.getCurve().createPoint(x, y, compressed);
     }
 
 

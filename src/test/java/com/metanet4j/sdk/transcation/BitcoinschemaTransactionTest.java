@@ -4,6 +4,7 @@ import cn.hutool.core.io.FileUtil;
 import com.google.common.base.Charsets;
 import com.google.common.collect.Lists;
 import com.metanet4j.base.model.B;
+import com.metanet4j.sdk.EcKeyLiteExtend;
 import com.metanet4j.sdk.SignType;
 import com.metanet4j.sdk.TestData;
 import com.metanet4j.sdk.bap.BapBase.BapProviderKeyBag;
@@ -13,6 +14,7 @@ import io.bitcoinsv.bitcoinjsv.core.Address;
 import io.bitcoinsv.bitcoinjsv.core.Coin;
 import io.bitcoinsv.bitcoinjsv.msg.protocol.Transaction;
 import io.bitcoinsv.bitcoinjsv.params.MainNetParams;
+import org.junit.Assert;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -79,7 +81,7 @@ public class BitcoinschemaTransactionTest extends TransactionContextTest {
     public void testBsocialPostTransaction(){
         try {
             B b = new B();
-            b.setContent("metanet4j-sdk has published,view it on https://github.com/metanet4j/metanet4j-sdk ");
+            b.setContent("test from metanet4j-sdk .1019-1,view it on https://github.com/metanet4j/metanet4j-sdk ");
             b.setByteBuffer(ByteBuffer.wrap(b.getContent().getBytes(Charsets.UTF_8)));
             b.setContentType("text/markdown");
             b.setEncoding("UTF-8");
@@ -208,6 +210,13 @@ public class BitcoinschemaTransactionTest extends TransactionContextTest {
         broadcast(transaction);
         parseTx(transaction);
 
+    }
+
+    @Test
+    public void testEckeyLiteExtend() {
+        String s1 = bapBase.getOrdAddress().toBase58();
+        String s2 = new Address(MainNetParams.get(), EcKeyLiteExtend.fromPrivate(bapBase.getOrdPrivateKey().getPrivKey()).getPubKeyHash()).toBase58();
+        Assert.assertEquals(s1, s2);
     }
 
     private void buildTxThenBroadcast(UnSpendableDataLockBuilder dataLockBuilder) throws SignErrorException {

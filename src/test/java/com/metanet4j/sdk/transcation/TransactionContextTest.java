@@ -1,6 +1,7 @@
 package com.metanet4j.sdk.transcation;
 
 import cn.hutool.core.util.HexUtil;
+import com.alibaba.fastjson.JSONObject;
 import com.metanet4j.sdk.BobHelper;
 import com.metanet4j.sdk.TestData;
 import com.metanet4j.sdk.TxoHelper;
@@ -125,7 +126,8 @@ public class TransactionContextTest {
     public static String broadcast(Transaction transaction) {
         String s = HexUtil.encodeHexStr(transaction.bitcoinSerialize());
         String broadcast = TransactionBuilder.broadcast(s, raw -> BitailsClient.broadcast(raw));
-        System.out.println("you can view your tx on whatsonchain:" + "https://whatsonchain.com/tx/" + broadcast);
-        return broadcast;
+        String txId = JSONObject.parseObject(broadcast).getString("txid");
+        System.out.println("you can view your tx on whatsonchain:" + "https://whatsonchain.com/tx/" + txId);
+        return txId;
     }
 }

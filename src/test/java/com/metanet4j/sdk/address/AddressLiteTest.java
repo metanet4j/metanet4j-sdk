@@ -11,4 +11,6 @@ public class AddressLiteTest {
         AddressLite address = AddressEnhance.fromBase58(RegTestParams.get(), "mqACwWBepT6dPqrs8vqxE2sBGKjXBSv9Tt");
         System.out.println(address.toBase58());
     }
+
+
 }

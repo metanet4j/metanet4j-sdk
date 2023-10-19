@@ -10,7 +10,7 @@
     </parent>
     <groupId>com.metanet4j</groupId>
     <artifactId>metanet4j-sdk</artifactId>
-    <version>0.1.0</version>
+    <version>0.2.0</version>
 
     <name>metanet4j-sdk</name>
 
@@ -22,8 +22,14 @@
         </dependency>
 
         <dependency>
-            <groupId>io.bitcoinsv.bitcoinjsv</groupId>
-            <artifactId>bitcoinj-base</artifactId>
+            <groupId>io.bitcoinsv.jcl</groupId>
+            <artifactId>jcl-store-levelDB</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.metanet4j</groupId>
+            <artifactId>metanet4j-base</artifactId>
+            <version>0.1.0</version>
         </dependency>
 
         <dependency>
@@ -33,14 +39,8 @@
         </dependency>
 
         <dependency>
-            <groupId>io.bitcoinsv.jcl</groupId>
-            <artifactId>jcl-store-levelDB</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>com.metanet4j</groupId>
-            <artifactId>metanet4j-base</artifactId>
-            <version>0.1.0</version>
+            <groupId>io.bitcoinsv.bitcoinjsv</groupId>
+            <artifactId>bitcoinj-base</artifactId>
         </dependency>
 
 

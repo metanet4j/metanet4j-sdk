@@ -32,7 +32,7 @@ public class BapDataLockBuilder extends UnSpendableDataLockBuilder<BapDataLockBu
     }
 
     public BapDataLockBuilder buildRoot() {
-        return this.buildId(false);
+        return this.buildRoot(false);
 
     }
 

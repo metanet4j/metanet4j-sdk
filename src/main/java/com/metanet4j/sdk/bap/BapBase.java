@@ -12,9 +12,7 @@ import com.metanet4j.sdk.PublicKey;
 import com.metanet4j.sdk.address.AddressEnhance;
 import com.metanet4j.sdk.crypto.Ecies;
 import com.metanet4j.sdk.crypto.MasterPrivateKey;
-import io.bitcoinsv.bitcoinjsv.core.ECKey;
-import io.bitcoinsv.bitcoinjsv.core.ECKeyLite;
-import io.bitcoinsv.bitcoinjsv.core.Sha256Hash;
+import io.bitcoinsv.bitcoinjsv.core.*;
 import io.bitcoinsv.bitcoinjsv.crypto.ChildNumber;
 import io.bitcoinsv.bitcoinjsv.crypto.DeterministicHierarchy;
 import io.bitcoinsv.bitcoinjsv.crypto.DeterministicKey;
@@ -22,7 +20,6 @@ import io.bitcoinsv.bitcoinjsv.crypto.HDUtils;
 import io.bitcoinsv.bitcoinjsv.params.MainNetParams;
 import io.bitcoinsv.bitcoinjsv.temp.KeyBag;
 import io.bitcoinsv.bitcoinjsv.temp.RedeemData;
-import lombok.Getter;
 
 import javax.annotation.Nullable;
 import javax.validation.constraints.NotNull;
@@ -34,7 +31,6 @@ import java.util.List;
 /**
  * Derive private key through HD to construct BapBase.
  */
-@Getter
 public class BapBase extends BapBaseAbstract {
 
     private static final int defaultBapIdChildNumberSize = BapBaseConfig.BAP_CHILD_NUMBER_SIZE;
@@ -43,15 +39,15 @@ public class BapBase extends BapBaseAbstract {
     private MasterPrivateKey masterPrivateKey;
 
     private String rootPath;
-    private ECKeyLite rootPrivateKey;
+    private DeterministicKey rootPrivateKey;
     private List<ChildNumber> rootChildNumberList;
 
     private String previousPath;
-    private ECKeyLite previousPrivateKey;
+    private DeterministicKey previousPrivateKey;
 
     private String currentPath;
     private List<ChildNumber> currentNumberList;
-    private ECKeyLite currentPrivateKey;
+    private DeterministicKey currentPrivateKey;
 
     public BapBase(MasterPrivateKey masterPrivateKey, List<ChildNumber> rootChildNumberList,
                    List<ChildNumber> currentNumberList, BapBaseConfig bapBaseConfig) {
@@ -76,6 +72,7 @@ public class BapBase extends BapBaseAbstract {
         this.bapBaseConfig = bapBaseConfig;
 
     }
+
 
     public static BapBase fromOnlyMasterPrivateKey(MasterPrivateKey masterPrivateKey) {
         return fromOnlyMasterPrivateKey(masterPrivateKey, new DefaultBapBaseConfig());
@@ -216,22 +213,12 @@ public class BapBase extends BapBaseAbstract {
     }
 
 
-    public AddressEnhance getPreviouAddress() {
-        return AddressEnhance.fromECkeyLite(getPreviousPrivateKey());
-
-    }
-
-    public ECKeyLite getPreviousPrivateKey() {
-
-        return ECKeyLite.fromPrivate(this.previousPrivateKey.getPrivKeyBytes());
-    }
 
 
-    @Override
-    public ECKeyLite getCurrentPrivateKey() {
 
-        return this.currentPrivateKey;
-    }
+
+
+
 
     public List<ChildNumber> generateNextChildNumbers() {
         List<ChildNumber> childNumbers = this.currentNumberList;
@@ -319,20 +306,6 @@ public class BapBase extends BapBaseAbstract {
     }
 
 
-    @Override
-    public ECKeyLite getOrdPrivateKey() {
-        return ECKeyLite.fromPrivate(getKeyBasePath(HDUtils.parsePath(this.bapBaseConfig.getDefaultOrdPath())).getPrivKey());
-    }
-
-    @Override
-    public ECKeyLite getEncryptKey() {
-        return ECKeyLite.fromPrivate(getKeyBaseRoot(HDUtils.parsePath(this.bapBaseConfig.getDefaultEncryptPath())).getPrivKeyBytes());
-    }
-
-
-    public ECKeyLite getPayAccountKey() {
-        return ECKeyLite.fromPrivate(getKeyBasePath(HDUtils.parsePath(this.bapBaseConfig.getDefaultPayAccountPath())).getPrivKeyBytes());
-    }
 
     private DeterministicKey getEncryptKey(List<ChildNumber> encryptChildNumberList) {
         ArrayList<ChildNumber> childNumbers = Lists.newArrayList(this.rootChildNumberList);
@@ -359,6 +332,91 @@ public class BapBase extends BapBaseAbstract {
                 childNumberList.get(childNumberList.size() - 1));
     }
 
+    public BapBaseConfig getBapBaseConfig() {
+        return bapBaseConfig;
+    }
+
+    public MasterPrivateKey getMasterPrivateKey() {
+        return masterPrivateKey;
+    }
+
+    public String getRootPath() {
+        return rootPath;
+    }
+
+    @Override
+    public ECKeyLite getRootPrivateKey() {
+        return ECKeyLite.fromPrivate(this.rootPrivateKey.getPrivKey());
+    }
+
+    @Override
+    public ECKeyLite getCurrentPrivateKey() {
+
+        return ECKeyLite.fromPrivate(this.currentPrivateKey.getPrivKey());
+    }
+
+    public ECKeyLite getPreviousPrivateKey() {
+        return ECKeyLite.fromPrivate(this.previousPrivateKey.getPrivKey());
+    }
+
+
+    @Override
+    public ECKeyLite getOrdPrivateKey() {
+        return ECKeyLite.fromPrivate(getKeyBasePath(HDUtils.parsePath(this.bapBaseConfig.getDefaultOrdPath())).getPrivKey());
+    }
+
+    @Override
+    public ECKeyLite getEncryptKey() {
+        return ECKeyLite.fromPrivate(getKeyBaseRoot(HDUtils.parsePath(this.bapBaseConfig.getDefaultEncryptPath())).getPrivKeyBytes());
+    }
+
+    @Override
+    public ECKeyLite getPayAccountKey() {
+        return ECKeyLite.fromPrivate(getKeyBasePath(HDUtils.parsePath(this.bapBaseConfig.getDefaultPayAccountPath())).getPrivKeyBytes());
+    }
+
+
+    @Override
+    public String getRootAddress() {
+        return new AddressLite(MainNetParams.get(), this.getRootPrivateKey().getPubKeyHash()).toBase58();
+    }
+
+    @Override
+    public AddressEnhance getCurrentAddress() {
+        return new AddressEnhance(MainNetParams.get(), this.getCurrentPrivateKey().getPubKeyHash());
+    }
+
+    public AddressEnhance getPreviouAddress() {
+        return AddressEnhance.fromECkeyLite(getPreviousPrivateKey());
+
+    }
+
+    @Override
+    public Address getOrdAddress() {
+        return new Address(MainNetParams.get(), this.getOrdPrivateKey().getPubKeyHash());
+    }
+
+    @Override
+    public AddressEnhance getPayAccountAddress() {
+        return new AddressEnhance(MainNetParams.get(), this.getPayAccountKey().getPubKeyHash());
+    }
+
+
+    public List<ChildNumber> getRootChildNumberList() {
+        return rootChildNumberList;
+    }
+
+    public String getPreviousPath() {
+        return previousPath;
+    }
+
+    public String getCurrentPath() {
+        return currentPath;
+    }
+
+    public List<ChildNumber> getCurrentNumberList() {
+        return currentNumberList;
+    }
 
     @Override
     public String getAppName() {
