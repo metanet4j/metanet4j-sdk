@@ -14,7 +14,7 @@ public class TestData {
 
     // prd test
     public static String xprv =
-            "your xprv";
+            "xprv9s21ZrQH143K4Jwwrru5PWNenNredeQQdhxTLUx6ESBNCxiZtGbhAQGjpWz2gVY45xgXZiBg4V8Kqu3ELnQXw92p8wNHQCWVgk3gxU8zxUp";
 
 
     public static MasterPrivateKey masterPrivateKey = MasterPrivateKey.fromXprv(TestData.xprv);

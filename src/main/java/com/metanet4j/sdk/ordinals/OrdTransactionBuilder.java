@@ -1,10 +1,16 @@
 package com.metanet4j.sdk.ordinals;
 
+import com.metanet4j.sdk.RemoteSignType;
+import com.metanet4j.sdk.bap.BapBaseCore;
+import com.metanet4j.sdk.bap.RemoteBapBase;
+import com.metanet4j.sdk.context.PreSignHashContext;
 import com.metanet4j.sdk.exception.SignErrorException;
 import com.metanet4j.sdk.input.TransactionInputEnhance;
 import com.metanet4j.sdk.input.TransactionOutPointEnhance;
 import com.metanet4j.sdk.output.TransactionOutputEnhance;
+import com.metanet4j.sdk.sigma.Sigma;
 import com.metanet4j.sdk.signers.ExtendForSignTransaction;
+import com.metanet4j.sdk.signers.RemoteTransactionSigner;
 import com.metanet4j.sdk.signers.TransactionExtend;
 import com.metanet4j.sdk.transcation.TransactionBuilder;
 import io.bitcoinsv.bitcoinjsv.core.Address;
@@ -20,24 +26,28 @@ import io.bitcoinsv.bitcoinjsv.temp.KeyBag;
 
 public class OrdTransactionBuilder extends TransactionBuilder {
 
-    public OrdTransactionBuilder(KeyBag keyBag) {
-        super(keyBag);
+    public OrdTransactionBuilder(BapBaseCore bapBaseCore, KeyBag keyBag) {
+        super(bapBaseCore, keyBag);
     }
 
-    public OrdTransactionBuilder(KeyBag keyBag, TransactionSigner transactionSigner) {
-        super(keyBag, transactionSigner);
+    public OrdTransactionBuilder(BapBaseCore bapBaseCore, KeyBag keyBag, TransactionSigner transactionSigner) {
+        super(bapBaseCore, keyBag, transactionSigner);
     }
 
-    public OrdTransactionBuilder(Net net, KeyBag keyBag) {
-        super(net, keyBag);
+    public OrdTransactionBuilder(RemoteBapBase bapBaseCore, TransactionSigner transactionSigner) {
+        super(bapBaseCore, transactionSigner);
     }
 
-    public OrdTransactionBuilder(Net net, Transaction targetTransaction, KeyBag keyBag) {
-        super(net, targetTransaction, keyBag);
+    public OrdTransactionBuilder(BapBaseCore bapBaseCore, Net net, KeyBag keyBag) {
+        super(bapBaseCore, net, keyBag);
     }
 
-    public OrdTransactionBuilder(Net net, Transaction targetTransaction, TransactionSigner transactionSigner, KeyBag keyBag) {
-        super(net, targetTransaction, transactionSigner, keyBag);
+    public OrdTransactionBuilder(BapBaseCore bapBaseCore, Net net, Transaction targetTransaction, KeyBag keyBag) {
+        super(bapBaseCore, net, targetTransaction, keyBag);
+    }
+
+    public OrdTransactionBuilder(BapBaseCore bapBaseCore, Net net, Transaction targetTransaction, TransactionSigner transactionSigner, KeyBag keyBag) {
+        super(bapBaseCore, net, targetTransaction, transactionSigner, keyBag);
     }
 
     public OrdTransactionBuilder addOrdInput(UTXO utxo) {
@@ -49,13 +59,27 @@ public class OrdTransactionBuilder extends TransactionBuilder {
         return this;
     }
 
+    public OrdTransactionBuilder addOrdOutput(Address destinationAddress,
+                                              byte[] b64File,
+                                              String mediaType,
+                                              OrdScriptBuilder.ORDMap metaData,
+                                              RemoteSignType remoteSignType) {
+        this.getTargetTransaction().addOutput(new TransactionOutput(this.getNet(), this.getTargetTransaction(), Coin.SATOSHI, OrdScriptBuilder.buildInscription(destinationAddress, b64File, mediaType, metaData).getProgram()));
+        this.bsmSignHashContexts.add(getSigmaPreSignHash(this.bapBaseCore, remoteSignType));
+        return this;
+    }
+
 
     public OrdTransactionBuilder addOrdOutput(Address destinationAddress,
                                               byte[] b64File,
                                               String mediaType,
                                               OrdScriptBuilder.ORDMap metaData) {
-        this.getTargetTransaction().addOutput(new TransactionOutput(this.getNet(), this.getTargetTransaction(), Coin.SATOSHI, OrdScriptBuilder.buildInscription(destinationAddress, b64File, mediaType, metaData).getProgram()));
-        return this;
+        return addOrdOutput(destinationAddress, b64File, mediaType, metaData, null);
+    }
+
+    private PreSignHashContext getSigmaPreSignHash(BapBaseCore bapBase, RemoteSignType remoteSignType) {
+        Sigma sigma = new Sigma(bapBase, targetTransaction, true, remoteSignType);
+        return sigma.getPreSignHashContext();
     }
 
 
@@ -65,8 +89,10 @@ public class OrdTransactionBuilder extends TransactionBuilder {
 
 
     public OrdTransactionBuilder signTx(KeyBag keyBag, SigHash.Flags hashFlags, boolean useForkId, boolean anyoneCanPay) throws SignErrorException {
+        if (keyBag != null && !(transactionSigner instanceof RemoteTransactionSigner)) {
+            super.setEmptyInputScriptHaveOrdinals(this.getTargetTransaction(), keyBag);
+        }
 
-        super.setEmptyInputScriptHaveOrdinals(this.getTargetTransaction(), keyBag);
         final ExtendForSignTransaction extendForSignTransaction = new ExtendForSignTransaction(TransactionExtend.toTransactionExtend(this.getTargetTransaction()), hashFlags, useForkId, anyoneCanPay);
         boolean b = this.getTransactionSigner().signInputs(extendForSignTransaction, keyBag);
         return this;

@@ -5,12 +5,15 @@ import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.HexUtil;
 import com.google.common.base.Charsets;
 import com.google.common.collect.Lists;
+import com.metanet4j.base.aip.AipHelper;
 import com.metanet4j.base.constants.ProtocolConstant;
 import com.metanet4j.sdk.PrivateKey;
 import com.metanet4j.sdk.RemoteSignType;
 import com.metanet4j.sdk.SignType;
 import com.metanet4j.sdk.address.AddressEnhance;
 import com.metanet4j.sdk.bap.BapBaseCore;
+import com.metanet4j.sdk.context.PreSignHashContext;
+import com.metanet4j.sdk.signers.PreSignHashUtils;
 import io.bitcoinsv.bitcoinjsv.core.Sha256Hash;
 import io.bitcoinsv.bitcoinjsv.core.Utils;
 import io.bitcoinsv.bitcoinjsv.script.Script;
@@ -23,13 +26,39 @@ import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.util.List;
 
-public abstract class UnSpendableDataLockBuilder<T extends UnSpendableDataLockBuilder> implements LockingScriptBuilder{
+public abstract class UnSpendableDataLockBuilder<T extends UnSpendableDataLockBuilder> implements LockingScriptBuilder {
 
-    protected List<ByteBuffer> dataList ;
+    protected List<ByteBuffer> dataList;
+    protected BapBaseCore bapBase;
+    protected boolean remoteSign;
+    protected SignType signType = SignType.CURRENT;
+    protected RemoteSignType remoteSignType;
+    private boolean isHaveSign;
 
-
-    public UnSpendableDataLockBuilder(List<ByteBuffer> buffers){
+    public UnSpendableDataLockBuilder(List<ByteBuffer> buffers, BapBaseCore bapBase) {
+        this.bapBase = bapBase;
         this.dataList = buffers;
+
+    }
+
+    public UnSpendableDataLockBuilder(List<ByteBuffer> buffers, BapBaseCore bapBase, SignType signType) {
+        this.bapBase = bapBase;
+        this.dataList = buffers;
+        if (signType == null) {
+            this.signType = SignType.CURRENT;
+        } else {
+            this.signType = signType;
+        }
+
+
+    }
+
+    public UnSpendableDataLockBuilder(List<ByteBuffer> buffers, BapBaseCore bapBase, boolean remoteSign, RemoteSignType remoteSignType) {
+        this.remoteSign = remoteSign;
+        this.bapBase = bapBase;
+        this.dataList = buffers;
+        this.remoteSignType = remoteSignType;
+
     }
 
 
@@ -45,7 +74,7 @@ public abstract class UnSpendableDataLockBuilder<T extends UnSpendableDataLockBu
 
     }
 
-    protected T addSig(RemoteSignType remoteSignType) {
+    private T addSig() {
         List<ByteBuffer> signingBuffers = Lists.newArrayList(this.dataList);
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 
@@ -58,14 +87,19 @@ public abstract class UnSpendableDataLockBuilder<T extends UnSpendableDataLockBu
         this.dataList.add(ByteBuffer.wrap("BITCOIN_ECDSA".getBytes(Charsets.UTF_8)));
         byte[] data = Utils.formatMessageForSigning(outputStream.toString(Charsets.UTF_8));
         Sha256Hash hash = Sha256Hash.twiceOf(data);
-        UnspendableDataSig unspendableDataSig = getSig(hash, remoteSignType);
-        this.dataList.add(ByteBuffer.wrap(unspendableDataSig.getSignatureAddress().getBytes(Charsets.UTF_8)));
-        this.dataList.add(ByteBuffer.wrap(Base64.decode(unspendableDataSig.getSig().getBytes(Charsets.UTF_8))));
-        return (T)this;
+        PreSignHashContext unspendableDataSig = getSig(hash);
+        this.dataList.add(ByteBuffer.wrap(unspendableDataSig.getSignAddress().getBytes(Charsets.UTF_8)));
+        this.dataList.add(ByteBuffer.wrap(Base64.decode(unspendableDataSig.getSigB64().getBytes(Charsets.UTF_8))));
+
+        boolean b = AipHelper.verifySign(unspendableDataSig.getSignAddress(), unspendableDataSig.getSigB64(), outputStream.toString(Charsets.UTF_8));
+        if (!b) {
+            throw new RuntimeException("aip sig verify failed,the sig is:" + unspendableDataSig.getSigB64() + ",the address is:" + unspendableDataSig.getSignAddress());
+        }
+        return (T) this;
     }
 
 
-    protected  T signOpReturnWithAIP(PrivateKey privateKey,AddressEnhance addressEnhance) {
+    private T signOpReturnWithAIP(PrivateKey privateKey, AddressEnhance addressEnhance) {
         Assert.notNull(privateKey, "sign privateKey not allow null when signOpReturnWithAIP");
         Assert.notNull(addressEnhance, "sign address not allow null when signOpReturnWithAIP");
         List<ByteBuffer> signingBuffers = Lists.newArrayList(this.dataList);
@@ -92,7 +126,7 @@ public abstract class UnSpendableDataLockBuilder<T extends UnSpendableDataLockBu
      * @param signType signType
      * @return
      */
-    protected T signOpReturnWithAIP(BapBaseCore bapBase, SignType signType) {
+    private T signOpReturnWithAIP(BapBaseCore bapBase, SignType signType) {
         Assert.notNull(bapBase, "sign bapBase not allow null when signOpReturnWithAIP");
         List<ByteBuffer> signingBuffers = Lists.newArrayList(this.dataList);
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
@@ -129,14 +163,68 @@ public abstract class UnSpendableDataLockBuilder<T extends UnSpendableDataLockBu
         return (T) this;
     }
 
+    @Override
+    public PreSignHashContext getPreSignHashContext() {
+        List<ByteBuffer> signingBuffers = Lists.newArrayList(this.dataList);
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+        outputStream.writeBytes(HexUtil.decodeHex("6a"));
+        signingBuffers.stream().forEach(o -> outputStream.writeBytes(o.array()));
+        outputStream.writeBytes(HexUtil.decodeHex("7c"));
+
+        this.dataList.add(ByteBuffer.wrap("|".getBytes(Charsets.UTF_8)));
+        this.dataList.add(ByteBuffer.wrap(ProtocolConstant.AIP_PROTOCOL.getBytes(Charsets.UTF_8)));
+        this.dataList.add(ByteBuffer.wrap("BITCOIN_ECDSA".getBytes(Charsets.UTF_8)));
+        byte[] data = Utils.formatMessageForSigning(outputStream.toString(Charsets.UTF_8));
+        Sha256Hash hash = Sha256Hash.twiceOf(data);
+
+        PreSignHashContext preSignHashContext = new PreSignHashContext();
+        preSignHashContext.setPreSignHash(hash);
+        preSignHashContext.setSignAddress(this.bapBase.getSignAddress(this.remoteSignType));
+        preSignHashContext.setRemoteSignType(this.remoteSignType);
+        return preSignHashContext;
+    }
+
+    @Override
+    public boolean isHaveSign() {
+        return this.isHaveSign;
+    }
+
+    public T sign() {
+        this.isHaveSign = true;
+        if (this.remoteSign) {
+            Assert.notNull(this.remoteSignType, "SignType is REMOTE, the remoteSignType not allow null");
+            return this.addSig();
+        }
+
+        return this.signOpReturnWithAIP(this.bapBase, this.signType);
+    }
+
+    public List<ByteBuffer> getDataList() {
+        return dataList;
+    }
+
+    public BapBaseCore getBapBase() {
+        return bapBase;
+    }
+
+    public boolean isRemoteSign() {
+        return remoteSign;
+    }
+
+    public RemoteSignType getRemoteSignType() {
+        return remoteSignType;
+    }
+
     /**
      * override for get remote sign
      *
      * @param hash
-     * @param remoteSignType
      * @return
      */
-    protected abstract UnspendableDataSig getSig(Sha256Hash hash, RemoteSignType remoteSignType);
+    public PreSignHashContext getSig(Sha256Hash hash) {
+        return PreSignHashUtils.getSignedHashContext(hash);
+    }
 
 
 }

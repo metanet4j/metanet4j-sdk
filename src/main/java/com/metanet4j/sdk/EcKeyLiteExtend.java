@@ -41,6 +41,10 @@ public class EcKeyLiteExtend extends ECKeyLite {
         return ECDSA.CURVE.getCurve().createPoint(x, y, compressed);
     }
 
+    public String signHash(Sha256Hash hash) {
+        return getSigB64(null, hash);
+    }
+
 
     public String signMessage(byte[] messageBytes) {
         return signMessage(messageBytes, null);
@@ -49,6 +53,10 @@ public class EcKeyLiteExtend extends ECKeyLite {
     public String signMessage(byte[] messageBytes, @Nullable KeyParameter aesKey) throws KeyCrypterException {
         byte[] data = UtilsExtend.formatMessageForSigning(messageBytes);
         Sha256Hash hash = Sha256Hash.twiceOf(data);
+        return getSigB64(aesKey, hash);
+    }
+
+    private String getSigB64(KeyParameter aesKey, Sha256Hash hash) {
         ECDSASignature sig = sign(hash, aesKey);
         // Now we have to work backwards to figure out the recId needed to recover the signature.
         int recId = -1;

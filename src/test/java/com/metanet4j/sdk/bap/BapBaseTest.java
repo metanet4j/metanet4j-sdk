@@ -62,6 +62,7 @@ public class BapBaseTest {
         System.out.println("ord PublicKey as hex:" + HexUtil.encodeHexStr(bapBase.getOrdPrivateKey().getPubKey()));
         System.out.println("ordPublicKeyhash as hex:" + HexUtil.encodeHexStr(bapBase.getOrdPrivateKey().getPubKeyHash()));
         System.out.println("---------");
+        System.out.println("paymentPublicKey len:" + bapBase.getPayAccountKey().getPubKey().length);
         for (int i = 0; i < 5; i++) {
             System.out.println("------------" + i);
             bapBase.generateNextChildNumbers();

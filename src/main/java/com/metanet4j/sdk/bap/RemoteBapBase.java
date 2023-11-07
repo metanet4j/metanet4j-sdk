@@ -1,5 +1,6 @@
 package com.metanet4j.sdk.bap;
 
+import com.metanet4j.base.bap.BapHelper;
 import com.metanet4j.sdk.address.AddressEnhance;
 import io.bitcoinsv.bitcoinjsv.core.Address;
 
@@ -11,25 +12,18 @@ public class RemoteBapBase extends BapBaseAbstract {
     private String rootAddress;
     private AddressEnhance previouAddress;
     private AddressEnhance currentAddress;
+    private AddressEnhance payAccountAddress;
     private Address ordAddress;
 
-    public RemoteBapBase(String identityKey, String rootAddress, String appName) {
-        this(identityKey, rootAddress, null, null, null, appName);
+    public RemoteBapBase() {
     }
 
-    public RemoteBapBase(String identityKey, String rootAddress, AddressEnhance currentAddress, String appName) {
-        this(identityKey, rootAddress, null, currentAddress, null, appName);
-    }
-
-    public RemoteBapBase(String identityKey, String rootAddress, AddressEnhance previouAddress, AddressEnhance currentAddress, String appName) {
-        this(identityKey, rootAddress, previouAddress, currentAddress, null, appName);
-    }
-
-    public RemoteBapBase(String identityKey, String rootAddress, AddressEnhance previouAddress, AddressEnhance currentAddress, Address ordAddress, String appName) {
-        this.identityKey = identityKey;
+    public RemoteBapBase(String rootAddress, AddressEnhance previouAddress, AddressEnhance currentAddress, AddressEnhance payAccountAddress, Address ordAddress, String appName) {
         this.rootAddress = rootAddress;
+        this.identityKey = BapHelper.getIdentityKey(this.rootAddress);
         this.previouAddress = previouAddress;
         this.currentAddress = currentAddress;
+        this.payAccountAddress = payAccountAddress;
         this.ordAddress = ordAddress;
         this.appName = appName;
     }
@@ -64,5 +58,10 @@ public class RemoteBapBase extends BapBaseAbstract {
     @Override
     public Address getOrdAddress() {
         return this.ordAddress;
+    }
+
+    @Override
+    public AddressEnhance getPayAccountAddress() {
+        return this.payAccountAddress;
     }
 }

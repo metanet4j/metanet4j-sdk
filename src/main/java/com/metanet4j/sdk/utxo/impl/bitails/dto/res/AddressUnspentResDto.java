@@ -1,7 +1,8 @@
 package com.metanet4j.sdk.utxo.impl.bitails.dto.res;
 
-import java.util.List;
 import lombok.Data;
+
+import java.util.List;
 
 @Data
 public class AddressUnspentResDto {
@@ -14,10 +15,11 @@ public class AddressUnspentResDto {
     public static class Unspent {
 
         private String txid;
-        private int vout;
-        private int satoshis;
-        private int time;
-        private int confirmations;
+        private Integer vout;
+        private Integer satoshis;
+        private Integer time;
+        private Integer blockheight;
+        private Integer confirmations;
     }
 
 }

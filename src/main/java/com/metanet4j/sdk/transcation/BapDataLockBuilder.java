@@ -1,6 +1,5 @@
 package com.metanet4j.sdk.transcation;
 
-import cn.hutool.core.lang.Assert;
 import com.google.common.base.Charsets;
 import com.google.common.collect.Lists;
 import com.metanet4j.base.constants.ProtocolConstant;
@@ -8,7 +7,6 @@ import com.metanet4j.base.type.BapTypeEnum;
 import com.metanet4j.sdk.RemoteSignType;
 import com.metanet4j.sdk.SignType;
 import com.metanet4j.sdk.bap.BapBaseCore;
-import io.bitcoinsv.bitcoinjsv.core.Sha256Hash;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -19,25 +17,37 @@ public class BapDataLockBuilder extends UnSpendableDataLockBuilder<BapDataLockBu
 
     private BapBaseCore bapBase;
 
+
     public BapDataLockBuilder(BapBaseCore bapBase) {
-        super(Lists.newArrayList());
+        super(Lists.newArrayList(), bapBase);
         this.bapBase = bapBase;
 
+    }
+
+    public BapDataLockBuilder(BapBaseCore bapBase, boolean remoteSign, RemoteSignType remoteSignType) {
+        this(Lists.newArrayList(), bapBase, remoteSign, remoteSignType);
     }
 
     public BapDataLockBuilder(List<ByteBuffer> buffers, BapBaseCore bapBase) {
-        super(buffers);
+        super(buffers, bapBase);
         this.bapBase = bapBase;
 
     }
 
-    public BapDataLockBuilder buildRoot() {
-        return this.buildRoot(false);
+    public BapDataLockBuilder(List<ByteBuffer> buffers, BapBaseCore bapBase, SignType signType) {
+        super(buffers, bapBase);
+        this.bapBase = bapBase;
+        this.signType = signType;
 
     }
 
 
-    public BapDataLockBuilder buildRoot(boolean remote) {
+    public BapDataLockBuilder(List<ByteBuffer> buffers, BapBaseCore bapBase, boolean remoteSign, RemoteSignType remoteSignType) {
+        super(buffers, bapBase, remoteSign, remoteSignType);
+        this.bapBase = bapBase;
+    }
+
+    public BapDataLockBuilder buildRoot() {
 
         List<ByteBuffer> byteBuffers = new ArrayList<>();
         byteBuffers.add(ByteBuffer.wrap(ProtocolConstant.BAP_PROTOCOL.getBytes(Charsets.UTF_8)));
@@ -45,18 +55,21 @@ public class BapDataLockBuilder extends UnSpendableDataLockBuilder<BapDataLockBu
         byteBuffers.add(ByteBuffer.wrap(bapBase.getIdentityKey().getBytes(Charsets.UTF_8)));
         byteBuffers.add(ByteBuffer.wrap(bapBase.getRootAddress().getBytes(Charsets.UTF_8)));
         this.dataList = byteBuffers;
-        if (remote) {
-            return this.sign(SignType.REMOTE);
+        if (this.remoteSign) {
+            if (this.remoteSignType == null) {
+                this.remoteSignType = RemoteSignType.ROOT;
+            }
+
+        } else {
+            if (this.signType == null) {
+                this.signType = SignType.ROOT;
+            }
         }
-        return this.sign(SignType.ROOT);
+        return this;
     }
+
 
     public BapDataLockBuilder buildId() {
-        return this.buildId(false);
-
-    }
-
-    public BapDataLockBuilder buildId(boolean remote) {
 
         List<ByteBuffer> byteBuffers = new ArrayList<>();
         byteBuffers.add(ByteBuffer.wrap(ProtocolConstant.BAP_PROTOCOL.getBytes(Charsets.UTF_8)));
@@ -64,18 +77,21 @@ public class BapDataLockBuilder extends UnSpendableDataLockBuilder<BapDataLockBu
         byteBuffers.add(ByteBuffer.wrap(bapBase.getIdentityKey().getBytes(Charsets.UTF_8)));
         byteBuffers.add(ByteBuffer.wrap(bapBase.getCurrentAddress().toBase58().getBytes(Charsets.UTF_8)));
         this.dataList = byteBuffers;
-        if (remote) {
-            return this.sign(SignType.REMOTE);
+        if (this.remoteSign) {
+            if (this.remoteSignType == null) {
+                this.remoteSignType = RemoteSignType.PREVIOUS;
+            }
+
+        } else {
+            if (this.signType == null) {
+                this.signType = SignType.PREVIOUS;
+            }
         }
-        return this.sign(SignType.PREVIOUS);
+        return this;
     }
+
 
     public BapDataLockBuilder buildAlias(String identity) {
-        return this.buildAlias(identity, false);
-    }
-
-
-    public BapDataLockBuilder buildAlias(String identity, boolean remote) {
 
         List<ByteBuffer> byteBuffers = new ArrayList<>();
         byteBuffers.add(ByteBuffer.wrap(ProtocolConstant.BAP_PROTOCOL.getBytes(Charsets.UTF_8)));
@@ -83,27 +99,24 @@ public class BapDataLockBuilder extends UnSpendableDataLockBuilder<BapDataLockBu
         byteBuffers.add(ByteBuffer.wrap(bapBase.getIdentityKey().getBytes(Charsets.UTF_8)));
         byteBuffers.add(ByteBuffer.wrap(identity.getBytes(Charsets.UTF_8)));
         this.dataList = byteBuffers;
-        if (remote) {
-            return this.sign(SignType.REMOTE);
+        if (this.remoteSign) {
+            if (this.remoteSignType == null) {
+                this.remoteSignType = RemoteSignType.CURRENT;
+            }
+
+        } else {
+            if (this.signType == null) {
+                this.signType = SignType.CURRENT;
+            }
         }
-        return this.sign(SignType.CURRENT);
-    }
-
-    public BapDataLockBuilder sign(SignType signType) {
-        return sign(signType, null);
-    }
-
-    public BapDataLockBuilder sign(SignType signType, RemoteSignType remoteSignType) {
-        if (signType == SignType.REMOTE) {
-            Assert.notNull(remoteSignType, "SignType is REMOTE, the remoteSignType not allow null");
-            return this.addSig(remoteSignType);
-        }
-        return this.signOpReturnWithAIP(this.bapBase, signType);
+        return this;
     }
 
 
-    @Override
-    protected UnspendableDataSig getSig(Sha256Hash hash, RemoteSignType remoteSignType) {
-        return null;
-    }
+
+
+
+
+
+
 }

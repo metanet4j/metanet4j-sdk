@@ -8,8 +8,14 @@ import com.metanet4j.base.aip.AipHelper;
 import com.metanet4j.sdk.EcKeyLiteExtend;
 import com.metanet4j.sdk.PrivateKey;
 import com.metanet4j.sdk.RemoteSignType;
+import com.metanet4j.sdk.SignType;
 import com.metanet4j.sdk.address.AddressEnhance;
+import com.metanet4j.sdk.bap.BapBaseCore;
+import com.metanet4j.sdk.context.PreSignHashContext;
+import com.metanet4j.sdk.signers.PreSignHash;
+import com.metanet4j.sdk.signers.PreSignHashUtils;
 import com.metanet4j.sdk.utils.ScriptHelper;
+import com.metanet4j.sdk.utils.UtilsExtend;
 import io.bitcoinsv.bitcoinjsv.core.AddressLite;
 import io.bitcoinsv.bitcoinjsv.core.Sha256Hash;
 import io.bitcoinsv.bitcoinjsv.core.UnsafeByteArrayOutputStream;
@@ -35,7 +41,7 @@ import java.util.List;
 
 @Data
 @Slf4j
-public class Sigma {
+public class Sigma implements PreSignHash {
 
     public static final String SIGMA_PREFIX = "5349474D41";
     private Sha256Hash inputHash;
@@ -45,16 +51,44 @@ public class Sigma {
     private int refVin;
     private int targetVout;
     private Sig sig;
+    private BapBaseCore bapBaseCore;
+    private boolean remoteSign;
+    private SignType signType = SignType.CURRENT;
+    private RemoteSignType remoteSignType;
+    private boolean isHaveSign;
 
-    public Sigma(Transaction transaction) {
-        this(transaction, 0, 0, 0);
+
+    public Sigma(BapBaseCore bapBaseCore, Transaction transaction) {
+        this(bapBaseCore, transaction, 0, 0, 0);
     }
 
-    public Sigma(Transaction transaction, int targetVout) {
-        this(transaction, targetVout, 0, 0);
+    public Sigma(BapBaseCore bapBaseCore, Transaction transaction, int targetVout) {
+        this(bapBaseCore, transaction, targetVout, 0, 0);
     }
 
-    public Sigma(Transaction transaction, int targetVout, int sigmaInstance, int refVin) {
+    public Sigma(BapBaseCore bapBaseCore, Transaction transaction, SignType signType) {
+        this(bapBaseCore, transaction, 0, 0, 0);
+        if (signType == null) {
+            this.signType = SignType.CURRENT;
+        } else {
+            this.signType = signType;
+        }
+
+    }
+
+    public Sigma(BapBaseCore bapBaseCore, Transaction transaction, boolean remoteSign, RemoteSignType remoteSignType) {
+        this(bapBaseCore, transaction, 0, 0, 0);
+        this.remoteSign = remoteSign;
+        if (remoteSignType == null) {
+            this.remoteSignType = RemoteSignType.CURRENT;
+        } else {
+            this.remoteSignType = remoteSignType;
+        }
+    }
+
+
+    public Sigma(BapBaseCore bapBaseCore, Transaction transaction, int targetVout, int sigmaInstance, int refVin) {
+        this.bapBaseCore = bapBaseCore;
         this.transaction = transaction;
         this.targetVout = targetVout;
         this.refVin = refVin;
@@ -136,20 +170,27 @@ public class Sigma {
 
     }
 
-    /**
-     * @param remoteSignType
-     * @return
-     */
-    public SignResponse signByRemote(RemoteSignType remoteSignType) {
-        Sig remoteSig = getSigByRemote(HexUtil.encodeHexStr(getMessageHash().getBytes()), remoteSignType);
-        return sigM(remoteSig.getSignature(), remoteSig.getAddress());
-    }
 
-
-    public SignResponse sign(EcKeyLiteExtend privateKey) {
-        System.out.println("sign messagehash:" + getMessageHash().toString());
-        String s = privateKey.signMessage(getMessageHash().getBytes());
-        return sigM(s, AddressEnhance.fromPrivateKey(new PrivateKey(privateKey)).toBase58());
+    public SignResponse sign() {
+        this.isHaveSign = true;
+        log.info("sign messagehash:" + getMessageHash().toString());
+        if (this.remoteSign) {
+            PreSignHashContext preSignHashContext = getSigByRemote(getPreSignHashContext().getPreSignHash());
+            return sigM(preSignHashContext.getSigB64(), preSignHashContext.getSignAddress());
+        } else {
+            EcKeyLiteExtend signPrivateKey = null;
+            if (signType == SignType.CURRENT) {
+                signPrivateKey = EcKeyLiteExtend.fromPrivate(bapBaseCore.getCurrentPrivateKey().getPrivKey());
+            } else if (signType == SignType.PREVIOUS) {
+                signPrivateKey = EcKeyLiteExtend.fromPrivate(bapBaseCore.getPreviousPrivateKey().getPrivKey());
+            } else if (signType == SignType.ROOT) {
+                signPrivateKey = EcKeyLiteExtend.fromPrivate(bapBaseCore.getRootPrivateKey().getPrivKey());
+            } else {
+                signPrivateKey = EcKeyLiteExtend.fromPrivate(bapBaseCore.getOrdPrivateKey().getPrivKey());
+            }
+            String s = signPrivateKey.signMessage(getMessageHash().getBytes());
+            return sigM(s, AddressEnhance.fromPrivateKey(new PrivateKey(signPrivateKey)).toBase58());
+        }
     }
 
 
@@ -164,12 +205,12 @@ public class Sigma {
         }
 
         AddressLite address = AddressLite.fromBase58(MainNetParams.get(), this.sig.getAddress());
-        log.debug("verify sigma sign the ,inputhash:" + this.inputHash.toString());
-        log.debug("verify sigma sign the ,datashash:" + this.dataHash.toString());
-        log.debug("verify sigma sign the ,message:" + getMessageHash().toString());
-        log.debug("verify sigma sign the ,sign address:" + address.toString());
-        log.debug("verify sigma sign the ,sig:" + this.sig.getSignature());
-        log.debug("verify sigma sign the ,vin:" + this.sig.getVin());
+        log.info("verify sigma sign the ,inputhash:" + this.inputHash.toString());
+        log.info("verify sigma sign the ,datashash:" + this.dataHash.toString());
+        log.info("verify sigma sign the ,message:" + getMessageHash().toString());
+        log.info("verify sigma sign the ,sign address:" + address.toString());
+        log.info("verify sigma sign the ,sig:" + this.sig.getSignature());
+        log.info("verify sigma sign the ,vin:" + this.sig.getVin());
 
         return AipHelper.verifySign(address.toString(), this.sig.getSignature(), getMessageHash().getBytes());
 
@@ -268,6 +309,17 @@ public class Sigma {
         }
     }
 
+    @Override
+    public PreSignHashContext getPreSignHashContext() {
+        PreSignHashContext context = new PreSignHashContext();
+        byte[] data = UtilsExtend.formatMessageForSigning(this.getMessageHash().getBytes());
+        Sha256Hash hash = Sha256Hash.twiceOf(data);
+        context.setPreSignHash(hash);
+        context.setSignAddress(this.bapBaseCore.getSignAddress(remoteSignType));
+        context.setRemoteSignType(this.remoteSignType);
+        return context;
+    }
+
 
     public Sha256Hash getMessageHash() {
 
@@ -346,12 +398,10 @@ public class Sigma {
     /**
      * Override this method to implement remote signature.
      *
-     * @param encodeHexStr
-     * @param remoteSignType
      * @return
      */
-    public Sig getSigByRemote(String encodeHexStr, RemoteSignType remoteSignType) {
-        return null;
+    public PreSignHashContext getSigByRemote(Sha256Hash hash) {
+        return PreSignHashUtils.getSignedHashContext(hash);
     }
 
 

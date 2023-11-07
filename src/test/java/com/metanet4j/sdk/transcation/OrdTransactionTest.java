@@ -30,7 +30,7 @@ public class OrdTransactionTest extends TransactionContextTest {
         OrdScriptBuilder.ORDMap ordMap = new OrdScriptBuilder.ORDMap();
         ordMap.put("app", "metanet-sdk");
         ordMap.put("type", "ord");
-        Transaction transaction = OrdTransactionTemplate.createOrdinal(Lists.newArrayList(paymentAddress),
+        Transaction transaction = new OrdTransactionTemplate().createOrdinal(Lists.newArrayList(paymentAddress),
                 new BitailsUtxoProvider(),
                 ordAddress,
                 changeAddress,
@@ -40,7 +40,7 @@ public class OrdTransactionTest extends TransactionContextTest {
                 ordMap,
                 bapBase,
                 keyBag
-        );
+        ).build();
 
         parseTx(transaction);
         correctlySpends(transaction);
@@ -53,7 +53,7 @@ public class OrdTransactionTest extends TransactionContextTest {
     @Test
     public void testCreateBapOrdinal() {
         OrdScriptBuilder.ORDMap ordMap = new OrdScriptBuilder.ORDMap();
-        Transaction transaction = OrdTransactionTemplate.createBapOrdinal(Lists.newArrayList(paymentAddress),
+        Transaction transaction = new OrdTransactionTemplate().createBapOrdinal(Lists.newArrayList(paymentAddress),
                 new BitailsUtxoProvider(),
                 ordAddress,
                 changeAddress,
@@ -78,7 +78,7 @@ public class OrdTransactionTest extends TransactionContextTest {
 
         List<UTXO> originUtxoList = new OrdinalsOriginGorillaUtxoProvider().listUxtos(Lists.newArrayList(origin));
         List<UTXO> paymentUtxoList = new BitailsUtxoProvider().listUxtos(Lists.newArrayList(paymentAddress));
-        Transaction transaction = OrdTransactionTemplate.sendOrdinal(originUtxoList.get(0), paymentUtxoList.get(0)
+        Transaction transaction = new OrdTransactionTemplate().sendOrdinal(this.bapBase, originUtxoList.get(0), paymentUtxoList.get(0)
                 , ordAddress, changeAddress, 50L, null, null, keyBag);
         parseTx(transaction);
         correctlySpends(transaction);
@@ -92,7 +92,7 @@ public class OrdTransactionTest extends TransactionContextTest {
         Address pandaAddress = Address.fromBase58(MainNetParams.get(), "1CVpujbP2AmDAfgNN4ahP6426J7nssL6Hi");
         List<UTXO> originUtxoList = new OrdinalsOriginGorillaUtxoProvider().listUxtos(Lists.newArrayList(origin));
         List<UTXO> paymentUtxoList = new BitailsUtxoProvider().listUxtos(Lists.newArrayList(paymentAddress));
-        Transaction transaction = OrdTransactionTemplate.sendOrdinal(originUtxoList.get(0), paymentUtxoList.get(0)
+        Transaction transaction = new OrdTransactionTemplate().sendOrdinal(this.bapBase, originUtxoList.get(0), paymentUtxoList.get(0)
                 , pandaAddress, changeAddress, 50L, null, null, keyBag);
         parseTx(transaction);
         correctlySpends(transaction);
@@ -127,7 +127,7 @@ public class OrdTransactionTest extends TransactionContextTest {
     public void testTransactionOrdSigmaDeserialize() {
         String ordTx = FileUtil.readString("ord/040c6d48c.hex", Charsets.UTF_8);
         Transaction transaction = new Transaction(Net.MAINNET, HexUtil.decodeHex(ordTx));
-        Sigma sigma = new Sigma(transaction);
+        Sigma sigma = new Sigma(bapBase, transaction);
         boolean b = sigma.verify();
         System.out.println(b);
         System.out.println(transaction.getHashAsString());

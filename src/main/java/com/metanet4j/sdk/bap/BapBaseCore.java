@@ -2,6 +2,7 @@ package com.metanet4j.sdk.bap;
 
 import cn.hutool.core.codec.Base64;
 import com.metanet4j.sdk.PublicKey;
+import com.metanet4j.sdk.RemoteSignType;
 import com.metanet4j.sdk.address.AddressEnhance;
 import com.metanet4j.sdk.crypto.Ecies;
 import io.bitcoinsv.bitcoinjsv.core.Address;
@@ -85,6 +86,23 @@ public interface BapBaseCore {
 
     default Address getOrdAddress() {
         return new Address(MainNetParams.get(), getOrdPrivateKey().getPubKeyHash());
+    }
+
+    default String getSignAddress(RemoteSignType remoteSignType) {
+        switch (remoteSignType) {
+            case CURRENT:
+                return getCurrentAddress().toBase58();
+            case PREVIOUS:
+                return getPreviouAddress().toBase58();
+            case ROOT:
+                return getRootAddress();
+            case ORD:
+                return getOrdAddress().toBase58();
+            case PAYMENT:
+                return getPayAccountAddress().toBase58();
+            default:
+                return null;
+        }
     }
 
     default byte[] encrypt(byte[] bytes) {

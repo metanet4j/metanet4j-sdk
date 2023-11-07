@@ -6,6 +6,7 @@ import com.metanet4j.sdk.BobHelper;
 import com.metanet4j.sdk.TestData;
 import com.metanet4j.sdk.TxoHelper;
 import com.metanet4j.sdk.bap.BapBase;
+import com.metanet4j.sdk.bap.RemoteBapBase;
 import com.metanet4j.sdk.utxo.impl.bitails.BitailsClient;
 import io.bitcoinsv.bitcoinjsv.core.Address;
 import io.bitcoinsv.bitcoinjsv.core.AddressLite;
@@ -31,16 +32,18 @@ import static io.bitcoinsv.bitcoinjsv.script.ScriptOpCodes.getOpCodeName;
 
 public class TransactionContextTest {
     public BapBase bapBase;
+    public RemoteBapBase remoteBapBase;
     public AddressLite paymentAddress;
     public Address ordAddress;
     public Address changeAddress;
     public KeyBag keyBag;
-    public long feePerKb = 500;
+    public long feePerKb = 50L;
 
 
     @Before
     public void before() {
         bapBase = BapBase.fromOnlyMasterPrivateKey(TestData.masterPrivateKey);
+        remoteBapBase = new RemoteBapBase(bapBase.getRootAddress(), bapBase.getPreviouAddress(), bapBase.getCurrentAddress(), bapBase.getPayAccountAddress(), bapBase.getOrdAddress(), bapBase.getAppName());
         paymentAddress = bapBase.getPayAccountAddress();
         ordAddress = bapBase.getOrdAddress();
         changeAddress = new Address(paymentAddress);
@@ -130,4 +133,6 @@ public class TransactionContextTest {
         System.out.println("you can view your tx on whatsonchain:" + "https://whatsonchain.com/tx/" + txId);
         return txId;
     }
+
+
 }

@@ -5,7 +5,6 @@ import com.google.common.base.Charsets;
 import com.google.common.collect.Lists;
 import com.metanet4j.base.model.B;
 import com.metanet4j.sdk.EcKeyLiteExtend;
-import com.metanet4j.sdk.SignType;
 import com.metanet4j.sdk.TestData;
 import com.metanet4j.sdk.bap.BapBase.BapProviderKeyBag;
 import com.metanet4j.sdk.exception.SignErrorException;
@@ -22,6 +21,7 @@ import java.nio.ByteBuffer;
 
 
 public class BitcoinschemaTransactionTest extends TransactionContextTest {
+
 
 
     @Test
@@ -43,7 +43,7 @@ public class BitcoinschemaTransactionTest extends TransactionContextTest {
         try {
             BapDataLockBuilder bapDataLockBuilder = new BapDataLockBuilder(bapBase);
             buildTxThenBroadcast(bapDataLockBuilder.buildAlias(FileUtil.readString("identity.json",
-                    Charsets.UTF_8)).sign(SignType.CURRENT));
+                    Charsets.UTF_8)).sign());
             System.out.println("you can view your bitcoin schema tx on https://blockpost.network/profile/" + bapBase.getIdentityKey());
         } catch (SignErrorException e) {
             e.printStackTrace();
@@ -177,7 +177,7 @@ public class BitcoinschemaTransactionTest extends TransactionContextTest {
 
     @Test
     public void testSendUtxo() {
-        TransactionBuilder transactionBuilder = new TransactionBuilder(new BapProviderKeyBag(TestData.masterPrivateKey
+        TransactionBuilder transactionBuilder = new TransactionBuilder(this.bapBase, new BapProviderKeyBag(TestData.masterPrivateKey
                 , 100));
         Transaction transaction = transactionBuilder
                 .addInputs(Lists.newArrayList(paymentAddress),
@@ -195,7 +195,7 @@ public class BitcoinschemaTransactionTest extends TransactionContextTest {
 
     @Test
     public void testSendUtxos() throws SignErrorException {
-        TransactionBuilder transactionBuilder = new TransactionBuilder(new BapProviderKeyBag(TestData.masterPrivateKey
+        TransactionBuilder transactionBuilder = new TransactionBuilder(this.bapBase, new BapProviderKeyBag(TestData.masterPrivateKey
                 , 100));
         Transaction transaction = transactionBuilder
                 .addInputs(Lists.newArrayList(paymentAddress),
@@ -220,7 +220,7 @@ public class BitcoinschemaTransactionTest extends TransactionContextTest {
     }
 
     private void buildTxThenBroadcast(UnSpendableDataLockBuilder dataLockBuilder) throws SignErrorException {
-        TransactionBuilder transactionBuilder = new TransactionBuilder(new BapProviderKeyBag(TestData.masterPrivateKey
+        TransactionBuilder transactionBuilder = new TransactionBuilder(this.bapBase, new BapProviderKeyBag(TestData.masterPrivateKey
                 , 100));
         Transaction transaction = transactionBuilder
                 .addInputs(Lists.newArrayList(paymentAddress),
@@ -235,4 +235,6 @@ public class BitcoinschemaTransactionTest extends TransactionContextTest {
 
 
     }
+
+
 }

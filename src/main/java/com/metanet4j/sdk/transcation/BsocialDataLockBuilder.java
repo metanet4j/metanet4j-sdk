@@ -9,9 +9,7 @@ import com.metanet4j.base.constants.ProtocolConstant;
 import com.metanet4j.base.model.*;
 import com.metanet4j.base.type.BsocialTypeEnum;
 import com.metanet4j.sdk.RemoteSignType;
-import com.metanet4j.sdk.SignType;
 import com.metanet4j.sdk.bap.BapBaseCore;
-import io.bitcoinsv.bitcoinjsv.core.Sha256Hash;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -27,12 +25,17 @@ public class BsocialDataLockBuilder extends UnSpendableDataLockBuilder<BsocialDa
 
 
     public BsocialDataLockBuilder(List<ByteBuffer> buffers, BapBaseCore bapBase) {
-        super(buffers);
+        super(buffers, bapBase);
         this.bapBase = bapBase;
     }
 
     public BsocialDataLockBuilder(BapBaseCore bapBase) {
-        super(Lists.newArrayList());
+        super(Lists.newArrayList(), bapBase);
+        this.bapBase = bapBase;
+    }
+
+    public BsocialDataLockBuilder(BapBaseCore bapBase, boolean remoteSign, RemoteSignType remoteSignType) {
+        super(Lists.newArrayList(), bapBase, remoteSign, remoteSignType);
         this.bapBase = bapBase;
     }
 
@@ -235,19 +238,7 @@ public class BsocialDataLockBuilder extends UnSpendableDataLockBuilder<BsocialDa
         return this;
     }
 
-    public BsocialDataLockBuilder sign() {
-        return sign(SignType.CURRENT, null);
-    }
 
-    public BsocialDataLockBuilder sign(SignType signType, RemoteSignType remoteSignType) {
-        if (signType == SignType.REMOTE) {
-            Assert.notNull(remoteSignType, "signType is REMOTE, the remoteSignType not allow null");
-            return this.addSig(remoteSignType);
-        } else {
-            return this.signOpReturnWithAIP(this.bapBase, signType);
-        }
-
-    }
 
 
     private MAP mAdd(BsocialTypeEnum bsocialTypeEnum, @Nonnull List<String> extendList) {
@@ -275,8 +266,4 @@ public class BsocialDataLockBuilder extends UnSpendableDataLockBuilder<BsocialDa
         return map;
     }
 
-    @Override
-    protected UnspendableDataSig getSig(Sha256Hash hash, RemoteSignType remoteSignType) {
-        return null;
-    }
 }
