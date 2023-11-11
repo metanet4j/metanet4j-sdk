@@ -2,9 +2,9 @@ package com.metanet4j.sdk.bap;
 
 import cn.hutool.core.codec.Base64;
 import com.metanet4j.sdk.PublicKey;
-import com.metanet4j.sdk.RemoteSignType;
 import com.metanet4j.sdk.address.AddressEnhance;
 import com.metanet4j.sdk.crypto.Ecies;
+import com.metanet4j.sdk.remote.RemoteSignType;
 import io.bitcoinsv.bitcoinjsv.core.Address;
 import io.bitcoinsv.bitcoinjsv.core.ECKeyLite;
 import io.bitcoinsv.bitcoinjsv.params.MainNetParams;

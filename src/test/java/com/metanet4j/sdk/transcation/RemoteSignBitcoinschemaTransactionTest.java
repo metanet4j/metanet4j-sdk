@@ -6,16 +6,10 @@ import com.google.common.collect.Lists;
 import com.metanet4j.base.util.JacksonUtil;
 import com.metanet4j.sdk.EcKeyLiteExtend;
 import com.metanet4j.sdk.PublicKey;
-import com.metanet4j.sdk.RemoteSignType;
-import com.metanet4j.sdk.TestData;
-import com.metanet4j.sdk.bap.BapBase.BapProviderKeyBag;
 import com.metanet4j.sdk.context.PreSignHashContext;
 import com.metanet4j.sdk.exception.SignErrorException;
 import com.metanet4j.sdk.ordinals.OrdScriptBuilder;
-import com.metanet4j.sdk.ordinals.OrdTransactionBuilder;
-import com.metanet4j.sdk.ordinals.OrdTransactionTemplate;
-import com.metanet4j.sdk.signers.PreSignHashUtils;
-import com.metanet4j.sdk.signers.RemoteTransactionSigner;
+import com.metanet4j.sdk.remote.*;
 import com.metanet4j.sdk.utxo.impl.bitails.BitailsUtxoProvider;
 import io.bitcoinsv.bitcoinjsv.core.Coin;
 import io.bitcoinsv.bitcoinjsv.ecc.ECDSASignature;
@@ -71,17 +65,17 @@ public class RemoteSignBitcoinschemaTransactionTest extends TransactionContextTe
         ordMap.put("type", "ord");
 
         OrdScriptBuilder.Inscription inscription = OrdScriptBuilder.Inscription.builder().contentType("text/markdown")
-                .dataB64(Base64.encode("test send oridinals 1019-1 from metanet-sdk".getBytes())).build();
+                .dataB64(Base64.encode("test send oridinals 1111-3 from metanet-sdk".getBytes())).build();
 
-        OrdTransactionTemplate ordTransactionTemplate = new OrdTransactionTemplate(false, false);
+        RemoteOrdTransactionTemplate ordTransactionTemplate = new RemoteOrdTransactionTemplate(false, false);
 
-        OrdTransactionBuilder ordTransactionBuilder = createOrdinalForRemoteSign(ordMap, inscription, ordTransactionTemplate);
+        RemoteOrdTransactionBuilder ordTransactionBuilder = createOrdinalForRemoteSign(ordMap, inscription, ordTransactionTemplate);
 
         signRemoteAllPreSignHash(ordTransactionBuilder.getAllBsmSignHash(true, false, bapBase));
 
 
         ordTransactionTemplate.setDoBsmSign(true);
-        OrdTransactionBuilder ordTransactionBuilder2 = createOrdinalForRemoteSign(ordMap, inscription, ordTransactionTemplate);
+        RemoteOrdTransactionBuilder ordTransactionBuilder2 = createOrdinalForRemoteSign(ordMap, inscription, ordTransactionTemplate);
 
 
         signRemoteAllPreSignHash(ordTransactionBuilder2.getTxInputSignHash(true, bapBase));
@@ -96,8 +90,8 @@ public class RemoteSignBitcoinschemaTransactionTest extends TransactionContextTe
 
     }
 
-    private OrdTransactionBuilder createOrdinalForRemoteSign(OrdScriptBuilder.ORDMap ordMap, OrdScriptBuilder.Inscription inscription, OrdTransactionTemplate ordTransactionTemplate) {
-        OrdTransactionBuilder ordTransactionBuilder = ordTransactionTemplate.createOrdinal(
+    private RemoteOrdTransactionBuilder createOrdinalForRemoteSign(OrdScriptBuilder.ORDMap ordMap, OrdScriptBuilder.Inscription inscription, RemoteOrdTransactionTemplate ordTransactionTemplate) {
+        RemoteOrdTransactionBuilder ordTransactionBuilder = ordTransactionTemplate.createOrdinal(
                 Lists.newArrayList(paymentAddress),
                 new BitailsUtxoProvider(),
                 ordAddress,
@@ -106,7 +100,6 @@ public class RemoteSignBitcoinschemaTransactionTest extends TransactionContextTe
                 inscription,
                 ordMap,
                 remoteBapBase,
-                null,
                 new RemoteTransactionSigner(),
                 RemoteSignType.CURRENT
 
@@ -152,24 +145,10 @@ public class RemoteSignBitcoinschemaTransactionTest extends TransactionContextTe
     }
 
 
-    private void buildTxThenBroadcast(UnSpendableDataLockBuilder dataLockBuilder) throws SignErrorException {
-        TransactionBuilder transactionBuilder = new TransactionBuilder(this.bapBase, new BapProviderKeyBag(TestData.masterPrivateKey
-                , 100));
-        Transaction transaction = transactionBuilder
-                .addInputs(Lists.newArrayList(paymentAddress),
-                        new BitailsUtxoProvider())
-                .addDataOutput(dataLockBuilder)
-                .withFeeKb(Coin.valueOf(500L))
-                .changeAddress(changeAddress)
-                .completeAndSignTx(transactionBuilder.getKeyBag(), true);
-        correctlySpends(transaction);
-        broadcast(transaction);
-        parseTx(transaction);
 
-    }
 
     private void buildRemoteSignTxThenBroadcast(UnSpendableDataLockBuilder dataLockBuilder) throws SignErrorException {
-        TransactionBuilder transactionBuilder = buildDataTx(dataLockBuilder);
+        RemoteTransactionBuilder transactionBuilder = buildDataTx(dataLockBuilder);
         Transaction transaction = transactionBuilder.completeAndSignTx(transactionBuilder.getKeyBag(), true);
         correctlySpends(transaction);
         broadcast(transaction);
@@ -179,7 +158,7 @@ public class RemoteSignBitcoinschemaTransactionTest extends TransactionContextTe
 
 
     private List<PreSignHashContext> buildBschemaTxAndGetAllBsmPreSignHash(UnSpendableDataLockBuilder dataLockBuilder) throws SignErrorException {
-        TransactionBuilder transactionBuilder = buildDataTx(dataLockBuilder);
+        RemoteTransactionBuilder transactionBuilder = buildDataTx(dataLockBuilder);
         List<PreSignHashContext> AllBsmSignHash = transactionBuilder.getAllBsmSignHash(true, false, remoteBapBase);
         System.out.println(JacksonUtil.obj2String(AllBsmSignHash.stream().map(o -> o.toMap()).collect(Collectors.toList())));
         return AllBsmSignHash;
@@ -188,15 +167,15 @@ public class RemoteSignBitcoinschemaTransactionTest extends TransactionContextTe
 
     private List<PreSignHashContext> buildBschemaTxAndGetAllInputPreSignHash(UnSpendableDataLockBuilder dataLockBuilder) throws SignErrorException {
         Assert.isTrue(dataLockBuilder.isRemoteSign() && dataLockBuilder.isHaveSign(), "dataLockBuilder should be remote sign and have sign");
-        TransactionBuilder transactionBuilder = buildDataTx(dataLockBuilder);
+        RemoteTransactionBuilder transactionBuilder = buildDataTx(dataLockBuilder);
         List<PreSignHashContext> inputSignHash = transactionBuilder.getTxInputSignHash(false, remoteBapBase);
         System.out.println(JacksonUtil.obj2String(inputSignHash.stream().map(o -> o.toMap()).collect(Collectors.toList())));
         return inputSignHash;
 
     }
 
-    private TransactionBuilder buildDataTx(UnSpendableDataLockBuilder dataLockBuilder) {
-        TransactionBuilder transactionBuilder = new TransactionBuilder(this.remoteBapBase, new RemoteTransactionSigner());
+    private RemoteTransactionBuilder buildDataTx(UnSpendableDataLockBuilder dataLockBuilder) {
+        RemoteTransactionBuilder transactionBuilder = new RemoteTransactionBuilder(this.remoteBapBase, new RemoteTransactionSigner());
         transactionBuilder
                 .addInputs(Lists.newArrayList(paymentAddress),
                         new BitailsUtxoProvider())

@@ -8,8 +8,8 @@ import com.google.common.collect.Lists;
 import com.metanet4j.base.constants.ProtocolConstant;
 import com.metanet4j.base.model.*;
 import com.metanet4j.base.type.BsocialTypeEnum;
-import com.metanet4j.sdk.RemoteSignType;
 import com.metanet4j.sdk.bap.BapBaseCore;
+import com.metanet4j.sdk.remote.RemoteSignType;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;

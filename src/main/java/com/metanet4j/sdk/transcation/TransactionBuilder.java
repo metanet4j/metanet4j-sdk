@@ -1,30 +1,24 @@
 package com.metanet4j.sdk.transcation;
 
 import com.google.common.collect.Lists;
-import com.metanet4j.sdk.RemoteSignType;
 import com.metanet4j.sdk.SignType;
 import com.metanet4j.sdk.bap.BapBaseCore;
-import com.metanet4j.sdk.bap.RemoteBapBase;
-import com.metanet4j.sdk.context.PreSignHashContext;
 import com.metanet4j.sdk.exception.SignErrorException;
 import com.metanet4j.sdk.input.TransactionInputEnhance;
 import com.metanet4j.sdk.input.TransactionOutPointEnhance;
 import com.metanet4j.sdk.output.TransactionOutputEnhance;
+import com.metanet4j.sdk.remote.RemoteTransactionSigner;
 import com.metanet4j.sdk.script.ScriptExtend;
 import com.metanet4j.sdk.sigma.Sigma;
 import com.metanet4j.sdk.signers.ExtendForSignTransaction;
-import com.metanet4j.sdk.signers.RemoteTransactionSigner;
-import com.metanet4j.sdk.signers.TransactionAllPreSignHash;
 import com.metanet4j.sdk.signers.TransactionExtend;
 import com.metanet4j.sdk.utils.RedeemDataExtend;
 import com.metanet4j.sdk.utils.TxHelperExtend;
 import com.metanet4j.sdk.utxo.UTXOProvider;
 import io.bitcoinsv.bitcoinjsv.core.*;
-import io.bitcoinsv.bitcoinjsv.msg.Translate;
 import io.bitcoinsv.bitcoinjsv.msg.protocol.*;
 import io.bitcoinsv.bitcoinjsv.params.Net;
 import io.bitcoinsv.bitcoinjsv.script.Script;
-import io.bitcoinsv.bitcoinjsv.script.ScriptBuilder;
 import io.bitcoinsv.bitcoinjsv.script.SigHash;
 import io.bitcoinsv.bitcoinjsv.script.interpreter.ScriptExecutionException;
 import io.bitcoinsv.bitcoinjsv.signers.LocalTransactionSigner;
@@ -34,16 +28,14 @@ import io.bitcoinsv.bitcoinjsv.temp.RedeemData;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
 
 @Data
 @Slf4j
-public class TransactionBuilder implements TransactionAllPreSignHash {
+public class TransactionBuilder {
 
     protected BapBaseCore bapBaseCore;
 
@@ -61,18 +53,11 @@ public class TransactionBuilder implements TransactionAllPreSignHash {
 
     protected Sigma sigma;
 
-    protected List<PreSignHashContext> bsmSignHashContexts;
 
     private RemoteTransactionSigner remoteTransactionSigner;
 
     private Coin changeAmount = Coin.ZERO;
     private Coin fee = Coin.ZERO;
-
-    public TransactionBuilder(RemoteBapBase bapBaseCore, TransactionSigner transactionSigner) {
-        this(bapBaseCore, Net.MAINNET, null, transactionSigner, null);
-
-    }
-
 
     public TransactionBuilder(BapBaseCore bapBaseCore, KeyBag keyBag) {
         this(bapBaseCore, Net.MAINNET, keyBag);
@@ -108,7 +93,7 @@ public class TransactionBuilder implements TransactionAllPreSignHash {
             this.transactionSigner = transactionSigner;
         }
         this.keyBag = keyBag;
-        this.bsmSignHashContexts = new ArrayList<>();
+
     }
 
 
@@ -158,9 +143,6 @@ public class TransactionBuilder implements TransactionAllPreSignHash {
     public TransactionBuilder addDataOutput(LockingScriptBuilder lockingScriptBuilder) {
         targetTransaction.addOutput(new TransactionOutput(net, targetTransaction, Coin.ZERO,
                 lockingScriptBuilder.getLockingScript().getProgram()));
-        if (!lockingScriptBuilder.isHaveSign()) {
-            bsmSignHashContexts.add(lockingScriptBuilder.getPreSignHashContext());
-        }
 
         return this;
     }
@@ -173,12 +155,7 @@ public class TransactionBuilder implements TransactionAllPreSignHash {
         return this;
     }
 
-    public TransactionBuilder addSigmaSign(BapBaseCore bapBase, RemoteSignType remoteSignType) {
-        Sigma sigma = new Sigma(bapBase, targetTransaction, true, remoteSignType);
-        targetTransaction = sigma.sign().getSignedTx();
-        this.sigma = sigma;
-        return this;
-    }
+
 
 
     public TransactionBuilder changeAddress(Address address) {
@@ -199,7 +176,7 @@ public class TransactionBuilder implements TransactionAllPreSignHash {
      * @param feePerKb
      * @return
      */
-    private Coin calculateChangeAmount(Transaction targetTransaction, Address address, Coin feePerKb) {
+    public Coin calculateChangeAmount(Transaction targetTransaction, Address address, Coin feePerKb) {
 
         long size = 0;
         TransactionOutput changeOutput = new TransactionOutput(net, targetTransaction, changeAmount, address);
@@ -210,23 +187,20 @@ public class TransactionBuilder implements TransactionAllPreSignHash {
         for (TransactionInput transactionInput : targetTransaction.getInputs()) {
 
             Script script = transactionInput.getConnectedOutput().getScriptPubKey();
-            if (keyBag == null && transactionSigner instanceof RemoteTransactionSigner) {
-                //sig + publickkey Len+ other
-                size += 76 + 33 + 10;
-            } else {
-
-                RedeemDataExtend redeemData = TxHelperExtend.getConnectedRedeemDataExtend(transactionInput.getOutpoint(), keyBag);
-                size += new ScriptExtend(script.getProgram()).getNumberOfBytesRequiredToSpend(
-                        redeemData.getFullKey() == null ? -1 : redeemData.getFullKey().getPubKey().length,
-                        redeemData.redeemScript);
-            }
-
+            size += getUnLockScriptSize(transactionInput, script);
         }
         Coin fee = Coin.valueOf((long) Math.ceil(size * this.feePerKb.value / 1000));
         this.fee = fee;
         this.changeAmount = targetTransaction.getInputSum().subtract(targetTransaction.getOutputSum()).subtract(fee);
         return this.changeAmount;
 
+    }
+
+    protected long getUnLockScriptSize(TransactionInput transactionInput, Script script) {
+        RedeemDataExtend redeemData = TxHelperExtend.getConnectedRedeemDataExtend(transactionInput.getOutpoint(), keyBag);
+        return new ScriptExtend(script.getProgram()).getNumberOfBytesRequiredToSpend(
+                redeemData.getFullKey() == null ? -1 : redeemData.getFullKey().getPubKey().length,
+                redeemData.redeemScript);
     }
 
     public Coin getFee() {
@@ -240,12 +214,7 @@ public class TransactionBuilder implements TransactionAllPreSignHash {
 
 
     public Transaction completeAndSignTx(KeyBag keyBag, boolean useForkId) throws SignErrorException {
-        if (keyBag != null && !(transactionSigner instanceof RemoteTransactionSigner)) {
-            setEmptyInputScript(targetTransaction, keyBag);
-        }
-
-//        final TransactionSigner.ProposedTransaction proposedTransaction = new TransactionSigner.ProposedTransaction(
-//                TransactionExtend.toTransactionExtend(targetTransaction), useForkId);
+        setEmptyInputScript(targetTransaction, keyBag);
         final ExtendForSignTransaction proposedTransaction = new ExtendForSignTransaction(TransactionExtend.toTransactionExtend(this.getTargetTransaction()), SigHash.Flags.ALL, true, false);
         boolean b = transactionSigner.signInputs(proposedTransaction, keyBag);
         if (b) {
@@ -255,72 +224,14 @@ public class TransactionBuilder implements TransactionAllPreSignHash {
     }
 
 
-    @Override
-    public List<PreSignHashContext> getAllBsmSignHash(boolean useForkId, boolean anyoneCanPay, BapBaseCore bapBase) {
-        return this.bsmSignHashContexts;
-    }
-
-    public List<PreSignHashContext> getTxInputSignHash(boolean anyoneCanPay, BapBaseCore bapBase) {
-        return getTxInputSignHash(SigHash.Flags.ALL, anyoneCanPay, bapBase);
-    }
-
-    public List<PreSignHashContext> getTxInputSignHash(SigHash.Flags flags, boolean anyoneCanPay, BapBaseCore bapBase) {
-        List<PreSignHashContext> preSignHashContexts = Lists.newArrayList();
-
-        int numInputs = this.targetTransaction.getInputs().size();
-        for (int i = 0; i < numInputs; i++) {
-            PreSignHashContext preSignHashContext = new PreSignHashContext();
-            TransactionInput txIn = this.targetTransaction.getInput(i);
-            if (txIn.getConnectedOutput() == null) {
-                log.warn("Missing connected output, assuming input {} is already signed.", i);
-                continue;
-            }
-            Script scriptPubKey = txIn.getConnectedOutput().getScriptPubKey();
 
 
-            Sha256Hash hash = SigHash.hashForForkIdSignature(Translate.toTx(this.targetTransaction), i, scriptPubKey.getProgram(), this.targetTransaction.getInput(i).getConnectedOutput().getValue(), flags, anyoneCanPay);
-            preSignHashContext.setPreSignHash(hash);
-
-            if (TxHelperExtend.isSentToOrdinals(scriptPubKey)) {
-                preSignHashContext.setRemoteSignType(RemoteSignType.ORD);
-                preSignHashContext.setSignAddress(bapBase.getSignAddress(RemoteSignType.ORD));
-            } else {
-                preSignHashContext.setRemoteSignType(RemoteSignType.PAYMENT);
-                preSignHashContext.setSignAddress(bapBase.getSignAddress(RemoteSignType.PAYMENT));
-            }
-            preSignHashContexts.add(preSignHashContext);
-        }
-
-        return preSignHashContexts.stream().map(o -> {
-            o.setFee(this.getFee());
-            return o;
-
-        }).collect(Collectors.toList());
-    }
 
     public static String broadcast(String raw, Broadcaster broadcaster) {
         return broadcaster.broadcast(raw);
     }
 
-    protected void setEmptyInputScriptHaveOrdinals(final Transaction outputTransaction, final KeyBag bag)
-            throws ScriptExecutionException {
-        int numInputs = outputTransaction.getInputs().size();
-        for (int i = 0; i < numInputs; i++) {
-            TransactionInput txIn = outputTransaction.getInput(i);
-            Script scriptPubKey = txIn.getConnectedOutput().getScriptPubKey();
-            RedeemDataExtend redeemData = TxHelperExtend.getConnectedRedeemDataExtend(txIn.getOutpoint(), bag);
-            checkNotNull(redeemData, "Transaction exists in wallet that we cannot redeem: %s",
-                    txIn.getOutpoint().getHash());
-            if (TxHelperExtend.isSentToOrdinals(scriptPubKey)) {
-                txIn.setScriptSig(
-                        ScriptBuilder.createInputScript(null, redeemData.keys.get(0).getPubKey()));
-            } else {
-                txIn.setScriptSig(
-                        scriptPubKey.createEmptyInputScript(redeemData.keys.get(0).getPubKey(), redeemData.redeemScript));
-            }
 
-        }
-    }
 
     /**
      * @param outputTransaction

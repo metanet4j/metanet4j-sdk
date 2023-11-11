@@ -1,7 +1,7 @@
 package com.metanet4j.sdk.context;
 
 import com.metanet4j.sdk.PublicKey;
-import com.metanet4j.sdk.RemoteSignType;
+import com.metanet4j.sdk.remote.RemoteSignType;
 import io.bitcoinsv.bitcoinjsv.core.Coin;
 import io.bitcoinsv.bitcoinjsv.core.Sha256Hash;
 import lombok.Data;

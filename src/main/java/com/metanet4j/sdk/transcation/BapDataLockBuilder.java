@@ -4,9 +4,9 @@ import com.google.common.base.Charsets;
 import com.google.common.collect.Lists;
 import com.metanet4j.base.constants.ProtocolConstant;
 import com.metanet4j.base.type.BapTypeEnum;
-import com.metanet4j.sdk.RemoteSignType;
 import com.metanet4j.sdk.SignType;
 import com.metanet4j.sdk.bap.BapBaseCore;
+import com.metanet4j.sdk.remote.RemoteSignType;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;

@@ -1,4 +1,4 @@
-package com.metanet4j.sdk;
+package com.metanet4j.sdk.remote;
 
 public enum RemoteSignType {
     ROOT,

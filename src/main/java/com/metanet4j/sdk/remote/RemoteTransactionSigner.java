@@ -1,9 +1,10 @@
-package com.metanet4j.sdk.signers;
+package com.metanet4j.sdk.remote;
 
 import cn.hutool.core.codec.Base64;
 import com.metanet4j.sdk.context.PreSignHashContext;
 import com.metanet4j.sdk.script.ScriptExtend;
 import com.metanet4j.sdk.script.SigHashExtend;
+import com.metanet4j.sdk.signers.ExtendForSignTransaction;
 import io.bitcoinsv.bitcoinjsv.core.ECKey;
 import io.bitcoinsv.bitcoinjsv.core.Sha256Hash;
 import io.bitcoinsv.bitcoinjsv.ecc.ECDSASignature;

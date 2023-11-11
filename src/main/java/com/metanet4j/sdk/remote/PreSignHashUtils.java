@@ -1,4 +1,4 @@
-package com.metanet4j.sdk.signers;
+package com.metanet4j.sdk.remote;
 
 import com.google.common.collect.Lists;
 import com.metanet4j.sdk.context.PreSignHashContext;

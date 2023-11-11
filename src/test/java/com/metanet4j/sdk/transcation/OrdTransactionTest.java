@@ -36,7 +36,7 @@ public class OrdTransactionTest extends TransactionContextTest {
                 changeAddress,
                 feePerKb,
                 OrdScriptBuilder.Inscription.builder().contentType("text/markdown")
-                        .dataB64(Base64.encode("test send oridinals 1019-1 from metanet-sdk".getBytes())).build(),
+                        .dataB64(Base64.encode("test send oridinals 1110-1 from metanet-sdk".getBytes())).build(),
                 ordMap,
                 bapBase,
                 keyBag
@@ -45,7 +45,7 @@ public class OrdTransactionTest extends TransactionContextTest {
         parseTx(transaction);
         correctlySpends(transaction);
         String txId = broadcast(transaction);
-        System.out.println("you can view your ordinal  tx on https://ordinals.gorillapool.io/api/inscriptions/origin/" + txId + "_0");
+        System.out.println("you can view your ordinal  tx on https://v3.ordinals.gorillapool.io/api/txos/" + txId + "_0?script=true");
 
     }
 
@@ -65,7 +65,7 @@ public class OrdTransactionTest extends TransactionContextTest {
         parseTx(transaction);
         correctlySpends(transaction);
         String txId = broadcast(transaction);
-        System.out.println("you can view your ordinal  tx on https://ordinals.gorillapool.io/api/inscriptions/origin/" + txId + "_0");
+        System.out.println("you can view your ordinal  tx on https://v3.ordinals.gorillapool.io/api/txos/" + txId + "_0?script=true");
     }
 
 
@@ -74,7 +74,7 @@ public class OrdTransactionTest extends TransactionContextTest {
      */
     @Test
     public void testSendOrdinalByCreateUtxo() {
-        String origin = "17227b7ebbb77fe988fcb4175ec56fa79534baf1e947e059c2d154db5f10befb_0";
+        String origin = "58a97bf6af7c1fa3325af5ccc717309d25df5bb8f3c611b145881e977a1eb8d4_0";
 
         List<UTXO> originUtxoList = new OrdinalsOriginGorillaUtxoProvider().listUxtos(Lists.newArrayList(origin));
         List<UTXO> paymentUtxoList = new BitailsUtxoProvider().listUxtos(Lists.newArrayList(paymentAddress));
@@ -82,22 +82,22 @@ public class OrdTransactionTest extends TransactionContextTest {
                 , ordAddress, changeAddress, 50L, null, null, keyBag);
         parseTx(transaction);
         correctlySpends(transaction);
-        broadcast(transaction);
-        System.out.println("you can view your ordinal utxo  on https://ordinals.gorillapool.io/api/utxos/origin/" + origin);
+        String txId = broadcast(transaction);
+        System.out.println("you can view your ordinal  tx on https://v3.ordinals.gorillapool.io/api/txos/" + txId + "_0?script=true");
     }
 
     @Test
     public void testSendOrdinalBySendUtxo() {
-        String origin = "your original origin";
-        Address pandaAddress = Address.fromBase58(MainNetParams.get(), "1CVpujbP2AmDAfgNN4ahP6426J7nssL6Hi");
+        String origin = "c51f95b21c4b0f6373f8ada9db85da469a86d5c564cc1c64183d964b78cdeadb_0";
+        Address pandaAddress = Address.fromBase58(MainNetParams.get(), "1PHhmDqXuwrX2kpA8DApVaMC98LrgNo9uF");
         List<UTXO> originUtxoList = new OrdinalsOriginGorillaUtxoProvider().listUxtos(Lists.newArrayList(origin));
         List<UTXO> paymentUtxoList = new BitailsUtxoProvider().listUxtos(Lists.newArrayList(paymentAddress));
         Transaction transaction = new OrdTransactionTemplate().sendOrdinal(this.bapBase, originUtxoList.get(0), paymentUtxoList.get(0)
                 , pandaAddress, changeAddress, 50L, null, null, keyBag);
         parseTx(transaction);
         correctlySpends(transaction);
-        broadcast(transaction);
-        System.out.println("you can view your ordinal utxo  on https://ordinals.gorillapool.io/api/utxos/origin/" + origin);
+        String txId = broadcast(transaction);
+        System.out.println("you can view your ordinal  tx on https://v3.ordinals.gorillapool.io/api/txos/" + txId + "_0?script=true");
     }
 
     /**

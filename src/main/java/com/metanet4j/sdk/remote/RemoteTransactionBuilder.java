@@ -1,14 +1,10 @@
 package com.metanet4j.sdk.remote;
 
 import com.google.common.collect.Lists;
-import com.metanet4j.sdk.RemoteSignType;
 import com.metanet4j.sdk.bap.BapBaseCore;
 import com.metanet4j.sdk.bap.RemoteBapBase;
 import com.metanet4j.sdk.context.PreSignHashContext;
-import com.metanet4j.sdk.exception.SignErrorException;
 import com.metanet4j.sdk.sigma.Sigma;
-import com.metanet4j.sdk.signers.ExtendForSignTransaction;
-import com.metanet4j.sdk.signers.TransactionExtend;
 import com.metanet4j.sdk.transcation.LockingScriptBuilder;
 import com.metanet4j.sdk.transcation.TransactionBuilder;
 import com.metanet4j.sdk.utils.TxHelperExtend;
@@ -18,20 +14,23 @@ import io.bitcoinsv.bitcoinjsv.msg.protocol.Transaction;
 import io.bitcoinsv.bitcoinjsv.msg.protocol.TransactionInput;
 import io.bitcoinsv.bitcoinjsv.script.Script;
 import io.bitcoinsv.bitcoinjsv.script.SigHash;
+import io.bitcoinsv.bitcoinjsv.script.interpreter.ScriptExecutionException;
 import io.bitcoinsv.bitcoinjsv.signers.TransactionSigner;
 import io.bitcoinsv.bitcoinjsv.temp.KeyBag;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Slf4j
-public class RemoteTransactionBuilder extends TransactionBuilder {
+public class RemoteTransactionBuilder extends TransactionBuilder implements TransactionAllPreSignHash {
 
     public List<PreSignHashContext> bsmSignHashContexts;
 
     public RemoteTransactionBuilder(RemoteBapBase bapBaseCore, TransactionSigner transactionSigner) {
-        super(bapBaseCore, transactionSigner);
+        super(bapBaseCore, null, transactionSigner);
+        this.bsmSignHashContexts = new ArrayList<>();
     }
 
 
@@ -43,7 +42,7 @@ public class RemoteTransactionBuilder extends TransactionBuilder {
         return super.addDataOutput(lockingScriptBuilder);
     }
 
-    @Override
+
     public TransactionBuilder addSigmaSign(BapBaseCore bapBase, RemoteSignType remoteSignType) {
         Sigma sigma = new Sigma(bapBase, targetTransaction, true, remoteSignType);
         targetTransaction = sigma.sign().getSignedTx();
@@ -52,13 +51,8 @@ public class RemoteTransactionBuilder extends TransactionBuilder {
     }
 
     @Override
-    public Transaction completeAndSignTx(KeyBag keyBag, boolean useForkId) throws SignErrorException {
-        final ExtendForSignTransaction proposedTransaction = new ExtendForSignTransaction(TransactionExtend.toTransactionExtend(this.getTargetTransaction()), SigHash.Flags.ALL, true, false);
-        boolean b = transactionSigner.signInputs(proposedTransaction, keyBag);
-        if (b) {
-            return proposedTransaction.partialTx;
-        }
-        throw new SignErrorException();
+    protected void setEmptyInputScript(Transaction outputTransaction, KeyBag bag) throws ScriptExecutionException {
+
     }
 
     @Override
@@ -66,12 +60,10 @@ public class RemoteTransactionBuilder extends TransactionBuilder {
         return this.bsmSignHashContexts;
     }
 
-    @Override
     public List<PreSignHashContext> getTxInputSignHash(boolean anyoneCanPay, BapBaseCore bapBase) {
-        return super.getTxInputSignHash(anyoneCanPay, bapBase);
+        return getTxInputSignHash(SigHash.Flags.ALL, anyoneCanPay, bapBase);
     }
 
-    @Override
     public List<PreSignHashContext> getTxInputSignHash(SigHash.Flags flags, boolean anyoneCanPay, BapBaseCore bapBase) {
         List<PreSignHashContext> preSignHashContexts = Lists.newArrayList();
 
@@ -105,4 +97,11 @@ public class RemoteTransactionBuilder extends TransactionBuilder {
 
         }).collect(Collectors.toList());
     }
+
+    @Override
+    protected long getUnLockScriptSize(TransactionInput transactionInput, Script script) {
+        return 76 + 33 + 10;
+    }
+
+
 }
