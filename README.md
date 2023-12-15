@@ -26,7 +26,7 @@ protocol. This is very helpful in simplifying development.
 
 3.Remote signing for enhanced security with unmanaged keys
 
-- [ ] Pending implementation of remote signing interface.
+- [x] Pending implementation of remote signing interface.
   Separating transaction construction from signing allows clients to perform the signing process, eliminating the need
   for service providers to manage user private keys. With remote signing, user private keys do not need to be
   transmitted over the network and remain securely stored locally. This provides convenience for applications that

@@ -7,7 +7,6 @@ import com.metanet4j.base.type.BapTypeEnum;
 import com.metanet4j.sdk.SignType;
 import com.metanet4j.sdk.bap.BapBaseCore;
 import com.metanet4j.sdk.remote.RemoteSignType;
-
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -111,12 +110,6 @@ public class BapDataLockBuilder extends UnSpendableDataLockBuilder<BapDataLockBu
         }
         return this;
     }
-
-
-
-
-
-
 
 
 }
