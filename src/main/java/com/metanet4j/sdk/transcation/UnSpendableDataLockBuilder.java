@@ -20,10 +20,11 @@ import io.bitcoinsv.bitcoinjsv.script.Script;
 import io.bitcoinsv.bitcoinjsv.script.ScriptBuilder;
 import io.bitcoinsv.bitcoinjsv.script.ScriptChunk;
 import io.bitcoinsv.bitcoinjsv.script.ScriptOpCodes;
+import org.spongycastle.util.encoders.Base64;
+
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.util.List;
-import org.spongycastle.util.encoders.Base64;
 
 public abstract class UnSpendableDataLockBuilder<T extends UnSpendableDataLockBuilder> implements LockingScriptBuilder {
 
@@ -53,7 +54,7 @@ public abstract class UnSpendableDataLockBuilder<T extends UnSpendableDataLockBu
     }
 
     public UnSpendableDataLockBuilder(List<ByteBuffer> buffers, BapBaseCore bapBase, boolean remoteSign,
-        RemoteSignType remoteSignType) {
+                                      RemoteSignType remoteSignType) {
         this.remoteSign = remoteSign;
         this.bapBase = bapBase;
         this.dataList = buffers;
@@ -92,10 +93,10 @@ public abstract class UnSpendableDataLockBuilder<T extends UnSpendableDataLockBu
         this.dataList.add(ByteBuffer.wrap(Base64.decode(unspendableDataSig.getSigB64().getBytes(Charsets.UTF_8))));
 
         boolean b = AipHelper.verifySign(unspendableDataSig.getSignAddress(), unspendableDataSig.getSigB64(),
-            outputStream.toString(Charsets.UTF_8));
+                outputStream.toString(Charsets.UTF_8));
         if (!b) {
             throw new RuntimeException("aip sig verify failed,the sig is:" + unspendableDataSig.getSigB64() + ",the address is:"
-                + unspendableDataSig.getSignAddress());
+                    + unspendableDataSig.getSignAddress());
         }
         return (T) this;
     }
@@ -143,26 +144,26 @@ public abstract class UnSpendableDataLockBuilder<T extends UnSpendableDataLockBu
 
         if (signType == SignType.PREVIOUS) {
             Assert.notNull(bapBase.getPreviouAddress(),
-                "the SignType is PREVIOUS,so sign previous address not allow null when signOpReturnWithAIP");
+                    "the SignType is PREVIOUS,so sign previous address not allow null when signOpReturnWithAIP");
             Assert.notNull(bapBase.getPreviousPrivateKey(),
-                "the SignType is PREVIOUS,so sign previous privateKey not allow null when signOpReturnWithAIP");
+                    "the SignType is PREVIOUS,so sign previous privateKey not allow null when signOpReturnWithAIP");
             this.dataList.add(ByteBuffer.wrap(bapBase.getPreviouAddress().toBase58().getBytes(Charsets.UTF_8)));
             String sig = bapBase.getPreviousPrivateKey().signMessage(outputStream.toString(Charsets.UTF_8));
             this.dataList.add(ByteBuffer.wrap(Base64.decode(sig.getBytes(Charsets.UTF_8))));
 
         } else if (signType == SignType.CURRENT) {
             Assert.notNull(bapBase.getCurrentAddress(),
-                "the SignType is CURRENT,so sign current address not allow null when signOpReturnWithAIP");
+                    "the SignType is CURRENT,so sign current address not allow null when signOpReturnWithAIP");
             Assert.notNull(bapBase.getCurrentPrivateKey(),
-                "the SignType is CURRENT,so sign current privateKey not allow null when signOpReturnWithAIP");
+                    "the SignType is CURRENT,so sign current privateKey not allow null when signOpReturnWithAIP");
             this.dataList.add(ByteBuffer.wrap(bapBase.getCurrentAddress().toBase58().getBytes(Charsets.UTF_8)));
             String sig = bapBase.getCurrentPrivateKey().signMessage(outputStream.toString(Charsets.UTF_8));
             this.dataList.add(ByteBuffer.wrap(Base64.decode(sig.getBytes(Charsets.UTF_8))));
         } else if (signType == SignType.ROOT) {
             Assert.notNull(bapBase.getRootAddress(),
-                "the SignType is ROOT,so sign root address not allow null when signOpReturnWithAIP");
+                    "the SignType is ROOT,so sign root address not allow null when signOpReturnWithAIP");
             Assert.notNull(bapBase.getRootPrivateKey(),
-                "the SignType is ROOT,so sign root privateKey not allow null when signOpReturnWithAIP");
+                    "the SignType is ROOT,so sign root privateKey not allow null when signOpReturnWithAIP");
             this.dataList.add(ByteBuffer.wrap(bapBase.getRootAddress().getBytes(Charsets.UTF_8)));
             String sig = bapBase.getRootPrivateKey().signMessage(outputStream.toString(Charsets.UTF_8));
             this.dataList.add(ByteBuffer.wrap(Base64.decode(sig.getBytes(Charsets.UTF_8))));
@@ -225,7 +226,8 @@ public abstract class UnSpendableDataLockBuilder<T extends UnSpendableDataLockBu
     }
 
     /**
-     * override for get remote sign
+     * 通过hash获取签名
+     * 子类可以重写这个方法，自定义获取签名的方式
      *
      * @param hash
      * @return

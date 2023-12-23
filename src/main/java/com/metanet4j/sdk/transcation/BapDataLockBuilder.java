@@ -7,6 +7,7 @@ import com.metanet4j.base.type.BapTypeEnum;
 import com.metanet4j.sdk.SignType;
 import com.metanet4j.sdk.bap.BapBaseCore;
 import com.metanet4j.sdk.remote.RemoteSignType;
+
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -54,16 +55,7 @@ public class BapDataLockBuilder extends UnSpendableDataLockBuilder<BapDataLockBu
         byteBuffers.add(ByteBuffer.wrap(bapBase.getIdentityKey().getBytes(Charsets.UTF_8)));
         byteBuffers.add(ByteBuffer.wrap(bapBase.getRootAddress().getBytes(Charsets.UTF_8)));
         this.dataList = byteBuffers;
-        if (this.remoteSign) {
-            if (this.remoteSignType == null) {
-                this.remoteSignType = RemoteSignType.ROOT;
-            }
-
-        } else {
-            if (this.signType == null) {
-                this.signType = SignType.ROOT;
-            }
-        }
+        initSignType(RemoteSignType.ROOT, SignType.ROOT);
         return this;
     }
 
@@ -76,16 +68,7 @@ public class BapDataLockBuilder extends UnSpendableDataLockBuilder<BapDataLockBu
         byteBuffers.add(ByteBuffer.wrap(bapBase.getIdentityKey().getBytes(Charsets.UTF_8)));
         byteBuffers.add(ByteBuffer.wrap(bapBase.getCurrentAddress().toBase58().getBytes(Charsets.UTF_8)));
         this.dataList = byteBuffers;
-        if (this.remoteSign) {
-            if (this.remoteSignType == null) {
-                this.remoteSignType = RemoteSignType.PREVIOUS;
-            }
-
-        } else {
-            if (this.signType == null) {
-                this.signType = SignType.PREVIOUS;
-            }
-        }
+        initSignType(RemoteSignType.PREVIOUS, SignType.PREVIOUS);
         return this;
     }
 
@@ -98,17 +81,21 @@ public class BapDataLockBuilder extends UnSpendableDataLockBuilder<BapDataLockBu
         byteBuffers.add(ByteBuffer.wrap(bapBase.getIdentityKey().getBytes(Charsets.UTF_8)));
         byteBuffers.add(ByteBuffer.wrap(identity.getBytes(Charsets.UTF_8)));
         this.dataList = byteBuffers;
+        initSignType(RemoteSignType.CURRENT, SignType.CURRENT);
+        return this;
+    }
+
+    private void initSignType(RemoteSignType remoteSignType, SignType signType) {
         if (this.remoteSign) {
             if (this.remoteSignType == null) {
-                this.remoteSignType = RemoteSignType.CURRENT;
+                this.remoteSignType = remoteSignType;
             }
 
         } else {
             if (this.signType == null) {
-                this.signType = SignType.CURRENT;
+                this.signType = signType;
             }
         }
-        return this;
     }
 
 

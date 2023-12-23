@@ -44,9 +44,8 @@ public class BapBaseTest {
     }
 
 
-
     @Test
-    public void testBapAddress(){
+    public void testBapAddress() {
         BapBase bapBase = BapBase.fromOnlyMasterPrivateKey(masterPrivateKey);
 
         System.out.println("identityKey:" + bapBase.getIdentityKey());
@@ -74,38 +73,38 @@ public class BapBaseTest {
 
 
     @Test
-    public void testEncrypt(){
+    public void testEncrypt() {
         BapBase bapBase = BapBase.fromOnlyMasterPrivateKey(masterPrivateKey);
-        String plainText ="god";
+        String plainText = "god";
         String encrypt = bapBase.encrypt(plainText);
         String decrypt = bapBase.decrypt(encrypt);
         System.out.println(decrypt);
     }
 
     /**
-     getSigningPathFromHex(hexString: string, hardened = true) {
-     // "m/0/0/1"
-     let signingPath = 'm';
-     const signingHex = hexString.match(/.{1,8}/g);
-     const maxNumber = 2147483648 - 1; // 0x80000000
-     signingHex?.forEach((hexNumber) => {
-     let number = Number('0x' + hexNumber);
-     if (number > maxNumber) number -= maxNumber;
-     signingPath += `/${number}${(hardened ? "'" : '')}`;
-     });
-
-     return signingPath;
-     },
+     * getSigningPathFromHex(hexString: string, hardened = true) {
+     * // "m/0/0/1"
+     * let signingPath = 'm';
+     * const signingHex = hexString.match(/.{1,8}/g);
+     * const maxNumber = 2147483648 - 1; // 0x80000000
+     * signingHex?.forEach((hexNumber) => {
+     * let number = Number('0x' + hexNumber);
+     * if (number > maxNumber) number -= maxNumber;
+     * signingPath += `/${number}${(hardened ? "'" : '')}`;
+     * });
+     * <p>
+     * return signingPath;
+     * },
      */
 
     @Test
-    public void testGetSigningPathFromHex(){
+    public void testGetSigningPathFromHex() {
         BapBase bapBase = BapBase.fromOnlyMasterPrivateKey(masterPrivateKey);
         String s = HexUtil.encodeHexStr("3jViMo5UdBsfWeoAWLJDmSbhpTwP".getBytes());
         String signPath = bapBase.getSigningPathFromHex(s);
 //
         //"m/943208499'/878916921'/909206374'/1714565172'/1667458660'/1714499894'/892560945'/1631151159'/1681076785'/929313587'/1647600436'/1681352037'/879126071'/1630942818'/825241913'/828793188'"
-        Assert.assertEquals(signPath,"m/862606953'/1299133781'/1682076518'/1466265409'/1464617540'/1834181224"
+        Assert.assertEquals(signPath, "m/862606953'/1299133781'/1682076518'/1466265409'/1464617540'/1834181224"
                 + "'/1884583760'");
     }
 
@@ -141,6 +140,8 @@ public class BapBaseTest {
         String message = new String(messageBytes, Charsets.UTF_8);
         byte[] bytes = message.getBytes(Charsets.UTF_8);
         System.out.println(Arrays.equals(messageBytes, bytes));
+
+
     }
 
 

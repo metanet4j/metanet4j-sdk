@@ -118,3 +118,6 @@ mvnw
 hs_err_pid*
 .encodings.xml
 *.xml
+.classpath
+.project
+org.*
