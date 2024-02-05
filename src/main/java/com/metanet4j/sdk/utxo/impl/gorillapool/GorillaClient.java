@@ -10,8 +10,7 @@ import static com.metanet4j.sdk.utxo.impl.HttpClientFactory.send;
 
 public class GorillaClient {
 
-    public static final String BASE_URL = "https://v3.ordinals.gorillapool.io";
-
+    public static final String BASE_URL = "https://ordinals.gorillapool.io";
 
 
     public static Txo GetTxoByOrigin(String Origin) {
