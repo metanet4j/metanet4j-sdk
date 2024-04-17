@@ -3,6 +3,7 @@ package com.metanet4j.sdk.transcation;
 import cn.hutool.core.io.FileUtil;
 import com.google.common.base.Charsets;
 import com.google.common.collect.Lists;
+import com.google.common.net.MediaType;
 import com.metanet4j.base.model.B;
 import com.metanet4j.sdk.EcKeyLiteExtend;
 import com.metanet4j.sdk.TestData;
@@ -23,7 +24,6 @@ import java.nio.ByteBuffer;
 public class BitcoinschemaTransactionTest extends TransactionContextTest {
 
 
-
     @Test
     public void testBapRootTransaction() {
 
@@ -38,7 +38,7 @@ public class BitcoinschemaTransactionTest extends TransactionContextTest {
 
 
     @Test
-    public void testBapAliasTransaction()  {
+    public void testBapAliasTransaction() {
 
         try {
             BapDataLockBuilder bapDataLockBuilder = new BapDataLockBuilder(bapBase);
@@ -51,7 +51,7 @@ public class BitcoinschemaTransactionTest extends TransactionContextTest {
     }
 
     @Test
-    public void testBsocialUnFollowTransaction(){
+    public void testBsocialUnFollowTransaction() {
         try {
             BsocialDataLockBuilder bsocialDataLockBuilder = new BsocialDataLockBuilder(bapBase);
             String identityKey = "TFXCK2wPgfBAB1VKWUPyjKQ6FQy";
@@ -64,7 +64,7 @@ public class BitcoinschemaTransactionTest extends TransactionContextTest {
 
 
     @Test
-    public void testBsocialFollowTransaction(){
+    public void testBsocialFollowTransaction() {
         try {
             BsocialDataLockBuilder bsocialDataLockBuilder = new BsocialDataLockBuilder(bapBase);
             String identityKey = "TFXCK2wPgfBAB1VKWUPyjKQ6FQy";
@@ -76,9 +76,8 @@ public class BitcoinschemaTransactionTest extends TransactionContextTest {
     }
 
 
-
     @Test
-    public void testBsocialPostTransaction(){
+    public void testBsocialPostTransaction() {
         try {
             B b = new B();
             b.setContent("test from metanet4j-sdk .1019-1,view it on https://github.com/metanet4j/metanet4j-sdk ");
@@ -97,7 +96,7 @@ public class BitcoinschemaTransactionTest extends TransactionContextTest {
 
 
     @Test
-    public void testBsocialRePostTransaction(){
+    public void testBsocialRePostTransaction() {
         try {
             B b = new B();
             b.setContent("it is  metanet4j-sdk");
@@ -116,10 +115,10 @@ public class BitcoinschemaTransactionTest extends TransactionContextTest {
     }
 
     @Test
-    public void testBsocialReply(){
+    public void testBsocialReply() {
         try {
             B b = new B();
-            b.setContent("it will be published on 2023-10-10");
+            b.setContent("it will be published on 2024-04-17");
             b.setByteBuffer(ByteBuffer.wrap(b.getContent().getBytes(Charsets.UTF_8)));
             b.setContentType("text/markdown");
             b.setEncoding("UTF-8");
@@ -156,6 +155,29 @@ public class BitcoinschemaTransactionTest extends TransactionContextTest {
             bImage.setIndex(1);
             BsocialDataLockBuilder bsocialDataLockBuilder = new BsocialDataLockBuilder(bapBase);
             buildTxThenBroadcast(bsocialDataLockBuilder.buildPost(Lists.newArrayList(bImage)).sign());
+            System.out.println("you can view your bitcoin schema tx on https://blockpost.network/profile/" + bapBase.getIdentityKey());
+        } catch (SignErrorException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Test
+    public void testBsocialPdfTransaction() throws IOException {
+        try {
+            B bText = new B();
+            bText.setContent("MMS 吉姆第一本书：21世纪的神奇矿物质溶液MMS（全版2011年）pdf");
+            bText.setByteBuffer(ByteBuffer.wrap(bText.getContent().getBytes(Charsets.UTF_8)));
+            bText.setContentType("text/markdown");
+            bText.setEncoding("UTF-8");
+            bText.setIndex(1);
+
+            B bpdf = new B();
+            bpdf.setContentType(MediaType.PDF.toString());
+            bpdf.setFilename("吉姆第一本书：21世纪的神奇矿物质溶液MMS（全版2011年).pdf");
+            bpdf.setByteBuffer(ByteBuffer.wrap(FileUtil.getInputStream("MMS/吉姆第一本书：21世纪的神奇矿物质溶液MMS（全版2011年）.pdf").readAllBytes()));
+            bpdf.setIndex(1);
+            BsocialDataLockBuilder bsocialDataLockBuilder = new BsocialDataLockBuilder(bapBase);
+            buildTxThenBroadcast(bsocialDataLockBuilder.buildPost(Lists.newArrayList(bpdf)).sign());
             System.out.println("you can view your bitcoin schema tx on https://blockpost.network/profile/" + bapBase.getIdentityKey());
         } catch (SignErrorException e) {
             e.printStackTrace();
@@ -226,7 +248,7 @@ public class BitcoinschemaTransactionTest extends TransactionContextTest {
                 .addInputs(Lists.newArrayList(paymentAddress),
                         new BitailsUtxoProvider())
                 .addDataOutput(dataLockBuilder)
-                .withFeeKb(Coin.valueOf(500L))
+                .withFeeKb(Coin.valueOf(5L))
                 .changeAddress(changeAddress)
                 .completeAndSignTx(transactionBuilder.getKeyBag(), true);
         correctlySpends(transaction);

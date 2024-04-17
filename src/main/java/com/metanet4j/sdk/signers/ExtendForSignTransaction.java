@@ -8,7 +8,7 @@ import io.bitcoinsv.bitcoinjsv.signers.TransactionSigner;
 public class ExtendForSignTransaction extends TransactionSigner.ProposedTransaction {
 
     private boolean useForkId = false;
-    private boolean anyoneCanPay =false;
+    private boolean anyoneCanPay = false;
     private SigHash.Flags hashFlags = SigHash.Flags.ALL;
 
     public ExtendForSignTransaction(Transaction partialTx) {
@@ -26,7 +26,7 @@ public class ExtendForSignTransaction extends TransactionSigner.ProposedTransact
     }
 
     public ExtendForSignTransaction(Transaction partialTx, SigHash.Flags hashFlags, boolean useForkId, boolean anyoneCanPay) {
-        super(partialTx);
+        super(partialTx, useForkId);
         this.useForkId = useForkId;
         this.anyoneCanPay = anyoneCanPay;
         this.hashFlags = hashFlags;
