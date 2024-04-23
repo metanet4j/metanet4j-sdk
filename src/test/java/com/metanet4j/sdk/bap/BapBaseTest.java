@@ -118,6 +118,7 @@ public class BapBaseTest {
         System.out.println("address:" + addressEnhance.toString());
     }
 
+
     @Test
     public void testAddress() {
 

@@ -106,7 +106,7 @@ public class BapBase extends BapBaseAbstract {
         return getFriendPublicKey(this.getIdentityKey());
     }
 
-    private PublicKey getFriendPublicKey(String friendBapId) {
+    public PublicKey getFriendPublicKey(String friendBapId) {
         String hex = HexUtil.encodeHexStr(Sha256Hash.hash(friendBapId.getBytes()));
         String path = getSigningPathFromHex(HexUtil.encodeHexStr(hex.getBytes(Charsets.UTF_8)));
 
@@ -213,13 +213,6 @@ public class BapBase extends BapBaseAbstract {
     }
 
 
-
-
-
-
-
-
-
     public List<ChildNumber> generateNextChildNumbers() {
         List<ChildNumber> childNumbers = this.currentNumberList;
         List<ChildNumber> currentChildNumbers = childNumbers.subList(0, defaultBapIdChildNumberSize - 1);
@@ -304,7 +297,6 @@ public class BapBase extends BapBaseAbstract {
         }
         return null;
     }
-
 
 
     private DeterministicKey getEncryptKey(List<ChildNumber> encryptChildNumberList) {
