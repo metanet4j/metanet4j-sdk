@@ -22,7 +22,6 @@ import io.bitcoinsv.bitcoinjsv.temp.KeyBag;
 import io.bitcoinsv.bitcoinjsv.temp.RedeemData;
 
 import javax.annotation.Nullable;
-import javax.validation.constraints.NotNull;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -31,33 +30,23 @@ import java.util.List;
 /**
  * Derive private key through HD to construct BapBase.
  */
-public class BapBase extends BapBaseAbstract {
+public class BapBase extends MasterKeyBapBase {
 
     private static final int defaultBapIdChildNumberSize = DefaultBapBaseConfig.BAP_CHILD_NUMBER_SIZE;
-    @NotNull
-    private BapBaseConfig bapBaseConfig;
-    private MasterPrivateKey masterPrivateKey;
 
-    private String rootPath;
     private DeterministicKey rootPrivateKey;
-    private List<ChildNumber> rootChildNumberList;
 
+    private DeterministicKey currentPrivateKey;
     private String previousPath;
     private DeterministicKey previousPrivateKey;
 
     private String currentPath;
     private List<ChildNumber> currentNumberList;
-    private DeterministicKey currentPrivateKey;
+
 
     public BapBase(MasterPrivateKey masterPrivateKey, List<ChildNumber> rootChildNumberList,
                    List<ChildNumber> currentNumberList, BapBaseConfig bapBaseConfig) {
-
-        this.masterPrivateKey = masterPrivateKey;
-        this.rootChildNumberList = rootChildNumberList;
-        this.currentNumberList = currentNumberList;
-        this.rootPath = HDUtils.formatPath(rootChildNumberList);
-        this.currentPath = HDUtils.formatPath(currentNumberList);
-
+        super(masterPrivateKey, rootChildNumberList, currentNumberList, bapBaseConfig);
         DeterministicHierarchy dh = new DeterministicHierarchy(masterPrivateKey.getMasterDeterministicKey());
         this.rootPrivateKey = dh.deriveChild(rootChildNumberList.subList(0, defaultBapIdChildNumberSize - 1), false, true,
                 rootChildNumberList.get(defaultBapIdChildNumberSize - 1));
@@ -106,7 +95,7 @@ public class BapBase extends BapBaseAbstract {
         return getFriendPublicKey(this.getIdentityKey());
     }
 
-    public PublicKey getFriendPublicKey(String friendBapId) {
+    protected PublicKey getFriendPublicKey(String friendBapId) {
         String hex = HexUtil.encodeHexStr(Sha256Hash.hash(friendBapId.getBytes()));
         String path = getSigningPathFromHex(HexUtil.encodeHexStr(hex.getBytes(Charsets.UTF_8)));
 
@@ -115,10 +104,41 @@ public class BapBase extends BapBaseAbstract {
         int size = childNumbers.size();
         DeterministicKey privateFriendKey = dh.deriveChild(childNumbers.subList(0, size - 1), false, true,
                 childNumbers.get(size - 1));
-
         System.out.println(privateFriendKey.serializePrivB58(MainNetParams.get()));
         PrivateKey privateKey = new PrivateKey(ECKeyLite.fromPrivate(privateFriendKey.getPrivKey()));
         return privateKey.getPublicKey();
+    }
+
+    public String getSigningPathFromHex(String hex) {
+        StringBuilder signPath = new StringBuilder("M");
+        Long maxNumber = 2147483648L - 1L;
+        String[] split = hex.split("(?<=\\G.{8})");
+        Arrays.stream(split).forEach(o -> {
+            //转为数字
+            Long i = Long.parseLong(o, 16);
+
+            if (i > maxNumber) {
+                i = i - maxNumber;
+            }
+            signPath.append("/").append(i.toString()).append("H");
+
+        });
+        return signPath.toString();
+    }
+
+    public String getSigningPathFromHex(String hexString, boolean hardened) {
+        String signingPath = "m";
+        String[] signingHex = hexString.split("(?<=\\G.{8})");
+        int maxNumber = 2147483647;
+        for (String hexNumber : signingHex) {
+            int number = Integer.parseInt(hexNumber, 16);
+            if (number > maxNumber) {
+                number -= maxNumber;
+            }
+            signingPath += "/" + number + (hardened ? "'" : "");
+        }
+
+        return signingPath;
     }
 
     /**
@@ -148,7 +168,6 @@ public class BapBase extends BapBaseAbstract {
         for (int i = 0; i < loop; i++) {
 
             ArrayList<ChildNumber> tmpList = Lists.newArrayList(head);
-
             tmpList.add(new ChildNumber(changeChildNumber.num() + i, changeChildNumber.isHardened()));
 
             DeterministicKey rootPrivateKey = dh.deriveChild(tmpList, false, true,
@@ -221,9 +240,7 @@ public class BapBase extends BapBaseAbstract {
                 childNumbers.get(defaultBapIdChildNumberSize - 1).isHardened()));
 
         this.previousPath = this.currentPath;
-
         this.currentNumberList = currentChildNumbers;
-
         this.currentPath = HDUtils.formatPath(currentChildNumbers);
         this.currentPrivateKey = getDeterministicKey(currentNumberList);
         this.previousPrivateKey = getDeterministicKey(HDUtils.parsePath(previousPath));
@@ -244,37 +261,6 @@ public class BapBase extends BapBaseAbstract {
                 childNumbers.get(defaultBapIdChildNumberSize - 1));
     }
 
-    public String getSigningPathFromHex(String hex) {
-        StringBuilder signPath = new StringBuilder("M");
-        Long maxNumber = 2147483648L - 1L;
-        String[] split = hex.split("(?<=\\G.{8})");
-        Arrays.stream(split).forEach(o -> {
-            //转为数字
-            Long i = Long.parseLong(o, 16);
-
-            if (i > maxNumber) {
-                i = i - maxNumber;
-            }
-            signPath.append("/").append(i.toString()).append("H");
-
-        });
-        return signPath.toString();
-    }
-
-    public String getSigningPathFromHex(String hexString, boolean hardened) {
-        String signingPath = "m";
-        String[] signingHex = hexString.split("(?<=\\G.{8})");
-        int maxNumber = 2147483647;
-        for (String hexNumber : signingHex) {
-            int number = Integer.parseInt(hexNumber, 16);
-            if (number > maxNumber) {
-                number -= maxNumber;
-            }
-            signingPath += "/" + number + (hardened ? "'" : "");
-        }
-
-        return signingPath;
-    }
 
     public String encryptSelf() {
         return null;
@@ -300,29 +286,21 @@ public class BapBase extends BapBaseAbstract {
 
 
     private DeterministicKey getEncryptKey(List<ChildNumber> encryptChildNumberList) {
-        ArrayList<ChildNumber> childNumbers = Lists.newArrayList(this.rootChildNumberList);
-        childNumbers.addAll(encryptChildNumberList);
-
-        DeterministicHierarchy dh = new DeterministicHierarchy(masterPrivateKey.getMasterDeterministicKey());
-        return dh.deriveChild(childNumbers.subList(0, childNumbers.size() - 1), false, true,
-                childNumbers.get(childNumbers.size() - 1));
+        return getKeyBaseRoot(encryptChildNumberList);
     }
 
-
+    /**
+     * 以rootPath作为根节点衍生秘钥
+     *
+     * @param childNumberList
+     * @return
+     */
     private DeterministicKey getKeyBaseRoot(List<ChildNumber> childNumberList) {
         ArrayList<ChildNumber> childNumbers = Lists.newArrayList(this.rootChildNumberList);
         childNumbers.addAll(childNumberList);
-
-        DeterministicHierarchy dh = new DeterministicHierarchy(masterPrivateKey.getMasterDeterministicKey());
-        return dh.deriveChild(childNumbers.subList(0, childNumbers.size() - 1), false, true,
-                childNumbers.get(childNumbers.size() - 1));
+        return super.getKeyBasePath(childNumbers);
     }
 
-    private DeterministicKey getKeyBasePath(List<ChildNumber> childNumberList) {
-        DeterministicHierarchy dh = new DeterministicHierarchy(masterPrivateKey.getMasterDeterministicKey());
-        return dh.deriveChild(childNumberList.subList(0, childNumberList.size() - 1), false, true,
-                childNumberList.get(childNumberList.size() - 1));
-    }
 
     public BapBaseConfig getBapBaseConfig() {
         return bapBaseConfig;
