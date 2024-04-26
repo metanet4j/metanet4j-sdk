@@ -33,7 +33,7 @@ import java.util.List;
  */
 public class BapBase extends BapBaseAbstract {
 
-    private static final int defaultBapIdChildNumberSize = BapBaseConfig.BAP_CHILD_NUMBER_SIZE;
+    private static final int defaultBapIdChildNumberSize = DefaultBapBaseConfig.BAP_CHILD_NUMBER_SIZE;
     @NotNull
     private BapBaseConfig bapBaseConfig;
     private MasterPrivateKey masterPrivateKey;
@@ -84,7 +84,7 @@ public class BapBase extends BapBaseAbstract {
     }
 
     public static BapBase fromSeed(String seed) {
-        return fromRootChildNumberList(MasterPrivateKey.fromSeed(seed), HDUtils.parsePath(BapBaseConfig.DEFAULT_ROOT_PATH), new DefaultBapBaseConfig());
+        return fromRootChildNumberList(MasterPrivateKey.fromSeed(seed), HDUtils.parsePath(DefaultBapBaseConfig.DEFAULT_ROOT_PATH), new DefaultBapBaseConfig());
     }
 
 
@@ -136,7 +136,7 @@ public class BapBase extends BapBaseAbstract {
 
         //find identityKey root rootPath;
         DeterministicHierarchy dh = new DeterministicHierarchy(masterPrivateKey.getMasterDeterministicKey());
-        List<ChildNumber> childNumbers = HDUtils.parsePath(BapBaseConfig.DEFAULT_ROOT_PATH);
+        List<ChildNumber> childNumbers = HDUtils.parsePath(DefaultBapBaseConfig.DEFAULT_ROOT_PATH);
 
         List<ChildNumber> head = Lists.newArrayList(childNumbers.subList(0, defaultBapIdChildNumberSize - 2));
         ChildNumber changeChildNumber = CollectionUtil.get(childNumbers, 4);
