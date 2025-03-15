@@ -6,6 +6,9 @@ import lombok.Data;
 
 import java.nio.charset.StandardCharsets;
 
+/**
+ * see https://yours-wallet.gitbook.io/provider-api/tools-and-utilities/tagged-derivation-keys-tm
+ */
 public class TaggedDerivation {
 
     public static void main(String[] args) {

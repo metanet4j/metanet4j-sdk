@@ -20,7 +20,7 @@ public class BitailsUtxoProvider implements UTXOProvider<AddressLite, UTXO> {
     @Override
     public List<UTXO> listUxtos(List<AddressLite> list) {
         List<UTXO> utxoList = new ArrayList<>();
-        list.stream().forEach(addressLite -> {
+         list.stream().forEach(addressLite -> {
             AddressUnspentResDto unspentResDto = BitailsClient.getAddressUnspentResDto(addressLite.toBase58(), 0, 100);
             List<UTXO> utxos = Optional.ofNullable(unspentResDto.getUnspent()).orElse(new ArrayList<>()).stream().map(o -> {
                 UTXO utxo = new UTXO(Sha256Hash.wrap(o.getTxid()), o.getVout(), Coin.valueOf(o.getSatoshis()),
