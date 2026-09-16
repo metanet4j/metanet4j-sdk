@@ -1,7 +1,7 @@
 package com.metanet4j.sdk.crypto;
 
 import cn.hutool.core.util.StrUtil;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.List;
 

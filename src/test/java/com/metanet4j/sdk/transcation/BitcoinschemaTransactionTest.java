@@ -14,8 +14,8 @@ import io.bitcoinsv.bitcoinjsv.core.Address;
 import io.bitcoinsv.bitcoinjsv.core.Coin;
 import io.bitcoinsv.bitcoinjsv.msg.protocol.Transaction;
 import io.bitcoinsv.bitcoinjsv.params.MainNetParams;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -238,7 +238,7 @@ public class BitcoinschemaTransactionTest extends TransactionContextTest {
     public void testEckeyLiteExtend() {
         String s1 = bapBase.getOrdAddress().toBase58();
         String s2 = new Address(MainNetParams.get(), EcKeyLiteExtend.fromPrivate(bapBase.getOrdPrivateKey().getPrivKey()).getPubKeyHash()).toBase58();
-        Assert.assertEquals(s1, s2);
+        Assertions.assertEquals(s1, s2);
     }
 
     private void buildTxThenBroadcast(UnSpendableDataLockBuilder dataLockBuilder) throws SignErrorException {

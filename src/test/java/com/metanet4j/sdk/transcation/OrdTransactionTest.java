@@ -16,7 +16,7 @@ import io.bitcoinsv.bitcoinjsv.msg.protocol.Transaction;
 import io.bitcoinsv.bitcoinjsv.params.MainNetParams;
 import io.bitcoinsv.bitcoinjsv.params.Net;
 import io.bitcoinsv.bitcoinjsv.script.SigHash;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.List;
 

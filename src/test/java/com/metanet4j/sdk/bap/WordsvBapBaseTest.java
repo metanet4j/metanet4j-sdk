@@ -3,7 +3,7 @@ package com.metanet4j.sdk.bap;
 import cn.hutool.core.codec.Base64;
 import com.metanet4j.sdk.WordsvTestData;
 import com.metanet4j.sdk.crypto.Ecies;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.nio.charset.Charset;
 

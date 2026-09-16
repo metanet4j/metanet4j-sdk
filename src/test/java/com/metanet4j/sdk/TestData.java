@@ -5,7 +5,7 @@ import tools.jackson.core.type.TypeReference;
 import com.google.common.base.Charsets;
 import com.metanet4j.base.util.JacksonUtil;
 import com.metanet4j.sdk.crypto.MasterPrivateKey;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
 import java.util.List;

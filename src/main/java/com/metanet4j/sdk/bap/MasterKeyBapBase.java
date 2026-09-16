@@ -32,7 +32,9 @@ public abstract class MasterKeyBapBase extends BapBaseAbstract {
         this.rootPath = HDUtils.formatPath(rootChildNumberList);
         this.currentPath = HDUtils.formatPath(currentNumberList);
 
-        this.identityKey = BapHelper.getIdentityKey(getRootAddress());
+        // 注意：不能在这里计算 identityKey —— getRootAddress() 被 BapBase 覆写，
+        // 而 BapBase.rootPrivateKey 要等本构造器返回后才赋值，提前调用会 NPE。
+        // 具体子类在自己的字段就绪后设置 identityKey（见 BapBase 构造器末尾）。
         this.bapBaseConfig = bapBaseConfig;
 
     }

@@ -7,9 +7,9 @@ import com.metanet4j.sdk.PublicKey;
 import com.metanet4j.sdk.TestData;
 import com.metanet4j.sdk.address.AddressEnhance;
 import com.metanet4j.sdk.crypto.MasterPrivateKey;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 import java.util.List;
@@ -19,9 +19,9 @@ public class BapBaseTest {
 
     MasterPrivateKey masterPrivateKey = MasterPrivateKey.fromXprv(TestData.xprv);
 
-    @Before
+    @BeforeEach
     public void testFromXprv() {
-        Assert.assertEquals(masterPrivateKey.toXprv(), TestData.xprv);
+        Assertions.assertEquals(masterPrivateKey.toXprv(), TestData.xprv);
     }
 
     @Test
@@ -104,8 +104,10 @@ public class BapBaseTest {
         String signPath = bapBase.getSigningPathFromHex(s);
 //
         //"m/943208499'/878916921'/909206374'/1714565172'/1667458660'/1714499894'/892560945'/1631151159'/1681076785'/929313587'/1647600436'/1681352037'/879126071'/1630942818'/825241913'/828793188'"
-        Assert.assertEquals(signPath, "m/862606953'/1299133781'/1682076518'/1466265409'/1464617540'/1834181224"
-                + "'/1884583760'");
+        // 修正（2026-09-16）：原断言的两个问题——① 参数顺序反了（expected 在前）；
+        // ② 期望值用的是 bitcoinj 的 "m/...'" 格式，而本方法按自家约定输出 "M/...H"（数字部分一致，已核对）。
+        Assertions.assertEquals("M/862606953H/1299133781H/1682076518H/1466265409H/1464617540H/1834181224H"
+                + "/1884583760H", signPath);
     }
 
     @Test

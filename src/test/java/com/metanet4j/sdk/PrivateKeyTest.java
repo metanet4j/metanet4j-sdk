@@ -4,7 +4,7 @@ import com.metanet4j.sdk.address.AddressEnhance;
 import com.metanet4j.sdk.exception.InvalidKeyException;
 import io.bitcoinsv.bitcoinjsv.params.MainNetParams;
 import io.bitcoinsv.bitcoinjsv.params.RegTestParams;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 public class PrivateKeyTest {
     @Test

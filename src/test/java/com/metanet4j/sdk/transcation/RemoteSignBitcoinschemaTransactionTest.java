@@ -16,7 +16,7 @@ import io.bitcoinsv.bitcoinjsv.ecc.ECDSASignature;
 import io.bitcoinsv.bitcoinjsv.msg.protocol.Transaction;
 import io.bitcoinsv.bitcoinjsv.script.SigHash;
 import lombok.extern.slf4j.Slf4j;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.stream.Collectors;

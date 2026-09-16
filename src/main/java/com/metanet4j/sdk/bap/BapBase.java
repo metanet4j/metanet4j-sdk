@@ -40,8 +40,9 @@ public class BapBase extends MasterKeyBapBase {
     private String previousPath;
     private DeterministicKey previousPrivateKey;
 
-    private String currentPath;
-    private List<ChildNumber> currentNumberList;
+    // 注意：不要在此重复声明 currentPath / currentNumberList —— 父类 MasterKeyBapBase 已有
+    // protected 同名字段并在其构造器中完成初始化；重复声明会遮蔽父类字段（本类那份从未赋值），
+    // 导致 getPreviousChildNumbers() 在构造器内 NPE、getCurrentPath()/getCurrentNumberList() 恒为 null。
 
 
     public BapBase(MasterPrivateKey masterPrivateKey, List<ChildNumber> rootChildNumberList,

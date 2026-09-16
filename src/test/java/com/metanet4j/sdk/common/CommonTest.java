@@ -1,7 +1,7 @@
 package com.metanet4j.sdk.common;
 
 import com.google.common.net.MediaType;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 public class CommonTest {
 

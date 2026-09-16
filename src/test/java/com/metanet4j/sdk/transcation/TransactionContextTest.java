@@ -23,7 +23,7 @@ import io.bitcoinsv.bitcoinjsv.script.ScriptVerifyFlag;
 import io.bitcoinsv.bitcoinjsv.script.interpreter.ScriptExecutionException;
 import io.bitcoinsv.bitcoinjsv.temp.KeyBag;
 import io.bitcoinsv.bitcoinjsv.temp.RedeemData;
-import org.junit.Before;
+import org.junit.jupiter.api.BeforeEach;
 
 import java.util.Map;
 
@@ -40,7 +40,7 @@ public class TransactionContextTest {
     public long feePerKb = 50L;
 
 
-    @Before
+    @BeforeEach
     public void before() {
         bapBase = BapBase.fromOnlyMasterPrivateKey(TestData.masterPrivateKey);
         remoteBapBase = new RemoteBapBase(bapBase.getRootAddress(), bapBase.getPreviouAddress(), bapBase.getCurrentAddress(), bapBase.getPayAccountAddress(), bapBase.getOrdAddress(), bapBase.getAppName());

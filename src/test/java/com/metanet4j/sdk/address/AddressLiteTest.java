@@ -2,7 +2,7 @@ package com.metanet4j.sdk.address;
 
 import io.bitcoinsv.bitcoinjsv.core.AddressLite;
 import io.bitcoinsv.bitcoinjsv.params.RegTestParams;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 public class AddressLiteTest {
 
