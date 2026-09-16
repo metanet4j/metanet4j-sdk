@@ -8,7 +8,7 @@ import io.bitcoinsv.bitcoinjsv.core.ECKeyLite;
 import io.bitcoinsv.bitcoinjsv.temp.KeyBag;
 import io.bitcoinsv.bitcoinjsv.temp.RedeemData;
 
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Specify a private key for signing and payments.

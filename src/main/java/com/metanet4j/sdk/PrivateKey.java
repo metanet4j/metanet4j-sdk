@@ -10,7 +10,7 @@ import io.bitcoinsv.bitcoinjsv.params.MainNetParams;
 import io.bitcoinsv.bitcoinjsv.params.Net;
 import io.bitcoinsv.bitcoinjsv.params.NetworkParameters;
 
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.math.BigInteger;
 
 public class PrivateKey  {

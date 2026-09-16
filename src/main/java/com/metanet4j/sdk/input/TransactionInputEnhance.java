@@ -5,7 +5,7 @@ import io.bitcoinsv.bitcoinjsv.msg.protocol.Transaction;
 import io.bitcoinsv.bitcoinjsv.msg.protocol.TransactionInput;
 import io.bitcoinsv.bitcoinjsv.msg.protocol.TransactionOutPoint;
 import io.bitcoinsv.bitcoinjsv.params.Net;
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public class TransactionInputEnhance extends TransactionInput {
 

@@ -5,7 +5,7 @@ import io.bitcoinsv.bitcoinjsv.script.Script;
 import io.bitcoinsv.bitcoinjsv.script.ScriptBuilder;
 import io.bitcoinsv.bitcoinjsv.script.ScriptParseException;
 
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import static com.google.common.base.Preconditions.checkArgument;
 

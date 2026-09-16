@@ -7,7 +7,7 @@ import io.bitcoinsv.bitcoinjsv.crypto.DeterministicHierarchy;
 import io.bitcoinsv.bitcoinjsv.crypto.DeterministicKey;
 import io.bitcoinsv.bitcoinjsv.crypto.HDUtils;
 
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotNull;
 import java.util.List;
 
 public abstract class MasterKeyBapBase extends BapBaseAbstract {

@@ -13,7 +13,7 @@ import io.bitcoinsv.bitcoinjsv.params.Net;
 import io.bitcoinsv.bitcoinjsv.params.SerializeMode;
 import io.bitcoinsv.bitcoinjsv.script.SigHash;
 
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public class TransactionExtend extends Transaction {
 

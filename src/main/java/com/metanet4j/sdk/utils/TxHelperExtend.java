@@ -11,7 +11,7 @@ import io.bitcoinsv.bitcoinjsv.script.ScriptChunk;
 import io.bitcoinsv.bitcoinjsv.script.interpreter.ScriptExecutionException;
 import io.bitcoinsv.bitcoinjsv.temp.KeyBag;
 
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.Arrays;
 import java.util.List;
 

@@ -1,7 +1,7 @@
 package com.metanet4j.sdk;
 
 import cn.hutool.core.io.FileUtil;
-import com.fasterxml.jackson.core.type.TypeReference;
+import tools.jackson.core.type.TypeReference;
 import com.google.common.base.Charsets;
 import com.metanet4j.base.util.JacksonUtil;
 import com.metanet4j.sdk.crypto.MasterPrivateKey;

@@ -11,8 +11,8 @@ import com.metanet4j.base.type.BsocialTypeEnum;
 import com.metanet4j.sdk.bap.BapBaseCore;
 import com.metanet4j.sdk.remote.RemoteSignType;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -39,7 +39,7 @@ public class BsocialDataLockBuilder extends UnSpendableDataLockBuilder<BsocialDa
         this.bapBase = bapBase;
     }
 
-    public BsocialDataLockBuilder buildTip(@Nonnull String txid,
+    public BsocialDataLockBuilder buildTip(@NonNull String txid,
                                            String currency, String amount) {
         ArrayList<String> mapDataList = Lists.newArrayList("context", "tx", "tx", txid);
         if (StrUtil.isNotEmpty(currency) && StrUtil.isNotEmpty(amount)) {
@@ -50,21 +50,21 @@ public class BsocialDataLockBuilder extends UnSpendableDataLockBuilder<BsocialDa
     }
 
 
-    public BsocialDataLockBuilder buildUnFollow(@Nonnull String identityKey) {
+    public BsocialDataLockBuilder buildUnFollow(@NonNull String identityKey) {
 
         ArrayList<String> mapDataList = Lists.newArrayList("idKey", identityKey);
         return buildSet(Collections.emptyList(), BsocialTypeEnum.UNFOLLOW, mapDataList);
 
     }
 
-    public BsocialDataLockBuilder buildFollow(@Nonnull String identityKey) {
+    public BsocialDataLockBuilder buildFollow(@NonNull String identityKey) {
         ArrayList<String> mapDataList = Lists.newArrayList("idKey", identityKey);
         return buildSet(Collections.emptyList(), BsocialTypeEnum.FOLLOW, mapDataList);
 
     }
 
 
-    public BsocialDataLockBuilder buildLike(@Nonnull String txId,
+    public BsocialDataLockBuilder buildLike(@NonNull String txId,
                                             @Nullable String emoji) {
         ArrayList<String> mapDataList = Lists.newArrayList("context", "tx", "tx", txId);
         if (StrUtil.isNotEmpty(emoji)) {
@@ -74,32 +74,32 @@ public class BsocialDataLockBuilder extends UnSpendableDataLockBuilder<BsocialDa
         return buildSet(Collections.emptyList(), BsocialTypeEnum.LIKE, mapDataList);
     }
 
-    public BsocialDataLockBuilder buildLike(@Nonnull String txId) {
+    public BsocialDataLockBuilder buildLike(@NonNull String txId) {
         return buildLike(txId, null);
     }
 
-    public BsocialDataLockBuilder buildUnLike(@Nonnull String txId
+    public BsocialDataLockBuilder buildUnLike(@NonNull String txId
     ) {
         ArrayList<String> mapDataList = Lists.newArrayList("context", "tx", "tx", txId);
         return buildSet(Collections.emptyList(), BsocialTypeEnum.UNLIKE, mapDataList);
     }
 
 
-    public BsocialDataLockBuilder buildReply(List<B> bList, @Nonnull String txId) {
+    public BsocialDataLockBuilder buildReply(List<B> bList, @NonNull String txId) {
         ArrayList<String> mapDataList = Lists.newArrayList("context", "tx", "tx", txId);
         return buildSet(bList, BsocialTypeEnum.REPLY, mapDataList);
     }
 
 
-    public BsocialDataLockBuilder buildRepost(List<B> bList, @Nonnull String txId) {
+    public BsocialDataLockBuilder buildRepost(List<B> bList, @NonNull String txId) {
         return buildSet(bList, BsocialTypeEnum.REPOST, Lists.newArrayList("tx", txId));
     }
 
-    public BsocialDataLockBuilder buildPost(@Nonnull List<B> bList, List<String> extendList) {
+    public BsocialDataLockBuilder buildPost(@NonNull List<B> bList, List<String> extendList) {
         return buildSet(bList, BsocialTypeEnum.POST, extendList);
     }
 
-    public BsocialDataLockBuilder buildPost(@Nonnull List<B> bList, List<String> extendList, List<String> addTags) {
+    public BsocialDataLockBuilder buildPost(@NonNull List<B> bList, List<String> extendList, List<String> addTags) {
         MAP setMap = new MAP();
         MAP addMap = new MAP();
 
@@ -113,12 +113,12 @@ public class BsocialDataLockBuilder extends UnSpendableDataLockBuilder<BsocialDa
     }
 
 
-    public BsocialDataLockBuilder buildPost(@Nonnull List<B> bList) {
+    public BsocialDataLockBuilder buildPost(@NonNull List<B> bList) {
         return buildSet(bList, BsocialTypeEnum.POST, Collections.emptyList());
     }
 
 
-    public BsocialDataLockBuilder buildSet(@Nonnull List<B> bList,
+    public BsocialDataLockBuilder buildSet(@NonNull List<B> bList,
                                            BsocialTypeEnum bsocialTypeEnum, List<String> extendList) {
         Bsocial bsocial = new Bsocial();
         if (CollectionUtil.isNotEmpty(bList)) {
@@ -132,7 +132,7 @@ public class BsocialDataLockBuilder extends UnSpendableDataLockBuilder<BsocialDa
         return build(bsocial);
     }
 
-    public BsocialDataLockBuilder buildSet(@Nonnull List<B> bList,
+    public BsocialDataLockBuilder buildSet(@NonNull List<B> bList,
                                            List<MAP> mapList) {
         Bsocial bsocial = new Bsocial();
         if (CollectionUtil.isNotEmpty(bList)) {
@@ -241,7 +241,7 @@ public class BsocialDataLockBuilder extends UnSpendableDataLockBuilder<BsocialDa
 
 
 
-    private MAP mAdd(BsocialTypeEnum bsocialTypeEnum, @Nonnull List<String> extendList) {
+    private MAP mAdd(BsocialTypeEnum bsocialTypeEnum, @NonNull List<String> extendList) {
         Assert.notNull(extendList, "ADD extendList not allow null");
         MAP map = new MAP();
         ArrayList<String> mapDataList = Lists

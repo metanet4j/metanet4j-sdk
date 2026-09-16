@@ -7,7 +7,7 @@ import cn.hutool.crypto.digest.HmacAlgorithm;
 import com.google.common.base.Charsets;
 import io.bitcoinsv.bitcoinjsv.core.ECKeyLite;
 
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.Charset;
 

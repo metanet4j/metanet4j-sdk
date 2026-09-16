@@ -16,6 +16,12 @@
 
     <dependencies>
 
+        <!-- 注解：javax.annotation.Nullable/Nonnull 的替代（版本随 Boot BOM 1.0.1） -->
+        <dependency>
+            <groupId>org.jspecify</groupId>
+            <artifactId>jspecify</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>com.github.briandilley.jsonrpc4j</groupId>
             <artifactId>jsonrpc4j</artifactId>
