@@ -15,12 +15,19 @@ import io.bitcoinsv.bitcoinjsv.core.Coin;
 import io.bitcoinsv.bitcoinjsv.msg.protocol.Transaction;
 import io.bitcoinsv.bitcoinjsv.params.MainNetParams;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
 
+/**
+ * 外部服务/链上数据依赖：本类通过公网 API（Bitails / GorillaPool）拉取实时 UTXO 并广播交易，
+ * 且 fixture 引用 2023 年的主网 outpoint，链上状态早已变化 → 不适合放进常规门禁。
+ * 执行方式：mvn clean test -DexcludedGroups=external（默认排除）；需人工验证时去掉该参数。
+ */
+@Tag("external")
 public class BitcoinschemaTransactionTest extends TransactionContextTest {
 
 
