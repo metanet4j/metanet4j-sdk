@@ -92,9 +92,11 @@ public class BapDataLockBuilder extends UnSpendableDataLockBuilder<BapDataLockBu
             }
 
         } else {
-            if (this.signType == null) {
-                this.signType = signType;
-            }
+            // 直接写入：buildRoot/buildId/buildAlias 自身最了解该交易该用哪种签名类型（ROOT/PREVIOUS/CURRENT）。
+            // 原实现用 `this.signType == null` 判断"未显式指定"，但父类已把该字段初始化为 CURRENT（非 null），
+            // 判断恒为假 → ROOT/PREVIOUS 永不生效，导致 BAP root 交易用 CURRENT 地址签名，
+            // BapHelper.isRootBap 判 false、解析器认不出 root（2026-09-16 修复，见验收报告 §5 遗留项 1）。
+            this.signType = signType;
         }
     }
 
