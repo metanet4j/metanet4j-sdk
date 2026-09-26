@@ -7,6 +7,7 @@ import com.google.common.base.Charsets;
 import com.google.common.collect.Lists;
 import com.metanet4j.base.aip.AipHelper;
 import com.metanet4j.base.constants.ProtocolConstant;
+import com.metanet4j.sdk.EcKeyLiteExtend;
 import com.metanet4j.sdk.PrivateKey;
 import com.metanet4j.sdk.SignType;
 import com.metanet4j.sdk.address.AddressEnhance;
@@ -14,8 +15,8 @@ import com.metanet4j.sdk.bap.BapBaseCore;
 import com.metanet4j.sdk.context.PreSignHashContext;
 import com.metanet4j.sdk.remote.PreSignHashUtils;
 import com.metanet4j.sdk.remote.RemoteSignType;
+import com.metanet4j.sdk.utils.UtilsExtend;
 import io.bitcoinsv.bitcoinjsv.core.Sha256Hash;
-import io.bitcoinsv.bitcoinjsv.core.Utils;
 import io.bitcoinsv.bitcoinjsv.script.Script;
 import io.bitcoinsv.bitcoinjsv.script.ScriptBuilder;
 import io.bitcoinsv.bitcoinjsv.script.ScriptChunk;
@@ -83,21 +84,21 @@ public abstract class UnSpendableDataLockBuilder<T extends UnSpendableDataLockBu
         signingBuffers.stream().forEach(o -> outputStream.writeBytes(o.array()));
         outputStream.writeBytes(HexUtil.decodeHex("7c"));
 
-        this.dataList.add(ByteBuffer.wrap("|".getBytes(Charsets.UTF_8)));
-        this.dataList.add(ByteBuffer.wrap(ProtocolConstant.AIP_PROTOCOL.getBytes(Charsets.UTF_8)));
-        this.dataList.add(ByteBuffer.wrap("BITCOIN_ECDSA".getBytes(Charsets.UTF_8)));
-        byte[] data = Utils.formatMessageForSigning(outputStream.toString(Charsets.UTF_8));
+        byte[] data = UtilsExtend.formatMessageForSigning(outputStream.toByteArray());
         Sha256Hash hash = Sha256Hash.twiceOf(data);
         PreSignHashContext unspendableDataSig = getSig(hash);
-        this.dataList.add(ByteBuffer.wrap(unspendableDataSig.getSignAddress().getBytes(Charsets.UTF_8)));
-        this.dataList.add(ByteBuffer.wrap(Base64.decode(unspendableDataSig.getSigB64().getBytes(Charsets.UTF_8))));
 
         boolean b = AipHelper.verifySign(unspendableDataSig.getSignAddress(), unspendableDataSig.getSigB64(),
-                outputStream.toString(Charsets.UTF_8));
+                outputStream.toByteArray());
         if (!b) {
             throw new RuntimeException("aip sig verify failed,the sig is:" + unspendableDataSig.getSigB64() + ",the address is:"
                     + unspendableDataSig.getSignAddress());
         }
+        this.dataList.add(ByteBuffer.wrap("|".getBytes(Charsets.UTF_8)));
+        this.dataList.add(ByteBuffer.wrap(ProtocolConstant.AIP_PROTOCOL.getBytes(Charsets.UTF_8)));
+        this.dataList.add(ByteBuffer.wrap("BITCOIN_ECDSA".getBytes(Charsets.UTF_8)));
+        this.dataList.add(ByteBuffer.wrap(unspendableDataSig.getSignAddress().getBytes(Charsets.UTF_8)));
+        this.dataList.add(ByteBuffer.wrap(Base64.decode(unspendableDataSig.getSigB64().getBytes(Charsets.UTF_8))));
         return (T) this;
     }
 
@@ -138,37 +139,42 @@ public abstract class UnSpendableDataLockBuilder<T extends UnSpendableDataLockBu
         signingBuffers.stream().forEach(o -> outputStream.writeBytes(o.array()));
         outputStream.writeBytes(HexUtil.decodeHex("7c"));
 
-        this.dataList.add(ByteBuffer.wrap("|".getBytes(Charsets.UTF_8)));
-        this.dataList.add(ByteBuffer.wrap(ProtocolConstant.AIP_PROTOCOL.getBytes(Charsets.UTF_8)));
-        this.dataList.add(ByteBuffer.wrap("BITCOIN_ECDSA".getBytes(Charsets.UTF_8)));
+        List<ByteBuffer> signatureBuffers = Lists.newArrayList();
+        signatureBuffers.add(ByteBuffer.wrap("|".getBytes(Charsets.UTF_8)));
+        signatureBuffers.add(ByteBuffer.wrap(ProtocolConstant.AIP_PROTOCOL.getBytes(Charsets.UTF_8)));
+        signatureBuffers.add(ByteBuffer.wrap("BITCOIN_ECDSA".getBytes(Charsets.UTF_8)));
 
         if (signType == SignType.PREVIOUS) {
             Assert.notNull(bapBase.getPreviouAddress(),
                     "the SignType is PREVIOUS,so sign previous address not allow null when signOpReturnWithAIP");
             Assert.notNull(bapBase.getPreviousPrivateKey(),
                     "the SignType is PREVIOUS,so sign previous privateKey not allow null when signOpReturnWithAIP");
-            this.dataList.add(ByteBuffer.wrap(bapBase.getPreviouAddress().toBase58().getBytes(Charsets.UTF_8)));
-            String sig = bapBase.getPreviousPrivateKey().signMessage(outputStream.toString(Charsets.UTF_8));
-            this.dataList.add(ByteBuffer.wrap(Base64.decode(sig.getBytes(Charsets.UTF_8))));
+            signatureBuffers.add(ByteBuffer.wrap(bapBase.getPreviouAddress().toBase58().getBytes(Charsets.UTF_8)));
+            String sig = new EcKeyLiteExtend(bapBase.getPreviousPrivateKey().getPrivKey(),
+                    bapBase.getPreviousPrivateKey().getPubKeyPoint()).signMessage(outputStream.toByteArray());
+            signatureBuffers.add(ByteBuffer.wrap(Base64.decode(sig.getBytes(Charsets.UTF_8))));
 
         } else if (signType == SignType.CURRENT) {
             Assert.notNull(bapBase.getCurrentAddress(),
                     "the SignType is CURRENT,so sign current address not allow null when signOpReturnWithAIP");
             Assert.notNull(bapBase.getCurrentPrivateKey(),
                     "the SignType is CURRENT,so sign current privateKey not allow null when signOpReturnWithAIP");
-            this.dataList.add(ByteBuffer.wrap(bapBase.getCurrentAddress().toBase58().getBytes(Charsets.UTF_8)));
-            String sig = bapBase.getCurrentPrivateKey().signMessage(outputStream.toString(Charsets.UTF_8));
-            this.dataList.add(ByteBuffer.wrap(Base64.decode(sig.getBytes(Charsets.UTF_8))));
+            signatureBuffers.add(ByteBuffer.wrap(bapBase.getCurrentAddress().toBase58().getBytes(Charsets.UTF_8)));
+            String sig = new EcKeyLiteExtend(bapBase.getCurrentPrivateKey().getPrivKey(),
+                    bapBase.getCurrentPrivateKey().getPubKeyPoint()).signMessage(outputStream.toByteArray());
+            signatureBuffers.add(ByteBuffer.wrap(Base64.decode(sig.getBytes(Charsets.UTF_8))));
         } else if (signType == SignType.ROOT) {
             Assert.notNull(bapBase.getRootAddress(),
                     "the SignType is ROOT,so sign root address not allow null when signOpReturnWithAIP");
             Assert.notNull(bapBase.getRootPrivateKey(),
                     "the SignType is ROOT,so sign root privateKey not allow null when signOpReturnWithAIP");
-            this.dataList.add(ByteBuffer.wrap(bapBase.getRootAddress().getBytes(Charsets.UTF_8)));
-            String sig = bapBase.getRootPrivateKey().signMessage(outputStream.toString(Charsets.UTF_8));
-            this.dataList.add(ByteBuffer.wrap(Base64.decode(sig.getBytes(Charsets.UTF_8))));
+            signatureBuffers.add(ByteBuffer.wrap(bapBase.getRootAddress().getBytes(Charsets.UTF_8)));
+            String sig = new EcKeyLiteExtend(bapBase.getRootPrivateKey().getPrivKey(),
+                    bapBase.getRootPrivateKey().getPubKeyPoint()).signMessage(outputStream.toByteArray());
+            signatureBuffers.add(ByteBuffer.wrap(Base64.decode(sig.getBytes(Charsets.UTF_8))));
         }
 
+        this.dataList.addAll(signatureBuffers);
         return (T) this;
     }
 
@@ -181,10 +187,7 @@ public abstract class UnSpendableDataLockBuilder<T extends UnSpendableDataLockBu
         signingBuffers.stream().forEach(o -> outputStream.writeBytes(o.array()));
         outputStream.writeBytes(HexUtil.decodeHex("7c"));
 
-        this.dataList.add(ByteBuffer.wrap("|".getBytes(Charsets.UTF_8)));
-        this.dataList.add(ByteBuffer.wrap(ProtocolConstant.AIP_PROTOCOL.getBytes(Charsets.UTF_8)));
-        this.dataList.add(ByteBuffer.wrap("BITCOIN_ECDSA".getBytes(Charsets.UTF_8)));
-        byte[] data = Utils.formatMessageForSigning(outputStream.toString(Charsets.UTF_8));
+        byte[] data = UtilsExtend.formatMessageForSigning(outputStream.toByteArray());
         Sha256Hash hash = Sha256Hash.twiceOf(data);
 
         PreSignHashContext preSignHashContext = new PreSignHashContext();
@@ -200,13 +203,15 @@ public abstract class UnSpendableDataLockBuilder<T extends UnSpendableDataLockBu
     }
 
     public T sign() {
-        this.isHaveSign = true;
+        T signedBuilder;
         if (this.remoteSign) {
             Assert.notNull(this.remoteSignType, "SignType is REMOTE, the remoteSignType not allow null");
-            return this.addSig();
+            signedBuilder = this.addSig();
+        } else {
+            signedBuilder = this.signOpReturnWithAIP(this.bapBase, this.signType);
         }
-
-        return this.signOpReturnWithAIP(this.bapBase, this.signType);
+        this.isHaveSign = true;
+        return signedBuilder;
     }
 
     public List<ByteBuffer> getDataList() {
