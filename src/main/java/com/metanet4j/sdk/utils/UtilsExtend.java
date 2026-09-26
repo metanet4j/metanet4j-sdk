@@ -5,23 +5,20 @@ import io.bitcoinsv.bitcoinjsv.core.Utils;
 import io.bitcoinsv.bitcoinjsv.core.VarInt;
 
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import lombok.experimental.UtilityClass;
 
+@UtilityClass
 public class UtilsExtend extends Utils {
     public static byte[] formatMessageForSigning(byte[] messageBytes) {
-        try {
-            ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            bos.write(BITCOIN_SIGNED_MESSAGE_HEADER_BYTES.length);
-            bos.write(BITCOIN_SIGNED_MESSAGE_HEADER_BYTES);
-            VarInt size = new VarInt(messageBytes.length);
-            bos.write(size.encode());
-            bos.write(messageBytes);
-            return bos.toByteArray();
-        } catch (IOException e) {
-            throw new RuntimeException(e);  // Cannot happen.
-        }
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        bos.write(BITCOIN_SIGNED_MESSAGE_HEADER_BYTES.length);
+        bos.writeBytes(BITCOIN_SIGNED_MESSAGE_HEADER_BYTES);
+        VarInt size = new VarInt(messageBytes.length);
+        bos.writeBytes(size.encode());
+        bos.writeBytes(messageBytes);
+        return bos.toByteArray();
     }
 
 

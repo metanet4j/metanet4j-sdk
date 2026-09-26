@@ -9,7 +9,7 @@ import io.bitcoinsv.bitcoinjsv.params.TxParams;
 public class ReadUtils {
 
 
-    private byte[] payload;
+    private final byte[] payload;
     private int cursor;
 
     public ReadUtils(byte[] payload){
@@ -18,21 +18,17 @@ public class ReadUtils {
     }
 
     private void checkReadLength(int length) throws ProtocolException {
-        if ((length > TxParams.MAX_TRANSACTION_SIZE_PARAM) || (cursor + length > payload.length)) {
+        if (length < 0 || length > TxParams.MAX_TRANSACTION_SIZE_PARAM || length > payload.length - cursor) {
             throw new ProtocolException("Claimed value length too large: " + length);
         }
     }
 
     public byte[] readBytes(int length) throws ProtocolException {
         checkReadLength(length);
-        try {
-            byte[] b = new byte[length];
-            System.arraycopy(payload, cursor, b, 0, length);
-            cursor += length;
-            return b;
-        } catch (IndexOutOfBoundsException e) {
-            throw new ProtocolException(e);
-        }
+        byte[] bytes = new byte[length];
+        System.arraycopy(payload, cursor, bytes, 0, length);
+        cursor += length;
+        return bytes;
     }
 
     public byte readByte() throws ProtocolException {
