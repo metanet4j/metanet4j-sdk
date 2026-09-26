@@ -122,8 +122,8 @@ public class OrdinalsTransactionSigner implements TransactionSigner {
 //                Sha256Hash hash = SigHashExtend.hashForForkIdSignature(Translate.toTx(tx), i, script, tx.getInput(i).getConnectedOutput().getValue(), propTx.getHashFlags(), propTx.isAnyoneCanPay());
 //                TransactionSignature signature =new  TransactionSignature(key.sign(hash), propTx.getHashFlags(), propTx.isAnyoneCanPay(), true);
                 TransactionSignature signature = propTx.isUseForkId() ?
-                        tx.calculateForkIdSignature(i, key, script, tx.getInput(i).getConnectedOutput().getValue(), SigHash.Flags.ALL, false) :
-                        tx.calculateLegacySignature(i, key, script, SigHash.Flags.ALL, false);
+                        tx.calculateForkIdSignature(i, key, script, tx.getInput(i).getConnectedOutput().getValue(), propTx.getHashFlags(), propTx.isAnyoneCanPay()) :
+                        tx.calculateLegacySignature(i, key, script, propTx.getHashFlags(), propTx.isAnyoneCanPay());
                 int sigIndex = 0;
                 inputScript = new ScriptExtend(script).getScriptSigWithSignature(inputScript, signature.encodeToBitcoin(), sigIndex);
                 txIn.setScriptSig(inputScript);
