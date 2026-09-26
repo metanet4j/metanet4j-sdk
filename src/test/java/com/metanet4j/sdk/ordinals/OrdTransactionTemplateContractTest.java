@@ -3,6 +3,7 @@ package com.metanet4j.sdk.ordinals;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -18,6 +19,9 @@ import io.bitcoinsv.bitcoinjsv.core.Coin;
 import io.bitcoinsv.bitcoinjsv.core.Sha256Hash;
 import io.bitcoinsv.bitcoinjsv.core.UTXO;
 import io.bitcoinsv.bitcoinjsv.msg.protocol.Transaction;
+import io.bitcoinsv.bitcoinjsv.script.ScriptBuilder;
+import io.bitcoinsv.bitcoinjsv.script.ScriptUtils_legacy;
+import io.bitcoinsv.bitcoinjsv.script.ScriptVerifyFlag;
 import io.bitcoinsv.bitcoinjsv.signers.TransactionSigner;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -82,6 +86,81 @@ class OrdTransactionTemplateContractTest {
         assertThrows(SignErrorException.class, () -> template.sendOrdinal(bap,
                 ordinalUtxo(4), paymentUtxo(5), destination, payment, 500,
                 null, null, keyBag, signer));
+    }
+
+    @Test
+    void defaultCreateOrdinalSignsThePaymentInputAndBalancesChange() {
+        OrdTransactionBuilder builder = new OrdTransactionTemplate().createOrdinal(
+                List.of(bap.getPayAccountAddress()), provider, destination, payment,
+                500, inscription("first", "text/plain"), null, bap, keyBag);
+
+        Transaction signed = builder.build();
+        assertEquals(Coin.SATOSHI, signed.getOutput(0).getValue());
+        assertEquals(signed.getInputSum(), signed.getOutputSum().add(builder.getFee()));
+        assertSpendable(signed);
+    }
+
+    @Test
+    void defaultSendOrdinalSignsBothInputsWithoutReinscription() {
+        Transaction signed = new OrdTransactionTemplate().sendOrdinal(bap,
+                ordinalUtxo(6), paymentUtxo(7), destination, payment, 500,
+                null, null, keyBag);
+
+        assertEquals(Coin.SATOSHI, signed.getOutput(0).getValue());
+        assertArrayEquals(ScriptBuilder.createOutputScript(destination).getProgram(),
+                signed.getOutput(0).getScriptBytes());
+        assertSpendable(signed);
+    }
+
+    @Test
+    void emptyReinscriptionFieldsUseTheOrdinaryTransferOutput() {
+        TransactionSigner signer = mock(TransactionSigner.class);
+        when(signer.signInputs(any(), any())).thenReturn(true);
+        Transaction missingContent = new OrdTransactionTemplate().sendOrdinal(bap,
+                ordinalUtxo(8), paymentUtxo(9), destination, payment, 500,
+                inscription("new", ""), null, keyBag, signer);
+        Transaction missingData = new OrdTransactionTemplate().sendOrdinal(bap,
+                ordinalUtxo(10), paymentUtxo(11), destination, payment, 500,
+                inscription("", "text/plain"), null, keyBag, signer);
+
+        byte[] ordinaryOutput = ScriptBuilder.createOutputScript(destination).getProgram();
+        assertArrayEquals(ordinaryOutput, missingContent.getOutput(0).getScriptBytes());
+        assertArrayEquals(ordinaryOutput, missingData.getOutput(0).getScriptBytes());
+    }
+
+    @Test
+    @SuppressWarnings("deprecation")
+    void deprecatedSendUtxosBuildsAndSignsTheChangePayment() throws Exception {
+        Transaction signed = new OrdTransactionTemplate().sendUtxos(bap,
+                List.of(paymentUtxo(12)), payment, 500, keyBag);
+
+        assertEquals(1, signed.getInputs().size());
+        assertEquals(1, signed.getOutputs().size());
+        assertTrue(signed.getOutputSum().isLessThan(signed.getInputSum()));
+        assertSpendable(signed);
+    }
+
+    @Test
+    void defaultCreateBapOrdinalIncludesRootAndSigmaProofs() {
+        Transaction signed = new OrdTransactionTemplate().createBapOrdinal(
+                List.of(bap.getPayAccountAddress()), provider, destination,
+                payment, 500, bap, keyBag);
+
+        assertEquals(Coin.SATOSHI, signed.getOutput(0).getValue());
+        assertTrue(signed.getOutputs().size() >= 3);
+        assertTrue(new String(signed.getOutput(1).getScriptBytes(), StandardCharsets.UTF_8)
+                .contains("1BAPSuaPnfGnSBM3GLV9yhxUdYe4vGbdM"));
+        assertSpendable(signed);
+    }
+
+    private void assertSpendable(Transaction signed) {
+        for (int i = 0; i < signed.getInputs().size(); i++) {
+            assertTrue(signed.getInput(i).getScriptBytes().length > 0);
+            ScriptUtils_legacy.correctlySpends(signed.getInput(i).getScriptSig(), signed, i,
+                    signed.getInput(i).getConnectedOutput().getScriptPubKey(),
+                    signed.getInput(i).getConnectedOutput().getValue(),
+                    ScriptVerifyFlag.GENESIS_SET);
+        }
     }
 
     private OrdScriptBuilder.Inscription inscription(String value, String contentType) {
