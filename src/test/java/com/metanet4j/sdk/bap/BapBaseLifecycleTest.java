@@ -71,4 +71,12 @@ class BapBaseLifecycleTest {
         assertThrows(IllegalStateException.class, () -> BapBase.fromSignatureAddress(
                 TestData.masterPrivateKey, expected.getIdentityKey(), "invalid-address", 3));
     }
+
+    @Test
+    void signingPathHandlesUnsignedHexChunksAndHardening() {
+        BapBase bap = BapBase.fromOnlyMasterPrivateKey(TestData.masterPrivateKey);
+        assertEquals("m/1'/2147483647'", bap.getSigningPathFromHex("000000017fffffff", true));
+        assertEquals("m/1", bap.getSigningPathFromHex("80000000", false));
+        assertEquals("m/1'", bap.getSigningPathFromHex("80000000", true));
+    }
 }

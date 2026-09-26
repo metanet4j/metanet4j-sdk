@@ -130,9 +130,9 @@ public class BapBase extends MasterKeyBapBase {
     public String getSigningPathFromHex(String hexString, boolean hardened) {
         String signingPath = "m";
         String[] signingHex = hexString.split("(?<=\\G.{8})");
-        int maxNumber = 2147483647;
+        long maxNumber = 2147483647L;
         for (String hexNumber : signingHex) {
-            int number = Integer.parseInt(hexNumber, 16);
+            long number = Long.parseLong(hexNumber, 16);
             if (number > maxNumber) {
                 number -= maxNumber;
             }
