@@ -151,7 +151,7 @@ public class BapBase extends MasterKeyBapBase {
     public static BapBase fromSignatureAddress(MasterPrivateKey masterPrivateKey, String identityKey,
                                                String currentSignatureAddress,
                                                int loop) {
-        Assert.isTrue(loop <= 100);
+        Assert.isTrue(loop > 0 && loop <= 100, "loop must be between 1 and 100");
         List<ChildNumber> rootChildNumberList = null;
         List<ChildNumber> currentNumberList = null;
 
@@ -208,13 +208,13 @@ public class BapBase extends MasterKeyBapBase {
             }
 
         } else {
-            throw new RuntimeException("identityKey match fail");
+            throw new IllegalStateException("identityKey match fail");
         }
 
         if (matchIdentityKey && matchCurrentSignatureAddress) {
             return new BapBase(masterPrivateKey, rootChildNumberList, currentNumberList, new DefaultBapBaseConfig());
         }
-        return null;
+        throw new IllegalStateException("currentSignatureAddress match fail");
 
 
     }
@@ -222,11 +222,12 @@ public class BapBase extends MasterKeyBapBase {
 
     public List<ChildNumber> getPreviousChildNumbers() {
         ChildNumber last = CollectionUtil.getLast(this.currentNumberList);
-        if (last.num() == 1) {
+        if (last.num() <= 1) {
             return this.rootChildNumberList;
         } else {
             List<ChildNumber> previousChildNumbers = CollectionUtil.newArrayList(this.currentNumberList);
-            previousChildNumbers.add(new ChildNumber(last.num() - 1, last.isHardened()));
+            previousChildNumbers.set(previousChildNumbers.size() - 1,
+                    new ChildNumber(last.num() - 1, last.isHardened()));
             return previousChildNumbers;
         }
 
