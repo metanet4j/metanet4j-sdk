@@ -231,7 +231,7 @@ public class RemoteOrdTransactionTemplate {
         OrdScriptBuilder.ORDMap ordMap = new OrdScriptBuilder.ORDMap();
         ordMap.put("app", bapBase.getAppName());
         ordMap.put("type", "post");
-        return createOrdinal(payAddressLiteList, utxoProvider, destinationAddress, changeAddress, feePerKb, inscription, null, bapBase, transactionSigner, remoteSignType).build();
+        return createOrdinal(payAddressLiteList, utxoProvider, destinationAddress, changeAddress, feePerKb, inscription, ordMap, bapBase, transactionSigner, remoteSignType).build();
 
     }
 
