@@ -31,9 +31,7 @@ public class TxHelperExtend extends TxHelper {
         RedeemDataExtend redeemData = null;
         try {
             byte[] bytes = getPubKeyHashByOrdinalScript(connectedScript);
-            if (bytes == null || bytes.length == 0) {
-
-            } else {
+            if (bytes.length != 0) {
                 redeemData = RedeemDataExtend.of(keyBag.findKeyFromPubHash(bytes), connectedScript);
             }
 
