@@ -50,7 +50,7 @@ public class RemoteTransactionSigner implements TransactionSigner {
 
             try {
 //
-                Sha256Hash hash = SigHashExtend.hashForForkIdSignature(Translate.toTx(tx), i, scriptPubKey.getProgram(), tx.getInput(i).getConnectedOutput().getValue(), SigHash.Flags.ALL, propTx.isAnyoneCanPay());
+                Sha256Hash hash = SigHashExtend.hashForForkIdSignature(Translate.toTx(tx), i, scriptPubKey.getProgram(), tx.getInput(i).getConnectedOutput().getValue(), propTx.getHashFlags(), propTx.isAnyoneCanPay());
                 PreSignHashContext signedHashContext = PreSignHashUtils.getSignedHashContext(hash);
                 TransactionSignature signature = new TransactionSignature(ECDSASignature.decodeFromDER(Base64.decode(signedHashContext.getSigB64())), propTx.getHashFlags(), propTx.isAnyoneCanPay(), true);
 

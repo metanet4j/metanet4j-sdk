@@ -4,6 +4,7 @@ import com.google.common.collect.Lists;
 import com.metanet4j.sdk.bap.BapBaseCore;
 import com.metanet4j.sdk.bap.RemoteBapBase;
 import com.metanet4j.sdk.context.PreSignHashContext;
+import com.metanet4j.sdk.script.SigHashExtend;
 import com.metanet4j.sdk.sigma.Sigma;
 import com.metanet4j.sdk.transcation.LockingScriptBuilder;
 import com.metanet4j.sdk.transcation.TransactionBuilder;
@@ -78,7 +79,7 @@ public class RemoteTransactionBuilder extends TransactionBuilder implements Tran
             Script scriptPubKey = txIn.getConnectedOutput().getScriptPubKey();
 
 
-            Sha256Hash hash = SigHash.hashForForkIdSignature(Translate.toTx(this.targetTransaction), i, scriptPubKey.getProgram(), this.targetTransaction.getInput(i).getConnectedOutput().getValue(), flags, anyoneCanPay);
+            Sha256Hash hash = SigHashExtend.hashForForkIdSignature(Translate.toTx(this.targetTransaction), i, scriptPubKey.getProgram(), this.targetTransaction.getInput(i).getConnectedOutput().getValue(), flags, anyoneCanPay);
             preSignHashContext.setPreSignHash(hash);
 
             if (TxHelperExtend.isSentToOrdinals(scriptPubKey)) {

@@ -47,13 +47,15 @@ public class RemoteOrdTransactionBuilder extends RemoteTransactionBuilder {
 
 
     public RemoteOrdTransactionBuilder signTx(KeyBag keyBag, boolean useForkId) throws SignErrorException {
-        return signTx(keyBag, SigHash.Flags.ALL, true, false);
+        return signTx(keyBag, SigHash.Flags.ALL, useForkId, false);
     }
 
 
     public RemoteOrdTransactionBuilder signTx(KeyBag keyBag, SigHash.Flags hashFlags, boolean useForkId, boolean anyoneCanPay) throws SignErrorException {
         final ExtendForSignTransaction extendForSignTransaction = new ExtendForSignTransaction(TransactionExtend.toTransactionExtend(this.getTargetTransaction()), hashFlags, useForkId, anyoneCanPay);
-        boolean b = this.getTransactionSigner().signInputs(extendForSignTransaction, keyBag);
+        if (!this.getTransactionSigner().signInputs(extendForSignTransaction, keyBag)) {
+            throw new SignErrorException();
+        }
         return this;
 
     }
