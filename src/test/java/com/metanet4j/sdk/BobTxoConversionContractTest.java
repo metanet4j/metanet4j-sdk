@@ -101,6 +101,35 @@ class BobTxoConversionContractTest {
         assertThrows(RuntimeException.class, () -> TxoHelper.toTxo("00"));
     }
 
+    @Test
+    void keepsNonP2pkhInputAndOpReturnAfterEarlierData() {
+        Transaction tx = new Transaction(Net.MAINNET);
+        tx.addInput(Sha256Hash.wrap(new byte[32]), 2,
+                new ScriptBuilder().op(ScriptOpCodes.OP_1).build());
+        tx.addOutput(Coin.valueOf(0), new ScriptBuilder()
+                .data("left".getBytes(StandardCharsets.UTF_8))
+                .data("right".getBytes(StandardCharsets.UTF_8))
+                .op(ScriptOpCodes.OP_RETURN)
+                .data("tail".getBytes(StandardCharsets.UTF_8)).build());
+        String hex = HexUtil.encodeHexStr(tx.bitcoinSerialize());
+
+        Map<String, Object> bob = BobHelper.toBob(hex);
+        Map<String, Object> txo = TxoHelper.toTxo(hex);
+        assertEquals(64, String.valueOf(field(item(bob, "in", 0), "e").get("a")).length());
+        assertTrue(String.valueOf(field(item(txo, "in", 0), "e").get("a")).contains("1"));
+        assertEquals(ScriptOpCodes.OP_1, cell(tape(item(bob, "in", 0)).get(0), 0).get("op"));
+        assertEquals("left", item(txo, "out", 0).get("s0"));
+        assertEquals("right", item(txo, "out", 0).get("s1"));
+        assertEquals("tail", item(txo, "out", 0).get("s3"));
+
+        List<Map<String, Object>> tape = tape(item(bob, "out", 0));
+        assertEquals(3, tape.size());
+        assertEquals("left", cell(tape.get(0), 0).get("s"));
+        assertEquals("right", cell(tape.get(0), 1).get("s"));
+        assertEquals(ScriptOpCodes.OP_RETURN, cell(tape.get(1), 0).get("op"));
+        assertEquals("tail", cell(tape.get(2), 0).get("s"));
+    }
+
     @SuppressWarnings("unchecked")
     private static Map<String, Object> field(Map<String, Object> item, String name) {
         return (Map<String, Object>) item.get(name);
