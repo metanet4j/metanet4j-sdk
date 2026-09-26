@@ -20,6 +20,7 @@ import io.bitcoinsv.bitcoinjsv.core.Coin;
 import io.bitcoinsv.bitcoinjsv.core.Sha256Hash;
 import io.bitcoinsv.bitcoinjsv.core.UTXO;
 import io.bitcoinsv.bitcoinjsv.msg.protocol.Transaction;
+import io.bitcoinsv.bitcoinjsv.params.Net;
 import io.bitcoinsv.bitcoinjsv.script.Script;
 import io.bitcoinsv.bitcoinjsv.script.ScriptUtils_legacy;
 import io.bitcoinsv.bitcoinjsv.script.ScriptVerifyFlag;
@@ -36,6 +37,29 @@ class OrdTransactionBuilderContractTest {
     private final KeyBag keyBag = new BapBase.BapProviderKeyBag(bap);
     private final Address paymentAddress = new Address(bap.getPayAccountAddress());
     private final Address ordAddress = bap.getOrdAddress();
+
+    @Test
+    void constructorsKeepTheSelectedNetworkTransactionAndSigner() {
+        Transaction existing = new Transaction(Net.TESTNET3);
+        existing.addOutput(Coin.valueOf(546), paymentAddress);
+        TransactionSigner signer = mock(TransactionSigner.class);
+
+        OrdTransactionBuilder defaults = new OrdTransactionBuilder(bap, keyBag);
+        OrdTransactionBuilder testnet = new OrdTransactionBuilder(bap, Net.TESTNET3, keyBag);
+        OrdTransactionBuilder existingTransaction = new OrdTransactionBuilder(
+                bap, Net.TESTNET3, existing, keyBag);
+        OrdTransactionBuilder configured = new OrdTransactionBuilder(
+                bap, Net.TESTNET3, existing, signer, keyBag);
+
+        assertEquals(Net.MAINNET, defaults.getNet());
+        assertTrue(defaults.getTransactionSigner() != null);
+        assertEquals(Net.TESTNET3, testnet.getNet());
+        assertEquals(Net.TESTNET3, testnet.build().getNet());
+        assertSame(existing, existingTransaction.build());
+        assertSame(existing, configured.build());
+        assertSame(signer, configured.getTransactionSigner());
+        assertEquals(Coin.valueOf(546), configured.build().getOutput(0).getValue());
+    }
 
     @Test
     void signsPaymentAndInscribedInputsInMemory() {
