@@ -3,8 +3,14 @@ package com.metanet4j.sdk;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import cn.hutool.core.util.HexUtil;
 import com.alibaba.fastjson.JSONArray;
+import com.metanet4j.sdk.bap.BapBase;
+import com.metanet4j.sdk.sigma.Sigma;
+import io.bitcoinsv.bitcoinjsv.msg.protocol.Transaction;
+import io.bitcoinsv.bitcoinjsv.params.Net;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -54,9 +60,22 @@ class OrdHistoricalFixtureContractTest {
     }
 
     @Test
-    void ordinaryInscriptionFixtureCarriesSameGltfAndGeohash() throws IOException {
-        // 仓库中的 ord1.hex 与 2809d6.hex 是同一笔交易的两个资源名。
-        assertGltfMetadata("ord1.hex");
+    void ordinaryInscriptionFixtureMatchesTheMetadataVector() throws IOException {
+        assertEquals(readFixture("2809d6.hex"), readFixture("ord1.hex"));
+    }
+
+    @Test
+    void sigmaFixtureVerifiesItsFixedSignedMessageAddress() throws IOException {
+        String hex = readFixture("040c6d48c.hex");
+        Converted tx = convert("040c6d48c.hex",
+                "db6d12611fbbbacf5ae652deee3a8e018d93eaa048348fb49f76173040c6d48c", 1, 2);
+        assertEquals(1L, value(tx.txo(), 0));
+        assertEquals("SIGMA", output(tx.txo(), 0).get("s27"));
+        assertEquals("BSM", output(tx.txo(), 0).get("s28"));
+        assertEquals("12cxrp1b47DgxtxisBCzuL24QHdkrAKf8Y", output(tx.txo(), 0).get("s29"));
+
+        Transaction transaction = new Transaction(Net.MAINNET, HexUtil.decodeHex(hex));
+        assertTrue(new Sigma(BapBase.fromOnlyMasterPrivateKey(TestData.masterPrivateKey), transaction).verify());
     }
 
     @Test
@@ -96,12 +115,7 @@ class OrdHistoricalFixtureContractTest {
     }
 
     private static Converted convert(String fixture, String txid, int inputs, int outputs) throws IOException {
-        String path = "/ord/" + fixture;
-        String hex;
-        try (InputStream stream = OrdHistoricalFixtureContractTest.class.getResourceAsStream(path)) {
-            assertNotNull(stream, path);
-            hex = new String(stream.readAllBytes(), StandardCharsets.UTF_8).trim();
-        }
+        String hex = readFixture(fixture);
         Map<String, Object> bob = BobHelper.toBob(hex);
         Map<String, Object> txo = TxoHelper.toTxo(hex);
         assertEquals(txid, field(bob, "tx").get("h"), fixture);
@@ -113,6 +127,14 @@ class OrdHistoricalFixtureContractTest {
         assertEquals(1, ((Number) bob.get("v")).intValue(), fixture);
         assertEquals(0, ((Number) bob.get("lock")).intValue(), fixture);
         return new Converted(bob, txo);
+    }
+
+    private static String readFixture(String fixture) throws IOException {
+        String path = "/ord/" + fixture;
+        try (InputStream stream = OrdHistoricalFixtureContractTest.class.getResourceAsStream(path)) {
+            assertNotNull(stream, path);
+            return new String(stream.readAllBytes(), StandardCharsets.UTF_8).trim();
+        }
     }
 
     private static long value(Map<String, Object> tx, int index) {
