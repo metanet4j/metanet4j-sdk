@@ -121,4 +121,14 @@ class BapBaseLifecycleTest {
         assertEquals("identity export", bap.decryptSelf(ciphertext));
         assertThrows(IllegalStateException.class, () -> bap.decryptSelf("invalid-ciphertext"));
     }
+
+    @Test
+    void selfExportEncryptsCurrentIdentityAndCanBeRestored() {
+        BapBase bap = BapBase.fromOnlyMasterPrivateKey(TestData.masterPrivateKey);
+        String ciphertext = bap.encryptSelf();
+
+        assertNotNull(ciphertext);
+        assertNotEquals(bap.getIdentityKey(), ciphertext);
+        assertEquals(bap.getIdentityKey(), bap.decryptSelf(ciphertext));
+    }
 }

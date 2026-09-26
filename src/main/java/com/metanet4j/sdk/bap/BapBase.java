@@ -265,7 +265,14 @@ public class BapBase extends MasterKeyBapBase {
 
 
     public String encryptSelf() {
-        return null;
+        try {
+            DeterministicKey encryptionKey = getEncryptDeterministicKey(
+                    HDUtils.parsePath(this.bapBaseConfig.getDefaultEncryptPath()));
+            return Ecies.encrypt(this.identityKey,
+                    ECKeyLite.fromPublicOnly(encryptionKey.getPubKey()), null);
+        } catch (Exception e) {
+            throw new IllegalStateException("BAP 身份加密失败", e);
+        }
     }
 
 
