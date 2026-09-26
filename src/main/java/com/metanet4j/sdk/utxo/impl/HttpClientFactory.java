@@ -12,23 +12,18 @@ import java.net.http.HttpClient.Version;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import lombok.experimental.UtilityClass;
 
-public final class HttpClientFactory {
+@UtilityClass
+public class HttpClientFactory {
 
-    private HttpClientFactory(){};
-    private static volatile HttpClient httpClient=null;
+    private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofMillis(1000 * 60))
+            .version(Version.HTTP_1_1)
+            .build();
 
     public static HttpClient createHttpClient(){
-        if (httpClient==null){
-            synchronized (HttpClientFactory.class){
-                if(httpClient==null){
-                    httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofMillis(1000 * 60))
-                            .version(Version.HTTP_1_1).build();
-                }
-            }
-
-        }
-        return httpClient;
+        return HTTP_CLIENT;
     }
 
 
@@ -59,24 +54,33 @@ public final class HttpClientFactory {
     }
 
     public static <T> T send(HttpRequest request, Class<T> tClass) {
+        return send(createHttpClient(), request, tClass);
+    }
+
+    public static <T> T send(HttpClient client, HttpRequest request, Class<T> tClass) {
         try {
-            HttpClient client = HttpClientFactory.createHttpClient();
             HttpResponse<String> response = client
                     .send(request, responseInfo -> HttpResponse.BodySubscribers.ofString(Charsets.UTF_8));
-            if (response != null && StrUtil.isNotEmpty(response.body())) {
-                T t = JacksonUtil
-                        .string2Obj(response.body(), tClass);
-
-                if (t == null) {
-                    throw new RuntimeException("send fail,the url is " + request.uri() + ",the body is " + response.body());
+            if (response != null) {
+                if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                    throw new RuntimeException("send fail,status " + response.statusCode()
+                            + ",the url is " + request.uri());
                 }
-                return t;
+                if (StrUtil.isNotEmpty(response.body())) {
+                    T t = JacksonUtil.string2Obj(response.body(), tClass);
+                    if (t == null) {
+                        throw new RuntimeException("send fail,the url is " + request.uri()
+                                + ",the body is " + response.body());
+                    }
+                    return t;
+                }
             }
 
         } catch (IOException e) {
             e.printStackTrace();
         } catch (InterruptedException e) {
             e.printStackTrace();
+            Thread.currentThread().interrupt();
         }
         return null;
     }

@@ -17,9 +17,19 @@ import java.util.List;
  */
 public class OrdinalsOriginGorillaUtxoProvider implements UTXOProvider<String, UTXO> {
 
+    private final String baseUrl;
+
+    public OrdinalsOriginGorillaUtxoProvider() {
+        this(GorillaClient.BASE_URL);
+    }
+
+    public OrdinalsOriginGorillaUtxoProvider(String baseUrl) {
+        this.baseUrl = baseUrl;
+    }
+
     @Override
     public List<UTXO> listUxtos(List<String> list) {
-        Txo txo = GorillaClient.GetTxoByOrigin(list.get(0));
+        Txo txo = GorillaClient.GetTxoByOrigin(baseUrl, list.get(0));
         UTXO utxo = new UTXO(Sha256Hash.wrap(StrUtil.isNotEmpty(txo.getSpend()) ? txo.getSpend() : txo.getTxid()), txo.getVout(), Coin.valueOf(txo.getSatoshis()),
                 0, false, new Script(Base64.decode(txo.getScript())));
         return Lists.newArrayList(utxo);

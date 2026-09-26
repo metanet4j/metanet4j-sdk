@@ -17,11 +17,21 @@ import java.util.stream.Collectors;
  */
 public class BitailsUtxoProvider implements UTXOProvider<AddressLite, UTXO> {
 
+    private final String baseUrl;
+
+    public BitailsUtxoProvider() {
+        this(BitailsClient.BASE_URL);
+    }
+
+    public BitailsUtxoProvider(String baseUrl) {
+        this.baseUrl = baseUrl;
+    }
+
     @Override
     public List<UTXO> listUxtos(List<AddressLite> list) {
         List<UTXO> utxoList = new ArrayList<>();
          list.stream().forEach(addressLite -> {
-            AddressUnspentResDto unspentResDto = BitailsClient.getAddressUnspentResDto(addressLite.toBase58(), 0, 100);
+            AddressUnspentResDto unspentResDto = BitailsClient.getAddressUnspentResDto(baseUrl, addressLite.toBase58(), 0, 100);
             List<UTXO> utxos = Optional.ofNullable(unspentResDto.getUnspent()).orElse(new ArrayList<>()).stream().map(o -> {
                 UTXO utxo = new UTXO(Sha256Hash.wrap(o.getTxid()), o.getVout(), Coin.valueOf(o.getSatoshis()),
                         0, false, null, unspentResDto.getAddress());

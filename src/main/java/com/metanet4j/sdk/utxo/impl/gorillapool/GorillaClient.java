@@ -14,9 +14,12 @@ public class GorillaClient {
 
 
     public static Txo GetTxoByOrigin(String Origin) {
+        return GetTxoByOrigin(BASE_URL, Origin);
+    }
 
-        String format = StrUtil.format(BASE_URL + "/api/txos/{}?script=true",
-                Origin);
+    public static Txo GetTxoByOrigin(String baseUrl, String origin) {
+        String format = StrUtil.format(baseUrl + "/api/txos/{}?script=true",
+                origin);
         HttpRequest getHttpRequest = HttpClientFactory.createGetHttpRequest(format, 1000 * 60);
 
         return send(getHttpRequest, Txo.class);
