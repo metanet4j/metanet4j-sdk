@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.metanet4j.sdk.utils.UtilsExtend;
@@ -58,5 +59,15 @@ class EcKeyLiteExtendContractTest {
                 new BigInteger(1, Arrays.copyOfRange(compact, 33, 65)));
         ECKeyLite recovered = ECKeyLite.recoverFromSignature(header - 27, decoded, hash, false);
         assertArrayEquals(key.getPubKey(), recovered.getPubKey());
+    }
+
+    @Test
+    void rejectsSignatureWhenPrivateAndPublicKeysDoNotMatch() {
+        EcKeyLiteExtend inconsistent = new EcKeyLiteExtend(BigInteger.TWO,
+                ECKeyLite.fromPrivate(BigInteger.valueOf(3)).getPubKeyPoint());
+
+        RuntimeException error = assertThrows(RuntimeException.class,
+                () -> inconsistent.signMessage(new byte[] {1, 2, 3}));
+        assertTrue(error.getMessage().contains("recoverable key"));
     }
 }
