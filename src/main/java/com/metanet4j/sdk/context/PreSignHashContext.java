@@ -38,10 +38,13 @@ public class PreSignHashContext {
     public PreSignHashContext fromMap(LinkedHashMap map) {
         this.signAddress = (String) map.get("signAddress");
         this.sigB64 = (String) map.get("sigB64");
-        this.preSignHash = Sha256Hash.wrap((String) map.get("preSignHash"));
+        Object hashValue = map.get("preSignHash");
+        this.preSignHash = hashValue == null ? null : Sha256Hash.wrap((String) hashValue);
         this.remoteSignType = RemoteSignType.valueOf((String) map.get("remoteSignType"));
-        this.fee = Coin.valueOf((Long) map.get("fee"));
-        this.publicKey = PublicKey.fromHex(map.get("publicKey").toString());
+        Object feeValue = map.get("fee");
+        this.fee = feeValue == null ? null : Coin.valueOf(((Number) feeValue).longValue());
+        Object keyValue = map.get("publicKey");
+        this.publicKey = keyValue == null ? null : PublicKey.fromHex(keyValue.toString());
         return this;
     }
 }

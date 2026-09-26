@@ -3,10 +3,12 @@ package com.metanet4j.sdk.remote;
 import com.google.common.collect.Lists;
 import com.metanet4j.sdk.context.PreSignHashContext;
 import io.bitcoinsv.bitcoinjsv.core.Sha256Hash;
+import lombok.experimental.UtilityClass;
 
 import java.util.List;
 
-public final class PreSignHashUtils {
+@UtilityClass
+public class PreSignHashUtils {
 
     private static final ThreadLocal<List<PreSignHashContext>> STORE = new ThreadLocal<List<PreSignHashContext>>() {
         protected List<PreSignHashContext> initialValue() {

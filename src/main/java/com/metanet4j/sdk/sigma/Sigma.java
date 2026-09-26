@@ -18,8 +18,6 @@ import com.metanet4j.sdk.utils.ScriptHelper;
 import com.metanet4j.sdk.utils.UtilsExtend;
 import io.bitcoinsv.bitcoinjsv.core.AddressLite;
 import io.bitcoinsv.bitcoinjsv.core.Sha256Hash;
-import io.bitcoinsv.bitcoinjsv.core.UnsafeByteArrayOutputStream;
-import io.bitcoinsv.bitcoinjsv.core.Utils;
 import io.bitcoinsv.bitcoinjsv.msg.protocol.Transaction;
 import io.bitcoinsv.bitcoinjsv.msg.protocol.TransactionInput;
 import io.bitcoinsv.bitcoinjsv.msg.protocol.TransactionOutput;
@@ -33,11 +31,12 @@ import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.spongycastle.pqc.math.linearalgebra.ByteUtils;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 @Data
 @Slf4j
@@ -89,7 +88,7 @@ public class Sigma implements PreSignHash {
 
     public Sigma(BapBaseCore bapBaseCore, Transaction transaction, int targetVout, int sigmaInstance, int refVin) {
         this.bapBaseCore = bapBaseCore;
-        this.transaction = transaction;
+        this.transaction = Objects.requireNonNull(transaction, "transaction");
         this.targetVout = targetVout;
         this.refVin = refVin;
         this.sigmaInstance = sigmaInstance;
@@ -98,7 +97,7 @@ public class Sigma implements PreSignHash {
     }
 
     public void setTransaction(Transaction transaction) {
-        this.transaction = transaction;
+        this.transaction = Objects.requireNonNull(transaction, "transaction");
         this.targetVout = 0;
         this.refVin = 0;
         this.sigmaInstance = 0;
@@ -119,31 +118,23 @@ public class Sigma implements PreSignHash {
                 .build();
 
         this.sig = new Sig(address, signature, Algorithm.BSM.toString(), vin, this.targetVout);
-        Sig existingSig = getSig();
-
-        List<ScriptChunk> newScriptAsm = new ArrayList<>();
-        List<ScriptChunk> existingAsm = this.getTargetTxOut().getScriptPubKey().getChunks();
-
-        boolean containsOpReturn = existingAsm.stream().filter(s -> s.opcode == ScriptOpCodes.OP_RETURN).findFirst().isPresent();
-        String separator = containsOpReturn ? "|" : "OP_RETURN";
-
-
-        if (existingSig != null && this.sigmaInstance == getSigInstanceCount()) {
-            // Get the location of the signature.
-            int sigIndex = getSigInstancePosition();
-            // Replace the old signature with a new one.
-            if (sigIndex != -1) {
-                existingAsm = existingAsm.subList(sigIndex, 5);
-                existingAsm.addAll(signedScript.getChunks());
-
-            }
+        List<ScriptChunk> newScriptAsm = new ArrayList<>(this.getTargetTxOut().getScriptPubKey().getChunks());
+        int existingCount = getSigInstanceCount();
+        if (sigmaInstance > existingCount) {
+            throw new IllegalArgumentException("Sigma instance is out of range: " + sigmaInstance);
         }
-
-        newScriptAsm.addAll(existingAsm);
-        ScriptBuilder newScriptBuilder = new ScriptBuilder();
-        newScriptBuilder.data(separator.getBytes());
-        newScriptAsm.addAll(newScriptBuilder.build().getChunks());
-        newScriptAsm.addAll(signedScript.getChunks());
+        if (sigmaInstance < existingCount) {
+            int sigIndex = getSigInstancePosition();
+            for (int i = 0; i < signedScript.getChunks().size(); i++) {
+                newScriptAsm.set(sigIndex + i, signedScript.getChunks().get(i));
+            }
+        } else {
+            boolean containsOpReturn = newScriptAsm.stream()
+                    .anyMatch(chunk -> chunk.opcode == ScriptOpCodes.OP_RETURN);
+            String separator = containsOpReturn ? "|" : "OP_RETURN";
+            newScriptAsm.addAll(new ScriptBuilder().data(separator.getBytes()).build().getChunks());
+            newScriptAsm.addAll(signedScript.getChunks());
+        }
 
         // Clone the transaction and set the output script.
         Transaction signedTx = this.transaction;
@@ -198,10 +189,6 @@ public class Sigma implements PreSignHash {
 
         if (sig == null) {
             throw new IllegalArgumentException("No signature provided");
-        }
-
-        if (getMessageHash() == null) {
-            throw new IllegalStateException("No transaction data");
         }
 
         AddressLite address = AddressLite.fromBase58(MainNetParams.get(), this.sig.getAddress());
@@ -272,12 +259,16 @@ public class Sigma implements PreSignHash {
         Script scriptPubKey = getTargetTxOut().getScriptPubKey();
         List<ScriptChunk> chunks = scriptPubKey.getChunks();
 
+        int instance = 0;
         for (int i = 0; i < chunks.size(); i++) {
             if (!ScriptHelper.hasPushData(chunks.get(i))) {
                 continue;
             }
             if (HexUtil.encodeHexStr(chunks.get(i).data()).equalsIgnoreCase(SIGMA_PREFIX)) {
-                return i;
+                if (instance == sigmaInstance) {
+                    return i;
+                }
+                instance++;
             }
         }
         return -1;
@@ -301,12 +292,7 @@ public class Sigma implements PreSignHash {
     }
 
     public TransactionOutput getTargetTxOut() {
-        TransactionOutput output = this.transaction.getOutput(targetVout);
-        if (output != null) {
-            return output;
-        } else {
-            return null;
-        }
+        return this.transaction.getOutput(targetVout);
     }
 
     @Override
@@ -335,10 +321,6 @@ public class Sigma implements PreSignHash {
     }
 
     public Sha256Hash getDataHash() {
-
-        if (this.transaction == null) {
-            throw new IllegalArgumentException("No transaction provided");
-        }
 
         TransactionOutput output = this.transaction.getOutput(this.targetVout);
         Script scriptPubKey = output.getScriptPubKey();
@@ -378,16 +360,13 @@ public class Sigma implements PreSignHash {
     }
 
     private Sha256Hash getInputHashByVin(int vin) {
-        TransactionInput input = this.transaction.getInput(vin);
-
-        if (input != null) {
-            ByteArrayOutputStream bos = new UnsafeByteArrayOutputStream(256);
-            try {
-                bos.write(input.getOutpoint().getHash().getBytes());
-                Utils.uint32ToByteStreamLE(input.getOutpoint().getIndex(), bos);
-                return Sha256Hash.of(bos.toByteArray());
-            } catch (IOException e) {
-                throw new RuntimeException(e);
+        if (vin >= 0 && vin < transaction.getInputs().size()) {
+            TransactionInput input = transaction.getInput(vin);
+            if (input != null) {
+                byte[] outpoint = ByteBuffer.allocate(36).order(ByteOrder.LITTLE_ENDIAN)
+                        .put(input.getOutpoint().getHash().getBytes())
+                        .putInt((int) input.getOutpoint().getIndex()).array();
+                return Sha256Hash.of(outpoint);
             }
         }
         // Use a dummy hash.
