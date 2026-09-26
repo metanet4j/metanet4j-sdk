@@ -165,6 +165,20 @@ class BobTxoConversionContractTest {
                 field(item(TxoHelper.toTxo(hex), "in", 0), "e").get("a"));
     }
 
+    @Test
+    void zeroPushInputIsReportedAsAnOpcode() {
+        Transaction tx = new Transaction(Net.MAINNET);
+        tx.addInput(Sha256Hash.wrap(new byte[32]), 0,
+                new ScriptBuilder().addChunk(new ScriptChunk(ScriptOpCodes.OP_FALSE, null)).build());
+        tx.addOutput(Coin.valueOf(1), new ScriptBuilder().data(new byte[] {1}).build());
+
+        Map<String, Object> input = item(TxoHelper.toTxo(
+                HexUtil.encodeHexStr(tx.bitcoinSerialize())), "in", 0);
+        assertTrue(input.containsKey("o0"));
+        assertTrue(String.valueOf(input.get("o0")).startsWith("OP_"));
+        assertEquals(1, input.get("len"));
+    }
+
     @SuppressWarnings("unchecked")
     private static Map<String, Object> field(Map<String, Object> item, String name) {
         return (Map<String, Object>) item.get(name);
