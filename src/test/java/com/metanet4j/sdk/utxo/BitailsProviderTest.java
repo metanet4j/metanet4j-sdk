@@ -10,8 +10,10 @@ import com.metanet4j.sdk.utxo.impl.bitails.dto.res.AddressBalanceResDto;
 import io.bitcoinsv.bitcoinjsv.core.UTXO;
 import io.bitcoinsv.bitcoinjsv.params.MainNetParams;
 import java.util.List;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
+@Tag("external")
 public class BitailsProviderTest {
 
 
