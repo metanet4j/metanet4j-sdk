@@ -4,7 +4,6 @@ import cn.hutool.core.codec.Base64;
 import cn.hutool.core.util.StrUtil;
 import com.metanet4j.sdk.bap.BapBase;
 import com.metanet4j.sdk.bap.BapBaseCore;
-import com.metanet4j.sdk.exception.SignErrorException;
 import com.metanet4j.sdk.signers.OrdinalsTransactionSigner;
 import com.metanet4j.sdk.transcation.BapDataLockBuilder;
 import com.metanet4j.sdk.utxo.UTXOProvider;
@@ -113,18 +112,14 @@ public class OrdTransactionTemplate {
         transactionBuilder.addInput(paymentUtxo);
 
         if (reInscription != null && StrUtil.isNotEmpty(reInscription.getDataB64()) && StrUtil.isNotEmpty(reInscription.getContentType())) {
-            transactionBuilder.addOrdOutput(destinationAddress, Base64.decode(reInscription.getDataB64()), metaData.get("type"), metaData);
+            transactionBuilder.addOrdOutput(destinationAddress, Base64.decode(reInscription.getDataB64()), reInscription.getContentType(), metaData);
         } else {
             transactionBuilder.addOutput(Coin.SATOSHI, destinationAddress);
         }
         transactionBuilder.withFeeKb(Coin.valueOf(feePerKb))
                 .changeAddress(changeAddress);
 
-        try {
-            transactionBuilder.signTx(keyBag, SigHash.Flags.SINGLE, true, true);
-        } catch (SignErrorException e) {
-
-        }
+        transactionBuilder.signTx(keyBag, SigHash.Flags.SINGLE, true, true);
         return transactionBuilder.build();
     }
 
@@ -223,7 +218,7 @@ public class OrdTransactionTemplate {
         OrdScriptBuilder.ORDMap ordMap = new OrdScriptBuilder.ORDMap();
         ordMap.put("app", bapBase.getAppName());
         ordMap.put("type", "post");
-        return createOrdinal(payAddressLiteList, utxoProvider, destinationAddress, changeAddress, feePerKb, inscription, null, bapBase, keyBag, transactionSigner).build();
+        return createOrdinal(payAddressLiteList, utxoProvider, destinationAddress, changeAddress, feePerKb, inscription, ordMap, bapBase, keyBag, transactionSigner).build();
 
     }
 
