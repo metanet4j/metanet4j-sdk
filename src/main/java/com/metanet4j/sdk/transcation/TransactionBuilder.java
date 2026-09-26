@@ -215,7 +215,7 @@ public class TransactionBuilder {
 
     public Transaction completeAndSignTx(KeyBag keyBag, boolean useForkId) throws SignErrorException {
         setEmptyInputScript(targetTransaction, keyBag);
-        final ExtendForSignTransaction proposedTransaction = new ExtendForSignTransaction(TransactionExtend.toTransactionExtend(this.getTargetTransaction()), SigHash.Flags.ALL, true, false);
+        final ExtendForSignTransaction proposedTransaction = new ExtendForSignTransaction(TransactionExtend.toTransactionExtend(this.getTargetTransaction()), SigHash.Flags.ALL, useForkId, false);
         boolean b = transactionSigner.signInputs(proposedTransaction, keyBag);
         if (b) {
             return proposedTransaction.partialTx;

@@ -3,18 +3,27 @@ package com.metanet4j.sdk.transcation;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 
 import com.metanet4j.sdk.TestData;
 import com.metanet4j.sdk.bap.BapBase;
 import com.metanet4j.sdk.exception.SignErrorException;
+import com.metanet4j.sdk.sigma.Sigma;
+import com.metanet4j.sdk.signers.ExtendForSignTransaction;
 import com.metanet4j.sdk.utxo.UTXOProvider;
 import io.bitcoinsv.bitcoinjsv.core.Address;
 import io.bitcoinsv.bitcoinjsv.core.AddressLite;
 import io.bitcoinsv.bitcoinjsv.core.Coin;
+import io.bitcoinsv.bitcoinjsv.core.ECKey;
 import io.bitcoinsv.bitcoinjsv.core.Sha256Hash;
 import io.bitcoinsv.bitcoinjsv.core.UTXO;
 import io.bitcoinsv.bitcoinjsv.msg.protocol.Transaction;
@@ -25,11 +34,13 @@ import io.bitcoinsv.bitcoinjsv.script.ScriptOpCodes;
 import io.bitcoinsv.bitcoinjsv.script.ScriptUtils_legacy;
 import io.bitcoinsv.bitcoinjsv.script.ScriptVerifyFlag;
 import io.bitcoinsv.bitcoinjsv.signers.TransactionSigner;
+import io.bitcoinsv.bitcoinjsv.signers.LocalTransactionSigner;
 import io.bitcoinsv.bitcoinjsv.temp.KeyBag;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class TransactionBuilderContractTest {
 
@@ -145,6 +156,83 @@ class TransactionBuilderContractTest {
 
         assertEquals("010203", receivedRaw.get());
         assertEquals("local-txid", result);
+    }
+
+    @Test
+    void constructorsPreserveTheSelectedNetworkAndExistingTransaction() {
+        Address testAddress = new Address(Net.TESTNET3.params(), bap.getPayAccountKey().getPubKeyHash());
+        Transaction existing = new Transaction(Net.TESTNET3);
+        existing.addOutput(Coin.valueOf(11), testAddress);
+        TransactionBuilder builder = new TransactionBuilder(bap, Net.TESTNET3, existing, keyBag);
+        assertSame(existing, builder.getTargetTransaction());
+        assertEquals(Net.TESTNET3, builder.getNet());
+        assertSame(keyBag, builder.getKeyBag());
+        assertInstanceOf(LocalTransactionSigner.class, builder.getTransactionSigner());
+        builder.addOutput(Coin.valueOf(22), testAddress);
+        assertEquals(Coin.valueOf(33), existing.getOutputSum());
+        assertEquals(Coin.valueOf(11), existing.getOutput(0).getValue());
+
+        TransactionSigner signer = mock(TransactionSigner.class);
+        TransactionBuilder explicit = new TransactionBuilder(bap, Net.TESTNET3, existing, signer, keyBag);
+        assertSame(existing, explicit.getTargetTransaction());
+        assertSame(signer, explicit.getTransactionSigner());
+        TransactionBuilder empty = new TransactionBuilder(bap, Net.TESTNET3, keyBag);
+        assertEquals(Net.TESTNET3, empty.getNet());
+        assertEquals(0, empty.getTargetTransaction().getOutputs().size());
+    }
+
+    @Test
+    void sigmaSigningKeepsThePayloadAndExposesAVerifiableCurrentIdentitySignature() {
+        BapDataLockBuilder data = new BapDataLockBuilder(bap).buildAlias("profile");
+        TransactionBuilder builder = new TransactionBuilder(bap, keyBag)
+                .addInput(utxo(8, 0, 20_000)).addDataOutput(data);
+        List<byte[]> payload = builder.getTargetTransaction().getOutput(0).getScriptPubKey().getChunks()
+                .stream().skip(2).map(chunk -> chunk.data()).toList();
+        assertNull(builder.getSigma());
+        assertSame(builder, builder.addSigmaSign(bap));
+        Sigma sigma = builder.getSigma();
+        assertSame(builder.getTargetTransaction(), sigma.getTransaction());
+        assertEquals(bap.getCurrentAddress().toBase58(), sigma.getSig().getAddress());
+        assertEquals(1, sigma.getSigInstanceCount());
+        assertTrue(new Sigma(bap, builder.getTargetTransaction()).verify());
+        assertEquals(Coin.valueOf(20_000), builder.getTargetTransaction().getInputSum());
+        assertEquals(Coin.ZERO, builder.getTargetTransaction().getOutput(0).getValue());
+        for (int i = 0; i < payload.size(); i++) {
+            assertArrayEquals(payload.get(i), builder.getTargetTransaction().getOutput(0)
+                    .getScriptPubKey().getChunks().get(i + 2).data());
+        }
+    }
+
+    @Test
+    void publicOnlyKeyUsesAConservativeUnlockingSizeForChangeEstimation() {
+        KeyBag publicOnlyBag = mock(KeyBag.class);
+        when(publicOnlyBag.findKeyFromPubHash(any(byte[].class)))
+                .thenReturn(ECKey.fromPublicOnly(bap.getPayAccountKey().getPubKey()));
+        TransactionBuilder full = new TransactionBuilder(bap, keyBag)
+                .addInput(utxo(9, 0, 20_000)).addOutput(Coin.valueOf(777), paymentAddress);
+        TransactionBuilder publicOnly = new TransactionBuilder(bap, publicOnlyBag)
+                .addInput(utxo(9, 0, 20_000)).addOutput(Coin.valueOf(777), paymentAddress);
+
+        Coin fullChange = full.calculateChangeAmount(full.getTargetTransaction(), paymentAddress, Coin.valueOf(1000));
+        Coin publicChange = publicOnly.calculateChangeAmount(
+                publicOnly.getTargetTransaction(), paymentAddress, Coin.valueOf(1000));
+        // 缺少私钥时保守按 65 字节公钥计费，比已知压缩公钥多 32 字节。
+        assertEquals(full.getFee().add(Coin.valueOf(32)), publicOnly.getFee());
+        assertEquals(fullChange.subtract(Coin.valueOf(32)), publicChange);
+        assertEquals(Coin.valueOf(19_223), publicChange.add(publicOnly.getFee()));
+    }
+
+    @Test
+    void completionForwardsTheRequestedForkIdModeToTheSigner() {
+        TransactionSigner signer = mock(TransactionSigner.class);
+        when(signer.signInputs(any(), eq(keyBag))).thenReturn(true);
+        TransactionBuilder builder = new TransactionBuilder(bap, keyBag, signer)
+                .addInput(utxo(10, 0, 20_000)).addOutput(Coin.valueOf(777), paymentAddress);
+        builder.completeAndSignTx(keyBag, false);
+        ArgumentCaptor<TransactionSigner.ProposedTransaction> captured =
+                ArgumentCaptor.forClass(TransactionSigner.ProposedTransaction.class);
+        verify(signer).signInputs(captured.capture(), eq(keyBag));
+        assertEquals(false, ((ExtendForSignTransaction) captured.getValue()).isUseForkId());
     }
 
     private UTXO utxo(int hashByte, long index, long satoshis) {
