@@ -6,7 +6,13 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.metanet4j.sdk.TestData;
+import com.metanet4j.sdk.crypto.MasterPrivateKey;
+import com.metanet4j.sdk.crypto.Ecies;
+import io.bitcoinsv.bitcoinjsv.core.ECKeyLite;
 import io.bitcoinsv.bitcoinjsv.crypto.ChildNumber;
+import io.bitcoinsv.bitcoinjsv.crypto.DeterministicHierarchy;
+import io.bitcoinsv.bitcoinjsv.crypto.DeterministicKey;
+import io.bitcoinsv.bitcoinjsv.crypto.HDUtils;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -78,5 +84,41 @@ class BapBaseLifecycleTest {
         assertEquals("m/1'/2147483647'", bap.getSigningPathFromHex("000000017fffffff", true));
         assertEquals("m/1", bap.getSigningPathFromHex("80000000", false));
         assertEquals("m/1'", bap.getSigningPathFromHex("80000000", true));
+        assertEquals("M/1H", bap.getSigningPathFromHex("80000000"));
+    }
+
+    @Test
+    void factoryEntryPointsPreserveTheConfiguredRootAndApp() {
+        DefaultBapBaseConfig config = new DefaultBapBaseConfig();
+        BapBase fromMaster = BapBase.fromOnlyMasterPrivateKey(TestData.masterPrivateKey, config);
+        BapBase fromPath = BapBase.fromRootPath(TestData.masterPrivateKey, config);
+        BapBase fromNumbers = BapBase.fromRootChildNumberList(TestData.masterPrivateKey,
+                HDUtils.parsePath(config.getDefaultRootPath()), config);
+
+        assertEquals(fromMaster.getIdentityKey(), fromPath.getIdentityKey());
+        assertEquals(fromMaster.getCurrentAddress(), fromNumbers.getCurrentAddress());
+        assertEquals(config.getDefaultRootPath(), fromMaster.getRootPath());
+        assertEquals(config, fromMaster.getBapBaseConfig());
+        assertEquals(config.getAppName(), fromMaster.getAppName());
+
+        String mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+        BapBase fromSeed = BapBase.fromSeed(mnemonic);
+        assertEquals(BapBase.fromOnlyMasterPrivateKey(MasterPrivateKey.fromSeed(mnemonic)).getIdentityKey(),
+                fromSeed.getIdentityKey());
+    }
+
+    @Test
+    void selfDecryptUsesTheConfiguredAbsoluteEncryptionPathAndReportsBadCiphertext() throws Exception {
+        BapBase bap = BapBase.fromOnlyMasterPrivateKey(TestData.masterPrivateKey);
+        List<ChildNumber> path = HDUtils.parsePath(bap.getBapBaseConfig().getDefaultEncryptPath());
+        DeterministicHierarchy hierarchy = new DeterministicHierarchy(
+                TestData.masterPrivateKey.getMasterDeterministicKey());
+        DeterministicKey key = hierarchy.deriveChild(path.subList(0, path.size() - 1),
+                false, true, path.getLast());
+        String ciphertext = Ecies.encrypt("identity export",
+                ECKeyLite.fromPublicOnly(key.getPubKey()), null);
+
+        assertEquals("identity export", bap.decryptSelf(ciphertext));
+        assertThrows(IllegalStateException.class, () -> bap.decryptSelf("invalid-ciphertext"));
     }
 }

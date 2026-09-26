@@ -211,7 +211,7 @@ public class BapBase extends MasterKeyBapBase {
             throw new IllegalStateException("identityKey match fail");
         }
 
-        if (matchIdentityKey && matchCurrentSignatureAddress) {
+        if (matchCurrentSignatureAddress) {
             return new BapBase(masterPrivateKey, rootChildNumberList, currentNumberList, new DefaultBapBaseConfig());
         }
         throw new IllegalStateException("currentSignatureAddress match fail");
@@ -281,14 +281,8 @@ public class BapBase extends MasterKeyBapBase {
                     ECKeyLite.fromPrivate(getEncryptDeterministicKey(HDUtils.parsePath(this.bapBaseConfig.getDefaultEncryptPath())).getPrivKeyBytes()),
                     null), Charset.forName("UTF-8"));
         } catch (Exception e) {
-            e.printStackTrace();
+            throw new IllegalStateException("BAP 身份解密失败", e);
         }
-        return null;
-    }
-
-
-    private DeterministicKey getEncryptKey(List<ChildNumber> encryptChildNumberList) {
-        return getKeyBaseRoot(encryptChildNumberList);
     }
 
     /**
