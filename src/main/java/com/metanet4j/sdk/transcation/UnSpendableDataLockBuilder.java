@@ -8,9 +8,7 @@ import com.google.common.collect.Lists;
 import com.metanet4j.base.aip.AipHelper;
 import com.metanet4j.base.constants.ProtocolConstant;
 import com.metanet4j.sdk.EcKeyLiteExtend;
-import com.metanet4j.sdk.PrivateKey;
 import com.metanet4j.sdk.SignType;
-import com.metanet4j.sdk.address.AddressEnhance;
 import com.metanet4j.sdk.bap.BapBaseCore;
 import com.metanet4j.sdk.context.PreSignHashContext;
 import com.metanet4j.sdk.remote.PreSignHashUtils;
@@ -87,6 +85,8 @@ public abstract class UnSpendableDataLockBuilder<T extends UnSpendableDataLockBu
         byte[] data = UtilsExtend.formatMessageForSigning(outputStream.toByteArray());
         Sha256Hash hash = Sha256Hash.twiceOf(data);
         PreSignHashContext unspendableDataSig = getSig(hash);
+        Assert.isTrue(this.bapBase.getSignAddress(this.remoteSignType).equals(unspendableDataSig.getSignAddress()),
+                "remote signature address does not match the requested BAP address");
 
         boolean b = AipHelper.verifySign(unspendableDataSig.getSignAddress(), unspendableDataSig.getSigB64(),
                 outputStream.toByteArray());
@@ -99,28 +99,6 @@ public abstract class UnSpendableDataLockBuilder<T extends UnSpendableDataLockBu
         this.dataList.add(ByteBuffer.wrap("BITCOIN_ECDSA".getBytes(Charsets.UTF_8)));
         this.dataList.add(ByteBuffer.wrap(unspendableDataSig.getSignAddress().getBytes(Charsets.UTF_8)));
         this.dataList.add(ByteBuffer.wrap(Base64.decode(unspendableDataSig.getSigB64().getBytes(Charsets.UTF_8))));
-        return (T) this;
-    }
-
-
-    private T signOpReturnWithAIP(PrivateKey privateKey, AddressEnhance addressEnhance) {
-        Assert.notNull(privateKey, "sign privateKey not allow null when signOpReturnWithAIP");
-        Assert.notNull(addressEnhance, "sign address not allow null when signOpReturnWithAIP");
-        List<ByteBuffer> signingBuffers = Lists.newArrayList(this.dataList);
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-
-        outputStream.writeBytes(HexUtil.decodeHex("6a"));
-        signingBuffers.stream().forEach(o -> outputStream.writeBytes(o.array()));
-        outputStream.writeBytes(HexUtil.decodeHex("7c"));
-
-        this.dataList.add(ByteBuffer.wrap("|".getBytes(Charsets.UTF_8)));
-        this.dataList.add(ByteBuffer.wrap(ProtocolConstant.AIP_PROTOCOL.getBytes(Charsets.UTF_8)));
-        this.dataList.add(ByteBuffer.wrap("BITCOIN_ECDSA".getBytes(Charsets.UTF_8)));
-
-        this.dataList.add(ByteBuffer.wrap(addressEnhance.toBase58().getBytes(Charsets.UTF_8)));
-        String sig = privateKey.getKey().signMessage(outputStream.toString(Charsets.UTF_8));
-        this.dataList.add(ByteBuffer.wrap(Base64.decode(sig.getBytes(Charsets.UTF_8))));
-
         return (T) this;
     }
 
@@ -172,6 +150,8 @@ public abstract class UnSpendableDataLockBuilder<T extends UnSpendableDataLockBu
             String sig = new EcKeyLiteExtend(bapBase.getRootPrivateKey().getPrivKey(),
                     bapBase.getRootPrivateKey().getPubKeyPoint()).signMessage(outputStream.toByteArray());
             signatureBuffers.add(ByteBuffer.wrap(Base64.decode(sig.getBytes(Charsets.UTF_8))));
+        } else {
+            throw new IllegalArgumentException("local signing requires ROOT, PREVIOUS or CURRENT");
         }
 
         this.dataList.addAll(signatureBuffers);
@@ -200,6 +180,10 @@ public abstract class UnSpendableDataLockBuilder<T extends UnSpendableDataLockBu
     @Override
     public boolean isHaveSign() {
         return this.isHaveSign;
+    }
+
+    protected void resetSignedState() {
+        this.isHaveSign = false;
     }
 
     public T sign() {

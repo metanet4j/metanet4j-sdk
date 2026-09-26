@@ -103,6 +103,99 @@ class UnSpendableDataLockBuilderContractTest {
                         .getBytes(StandardCharsets.UTF_8));
     }
 
+    @Test
+    void remoteSignatureMustComeFromTheRequestedBapAddress() {
+        BapDataLockBuilder builder = new BapDataLockBuilder(bap, true, RemoteSignType.CURRENT).buildAlias("profile");
+        byte[] unsigned = builder.getLockingScript().getProgram();
+        PreSignHashContext request = builder.getPreSignHashContext();
+        request.setSignAddress(bap.getRootAddress());
+        request.setSigB64(EcKeyLiteExtend.fromPrivate(bap.getRootPrivateKey().getPrivKey())
+                .signHash(request.getPreSignHash()));
+        PreSignHashUtils.setPreSignHashContext(request);
+        assertThrows(IllegalArgumentException.class, builder::sign);
+        assertFalse(builder.isHaveSign());
+        assertArrayEquals(unsigned, builder.getLockingScript().getProgram());
+
+        PreSignHashUtils.clear();
+        request.setSignAddress(bap.getCurrentAddress().toBase58());
+        request.setSigB64(EcKeyLiteExtend.fromPrivate(bap.getCurrentPrivateKey().getPrivKey())
+                .signHash(request.getPreSignHash()));
+        PreSignHashUtils.setPreSignHashContext(request);
+        builder.sign();
+        assertValidAip(builder, bap.getCurrentAddress().toBase58(),
+                ("j1BAPSuaPnfGnSBM3GLV9yhxUdYe4vGbdMTALIAS" + bap.getIdentityKey() + "profile|")
+                        .getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void malformedRemoteSignaturesDoNotChangeTheUnsignedScript() {
+        BapDataLockBuilder builder = new BapDataLockBuilder(bap, true, RemoteSignType.ROOT).buildRoot();
+        byte[] unsigned = builder.getLockingScript().getProgram();
+        PreSignHashContext request = builder.getPreSignHashContext();
+        for (String invalid : List.of("AA==", "???")) {
+            PreSignHashUtils.clear();
+            request.setSigB64(invalid);
+            PreSignHashUtils.setPreSignHashContext(request);
+            assertThrows(RuntimeException.class, builder::sign);
+            assertFalse(builder.isHaveSign());
+            assertArrayEquals(unsigned, builder.getLockingScript().getProgram());
+        }
+    }
+
+    @Test
+    void nullLocalSignTypeUsesTheSameCurrentKeyAsTheDefaultConstructor() {
+        BapDataLockBuilder defaultBuilder = new BapDataLockBuilder(binaryPayload(), bap).sign();
+        BapDataLockBuilder nullTypeBuilder = new BapDataLockBuilder(binaryPayload(), bap, (SignType) null).sign();
+        assertEquals(8, nullTypeBuilder.getLockingScript().getChunks().size());
+        assertArrayEquals(defaultBuilder.getLockingScript().getProgram(), nullTypeBuilder.getLockingScript().getProgram());
+        assertValidAip(nullTypeBuilder, bap.getCurrentAddress().toBase58(),
+                new byte[] {0x6a, 0, (byte) 0x80, (byte) 0xff, 0x7c, 0x7c});
+    }
+
+    @Test
+    void remoteEnumCannotSilentlyProduceAnIncompleteLocalSignature() {
+        BapDataLockBuilder builder = new BapDataLockBuilder(binaryPayload(), bap, SignType.REMOTE);
+        byte[] unsigned = builder.getLockingScript().getProgram();
+        assertThrows(IllegalArgumentException.class, builder::sign);
+        assertFalse(builder.isHaveSign());
+        assertArrayEquals(unsigned, builder.getLockingScript().getProgram());
+    }
+
+    @Test
+    void rebuildingBapDataClearsThePreviousSignedState() {
+        BapDataLockBuilder builder = new BapDataLockBuilder(bap).buildRoot().sign();
+        builder.buildAlias("profile");
+        assertFalse(builder.isHaveSign());
+        assertEquals(6, builder.getLockingScript().getChunks().size());
+        builder.sign();
+        assertTrue(builder.isHaveSign());
+        assertValidAip(builder, bap.getCurrentAddress().toBase58(),
+                ("j1BAPSuaPnfGnSBM3GLV9yhxUdYe4vGbdMTALIAS" + bap.getIdentityKey() + "profile|")
+                        .getBytes(StandardCharsets.UTF_8));
+        builder.buildId();
+        assertFalse(builder.isHaveSign());
+        builder.sign();
+        builder.buildRoot();
+        assertFalse(builder.isHaveSign());
+    }
+
+    @Test
+    void inferredRemoteKeyTracksTheOperationWhenTheBuilderIsReused() {
+        BapDataLockBuilder builder = new BapDataLockBuilder(bap, true, null);
+        assertEquals(RemoteSignType.ROOT, builder.buildRoot().getRemoteSignType());
+        assertEquals(RemoteSignType.PREVIOUS, builder.buildId().getRemoteSignType());
+        assertEquals(RemoteSignType.CURRENT, builder.buildAlias("profile").getRemoteSignType());
+        assertEquals(bap.getCurrentAddress().toBase58(), builder.getPreSignHashContext().getSignAddress());
+    }
+
+    @Test
+    void explicitRemoteKeyIsPreservedAcrossBapOperations() {
+        BapDataLockBuilder builder = new BapDataLockBuilder(bap, true, RemoteSignType.ROOT);
+        assertEquals(RemoteSignType.ROOT, builder.buildId().getRemoteSignType());
+        assertEquals(RemoteSignType.ROOT, builder.buildAlias("profile").getRemoteSignType());
+        assertEquals(bap.getRootAddress(), builder.getPreSignHashContext().getSignAddress());
+    }
+
     private static List<ByteBuffer> binaryPayload() {
         return new ArrayList<>(List.of(ByteBuffer.wrap(new byte[] {0, (byte) 0x80, (byte) 0xff, 0x7c})));
     }

@@ -16,6 +16,7 @@ public class BapDataLockBuilder extends UnSpendableDataLockBuilder<BapDataLockBu
 
 
     private BapBaseCore bapBase;
+    private boolean explicitRemoteSignType;
 
 
     public BapDataLockBuilder(BapBaseCore bapBase) {
@@ -35,9 +36,8 @@ public class BapDataLockBuilder extends UnSpendableDataLockBuilder<BapDataLockBu
     }
 
     public BapDataLockBuilder(List<ByteBuffer> buffers, BapBaseCore bapBase, SignType signType) {
-        super(buffers, bapBase);
+        super(buffers, bapBase, signType);
         this.bapBase = bapBase;
-        this.signType = signType;
 
     }
 
@@ -45,6 +45,7 @@ public class BapDataLockBuilder extends UnSpendableDataLockBuilder<BapDataLockBu
     public BapDataLockBuilder(List<ByteBuffer> buffers, BapBaseCore bapBase, boolean remoteSign, RemoteSignType remoteSignType) {
         super(buffers, bapBase, remoteSign, remoteSignType);
         this.bapBase = bapBase;
+        this.explicitRemoteSignType = remoteSignType != null;
     }
 
     public BapDataLockBuilder buildRoot() {
@@ -86,8 +87,9 @@ public class BapDataLockBuilder extends UnSpendableDataLockBuilder<BapDataLockBu
     }
 
     private void initSignType(RemoteSignType remoteSignType, SignType signType) {
+        resetSignedState();
         if (this.remoteSign) {
-            if (this.remoteSignType == null) {
+            if (!this.explicitRemoteSignType) {
                 this.remoteSignType = remoteSignType;
             }
 
