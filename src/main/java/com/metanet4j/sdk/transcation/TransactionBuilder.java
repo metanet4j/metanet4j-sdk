@@ -189,7 +189,7 @@ public class TransactionBuilder {
             Script script = transactionInput.getConnectedOutput().getScriptPubKey();
             size += getUnLockScriptSize(transactionInput, script);
         }
-        Coin fee = Coin.valueOf((long) Math.ceil(size * this.feePerKb.value / 1000));
+        Coin fee = Coin.valueOf((long) Math.ceil(size * feePerKb.value / 1000));
         this.fee = fee;
         this.changeAmount = targetTransaction.getInputSum().subtract(targetTransaction.getOutputSum()).subtract(fee);
         return this.changeAmount;
