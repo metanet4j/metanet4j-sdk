@@ -155,6 +155,10 @@ public class BsocialDataLockBuilder extends UnSpendableDataLockBuilder<BsocialDa
 
     public BsocialDataLockBuilder build(Bsocial bsocial) {
         Assert.notEmpty(bsocial.getMapList());
+        for (MAP map : bsocial.getMapList()) {
+            Assert.notNull(map.getBsocialTypeEnum());
+            Assert.notEmpty(map.getMapDataList());
+        }
         List<ByteBuffer> byteBuffers = this.dataList;
 
         List<SortAble> sortAbleList = new ArrayList<>();
@@ -178,29 +182,25 @@ public class BsocialDataLockBuilder extends UnSpendableDataLockBuilder<BsocialDa
                 Assert.notEmpty(b.getContentType());
 
                 byteBuffers.add(ByteBuffer.wrap(ProtocolConstant.B_PROTOCOL.getBytes(Charsets.UTF_8)));
-                if (b.getByteBuffer() != null) {
-                    if (b.isEncrypted()) {
-                        if (this.bapBase.getEncryptKey() != null) {
-                            byteBuffers.add(ByteBuffer.wrap(this.bapBase.encrypt(b.getByteBuffer().array())));
-                        } else {
-                            byteBuffers.add(b.getByteBuffer());
-                        }
-
+                if (b.isEncrypted()) {
+                    if (this.bapBase.getEncryptKey() != null) {
+                        byteBuffers.add(ByteBuffer.wrap(this.bapBase.encrypt(b.getByteBuffer().array())));
                     } else {
                         byteBuffers.add(b.getByteBuffer());
                     }
-
+                } else {
+                    byteBuffers.add(b.getByteBuffer());
                 }
-                if (b.isEncrypted()) {
-                    b.setContentType("application/bitcoin-ecies; content-type=" + b.getContentType());
-                }
-                byteBuffers.add(ByteBuffer.wrap(b.getContentType().getBytes(Charsets.UTF_8)));
+                String contentType = b.isEncrypted()
+                        ? "application/bitcoin-ecies; content-type=" + b.getContentType()
+                        : b.getContentType();
+                byteBuffers.add(ByteBuffer.wrap(contentType.getBytes(Charsets.UTF_8)));
                 if (StrUtil.isNotEmpty(b.getEncoding())) {
                     byteBuffers.add(ByteBuffer.wrap(b.getEncoding().getBytes(Charsets.UTF_8)));
                 }
                 byteBuffers.add(ByteBuffer.wrap("|".getBytes(Charsets.UTF_8)));
 
-            } else if (item instanceof BPP) {
+            } else {
                 BPP bpp = (BPP) item;
                 byteBuffers.add(ByteBuffer.wrap(ProtocolConstant.BPP_PROTOCOL.getBytes(Charsets.UTF_8)));
                 byteBuffers.add(ByteBuffer.wrap(bpp.getAction().getBytes(Charsets.UTF_8)));
@@ -214,13 +214,11 @@ public class BsocialDataLockBuilder extends UnSpendableDataLockBuilder<BsocialDa
 
         if (bsocial.getMapList().size() == 1) {
             MAP map = bsocial.getMapList().stream().findFirst().orElse(null);
-            Assert.notNull(map.getBsocialTypeEnum());
-            Assert.notEmpty(map.getMapDataList());
             byteBuffers.add(ByteBuffer.wrap(ProtocolConstant.MAP_PROTOCOL.getBytes(Charsets.UTF_8)));
             for (String item : map.getMapDataList()) {
                 byteBuffers.add(ByteBuffer.wrap(item.getBytes(Charsets.UTF_8)));
             }
-        } else if (bsocial.getMapList().size() > 1) {
+        } else {
 
             for (int i = 0; i < bsocial.getMapList().size(); i++) {
 
