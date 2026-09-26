@@ -6,7 +6,6 @@ import cn.hutool.core.util.StrUtil;
 import com.metanet4j.sdk.bap.BapBase;
 import com.metanet4j.sdk.bap.BapBaseCore;
 import com.metanet4j.sdk.bap.RemoteBapBase;
-import com.metanet4j.sdk.exception.SignErrorException;
 import com.metanet4j.sdk.ordinals.OrdScriptBuilder;
 import com.metanet4j.sdk.ordinals.OrdTransactionBuilder;
 import com.metanet4j.sdk.signers.OrdinalsTransactionSigner;
@@ -134,18 +133,14 @@ public class RemoteOrdTransactionTemplate {
         transactionBuilder.addInput(paymentUtxo);
 
         if (reInscription != null && StrUtil.isNotEmpty(reInscription.getDataB64()) && StrUtil.isNotEmpty(reInscription.getContentType())) {
-            transactionBuilder.addOrdOutput(destinationAddress, Base64.decode(reInscription.getDataB64()), metaData.get("type"), metaData);
+            transactionBuilder.addOrdOutput(destinationAddress, Base64.decode(reInscription.getDataB64()), reInscription.getContentType(), metaData);
         } else {
             transactionBuilder.addOutput(Coin.SATOSHI, destinationAddress);
         }
         transactionBuilder.withFeeKb(Coin.valueOf(feePerKb))
                 .changeAddress(changeAddress);
 
-        try {
-            transactionBuilder.signTx(keyBag, SigHash.Flags.SINGLE, true, true);
-        } catch (SignErrorException e) {
-
-        }
+        transactionBuilder.signTx(keyBag, SigHash.Flags.SINGLE, true, true);
         return transactionBuilder.build();
     }
 

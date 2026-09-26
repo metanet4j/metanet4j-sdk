@@ -19,6 +19,13 @@ import io.bitcoinsv.bitcoinjsv.core.AddressLite;
 import io.bitcoinsv.bitcoinjsv.core.Coin;
 import io.bitcoinsv.bitcoinjsv.core.Sha256Hash;
 import io.bitcoinsv.bitcoinjsv.core.UTXO;
+import io.bitcoinsv.bitcoinjsv.msg.protocol.Transaction;
+import io.bitcoinsv.bitcoinjsv.script.Script;
+import io.bitcoinsv.bitcoinjsv.script.ScriptBuilder;
+import io.bitcoinsv.bitcoinjsv.script.ScriptUtils_legacy;
+import io.bitcoinsv.bitcoinjsv.script.ScriptVerifyFlag;
+import io.bitcoinsv.bitcoinjsv.signers.TransactionSigner;
+import io.bitcoinsv.bitcoinjsv.temp.KeyBag;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -32,6 +39,7 @@ class RemoteOrdTransactionTemplateContractTest {
             bap.getOrdAddress(), bap.getAppName());
     private final Address paymentAddress = new Address(bap.getPayAccountAddress());
     private final Address destination = bap.getOrdAddress();
+    private final KeyBag keyBag = new BapBase.BapProviderKeyBag(bap);
     private final UTXOProvider<AddressLite, UTXO> provider = addresses -> {
         assertEquals(List.of(paymentAddress.toBase58()),
                 addresses.stream().map(AddressLite::toBase58).toList());
@@ -106,6 +114,66 @@ class RemoteOrdTransactionTemplateContractTest {
         RemoteOrdTransactionTemplate template = new RemoteOrdTransactionTemplate();
         assertTrue(template.isDoBsmSign());
         assertTrue(template.isDoInputSign());
+    }
+
+    @Test
+    void sendsAnExistingOrdinalWithTwoSpendableInputs() {
+        Transaction sent = new RemoteOrdTransactionTemplate(false, false).sendOrdinal(
+                bap, ordinalUtxo(), paymentUtxo(), destination, paymentAddress,
+                500, null, null, keyBag);
+
+        assertEquals(2, sent.getInputs().size());
+        assertEquals(Coin.SATOSHI, sent.getOutput(0).getValue());
+        assertArrayEquals(ScriptBuilder.createOutputScript(destination).getProgram(),
+                sent.getOutput(0).getScriptBytes());
+        assertTrue(sent.getInputSum().getValue() > sent.getOutputSum().getValue());
+        for (int i = 0; i < sent.getInputs().size(); i++) {
+            ScriptUtils_legacy.correctlySpends(sent.getInput(i).getScriptSig(), sent, i,
+                    sent.getInput(i).getConnectedOutput().getScriptPubKey(),
+                    sent.getInput(i).getConnectedOutput().getValue(),
+                    ScriptVerifyFlag.GENESIS_SET);
+        }
+    }
+
+    @Test
+    void reinscriptionKeepsTheRequestedMediaType() {
+        OrdScriptBuilder.ORDMap metadata = new OrdScriptBuilder.ORDMap();
+        metadata.put("app", "test");
+        metadata.put("type", "ord");
+        OrdScriptBuilder.Inscription reinscription = inscription("second");
+
+        Transaction sent = new RemoteOrdTransactionTemplate(false, false).sendOrdinal(
+                bap, ordinalUtxo(), paymentUtxo(), destination, paymentAddress,
+                500, reinscription, metadata, keyBag);
+
+        assertArrayEquals(OrdScriptBuilder.buildInscription(destination,
+                        "second".getBytes(StandardCharsets.US_ASCII), "text/plain", metadata).getProgram(),
+                sent.getOutput(0).getScriptBytes());
+    }
+
+    @Test
+    void sendOrdinalPropagatesSignerFailure() {
+        TransactionSigner refusingSigner = mock(TransactionSigner.class);
+
+        assertThrows(SignErrorException.class, () ->
+                new RemoteOrdTransactionTemplate(false, false).sendOrdinal(
+                        bap, ordinalUtxo(), paymentUtxo(), destination, paymentAddress,
+                        500, null, null, keyBag, refusingSigner, null));
+    }
+
+    private UTXO paymentUtxo() {
+        byte[] hash = new byte[32];
+        hash[0] = 2;
+        return new UTXO(Sha256Hash.wrap(hash), 0, Coin.valueOf(20_000),
+                0, false, null, paymentAddress.toBase58());
+    }
+
+    private UTXO ordinalUtxo() {
+        byte[] hash = new byte[32];
+        hash[0] = 3;
+        Script prior = OrdScriptBuilder.buildInscription(destination,
+                "prior".getBytes(StandardCharsets.US_ASCII), "text/plain", null);
+        return new UTXO(Sha256Hash.wrap(hash), 0, Coin.SATOSHI, 0, false, prior);
     }
 
     private OrdScriptBuilder.Inscription inscription(String value) {
