@@ -51,7 +51,7 @@ public class TxoHelper {
                 {
                     this.put("h",txInput.getOutpoint().getHashAsString());
                     this.put("i",txInput.getOutpoint().getIndex());
-                    if(chunks.size()==2){ //P2PKH input script
+                    if(chunks.size()==2 && chunks.get(1).data()!=null){ //P2PKH input script
                         try {
                             ScriptChunk scriptChunk = chunks.get(1);
                             this.put("a",new BasicAddress(MainNetParams.get(),

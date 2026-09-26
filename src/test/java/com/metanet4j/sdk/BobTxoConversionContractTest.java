@@ -13,6 +13,7 @@ import io.bitcoinsv.bitcoinjsv.core.Sha256Hash;
 import io.bitcoinsv.bitcoinjsv.msg.protocol.Transaction;
 import io.bitcoinsv.bitcoinjsv.params.MainNetParams;
 import io.bitcoinsv.bitcoinjsv.params.Net;
+import io.bitcoinsv.bitcoinjsv.script.Script;
 import io.bitcoinsv.bitcoinjsv.script.ScriptBuilder;
 import io.bitcoinsv.bitcoinjsv.script.ScriptChunk;
 import io.bitcoinsv.bitcoinjsv.script.ScriptOpCodes;
@@ -128,6 +129,40 @@ class BobTxoConversionContractTest {
         assertEquals("right", cell(tape.get(0), 1).get("s"));
         assertEquals(ScriptOpCodes.OP_RETURN, cell(tape.get(1), 0).get("op"));
         assertEquals("tail", cell(tape.get(2), 0).get("s"));
+    }
+
+    @Test
+    void keepsFalseReturnPairTogetherAfterEarlierPayload() {
+        Transaction tx = new Transaction(Net.MAINNET);
+        tx.addInput(Sha256Hash.wrap(new byte[32]), 0, new ScriptBuilder().build());
+        tx.addOutput(Coin.valueOf(0), new ScriptBuilder()
+                .data("left".getBytes(StandardCharsets.UTF_8))
+                .data("right".getBytes(StandardCharsets.UTF_8))
+                .addChunk(new ScriptChunk(ScriptOpCodes.OP_FALSE, null))
+                .op(ScriptOpCodes.OP_RETURN)
+                .data("tail".getBytes(StandardCharsets.UTF_8)).build());
+
+        List<Map<String, Object>> tape = tape(item(BobHelper.toBob(
+                HexUtil.encodeHexStr(tx.bitcoinSerialize())), "out", 0));
+        assertEquals(3, tape.size());
+        assertEquals(ScriptOpCodes.OP_FALSE, cell(tape.get(1), 0).get("op"));
+        assertEquals(ScriptOpCodes.OP_RETURN, cell(tape.get(1), 1).get("op"));
+        assertEquals("tail", cell(tape.get(2), 0).get("s"));
+    }
+
+    @Test
+    void opcodeOnlyInputFallsBackToScriptIdentity() {
+        Script inputScript = new ScriptBuilder().op(ScriptOpCodes.OP_DUP)
+                .op(ScriptOpCodes.OP_HASH160).build();
+        Transaction tx = new Transaction(Net.MAINNET);
+        tx.addInput(Sha256Hash.wrap(new byte[32]), 0, inputScript);
+        tx.addOutput(Coin.valueOf(1), new ScriptBuilder().data(new byte[] {1}).build());
+        String hex = HexUtil.encodeHexStr(tx.bitcoinSerialize());
+
+        assertEquals(Sha256Hash.of(inputScript.getProgram()).toString(),
+                field(item(BobHelper.toBob(hex), "in", 0), "e").get("a"));
+        assertEquals(inputScript.toString(),
+                field(item(TxoHelper.toTxo(hex), "in", 0), "e").get("a"));
     }
 
     @SuppressWarnings("unchecked")
