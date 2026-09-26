@@ -131,4 +131,19 @@ class BapBaseLifecycleTest {
         assertNotEquals(bap.getIdentityKey(), ciphertext);
         assertEquals(bap.getIdentityKey(), bap.decryptSelf(ciphertext));
     }
+
+    @Test
+    void selfExportReportsMissingEncryptionPathWithItsCause() {
+        DefaultBapBaseConfig config = new DefaultBapBaseConfig() {
+            @Override
+            public String getDefaultEncryptPath() {
+                return null;
+            }
+        };
+        BapBase bap = BapBase.fromOnlyMasterPrivateKey(TestData.masterPrivateKey, config);
+
+        IllegalStateException error = assertThrows(IllegalStateException.class, bap::encryptSelf);
+        assertEquals("BAP 身份加密失败", error.getMessage());
+        assertNotNull(error.getCause());
+    }
 }
