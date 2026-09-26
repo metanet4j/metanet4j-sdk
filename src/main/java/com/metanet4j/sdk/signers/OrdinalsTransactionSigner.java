@@ -50,6 +50,7 @@ public class OrdinalsTransactionSigner implements TransactionSigner {
         ECKey key;
         if ((key = redeemData.getFullKey()) == null) {
             log.warn("No local key found for input {}", inputIndex);
+            return false;
         }
 
         Script inputScript = txIn.getScriptSig();
@@ -75,6 +76,7 @@ public class OrdinalsTransactionSigner implements TransactionSigner {
             throw e;
         } catch (ECKey.MissingPrivateKeyException e) {
             log.warn("No private key in keypair for input {}", inputIndex);
+            return false;
         }
         return true;
     }
@@ -139,7 +141,7 @@ public class OrdinalsTransactionSigner implements TransactionSigner {
 
     @Override
     public boolean isReady() {
-        return false;
+        return true;
     }
 
     @Override

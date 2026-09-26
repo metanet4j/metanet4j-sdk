@@ -39,7 +39,7 @@ public class TransactionExtend extends Transaction {
     }
 
     public static TransactionExtend toTransactionExtend(Transaction transaction) {
-        TransactionExtend transactionExtend = new TransactionExtend(Net.MAINNET);
+        TransactionExtend transactionExtend = new TransactionExtend(transaction.getNet());
         transactionExtend.setVersion((int) transaction.getVersion());
         transactionExtend.setLockTime(transaction.getLockTime());
         transaction.getInputs().forEach(transactionExtend::addInput);
