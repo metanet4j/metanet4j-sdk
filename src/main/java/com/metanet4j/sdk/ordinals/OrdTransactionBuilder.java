@@ -69,7 +69,7 @@ public class OrdTransactionBuilder extends TransactionBuilder {
 
 
     public OrdTransactionBuilder signTx(KeyBag keyBag, boolean useForkId) throws SignErrorException {
-        return signTx(keyBag, SigHash.Flags.ALL, true, false);
+        return signTx(keyBag, SigHash.Flags.ALL, useForkId, false);
     }
 
 
@@ -77,7 +77,9 @@ public class OrdTransactionBuilder extends TransactionBuilder {
 
         setEmptyInputScriptHaveOrdinals(this.getTargetTransaction(), keyBag);
         final ExtendForSignTransaction extendForSignTransaction = new ExtendForSignTransaction(TransactionExtend.toTransactionExtend(this.getTargetTransaction()), hashFlags, useForkId, anyoneCanPay);
-        boolean b = this.getTransactionSigner().signInputs(extendForSignTransaction, keyBag);
+        if (!this.getTransactionSigner().signInputs(extendForSignTransaction, keyBag)) {
+            throw new SignErrorException();
+        }
         return this;
 
     }
