@@ -8,15 +8,19 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import cn.hutool.core.codec.Base64;
+import com.metanet4j.sdk.EcKeyLiteExtend;
+import com.metanet4j.sdk.PublicKey;
 import com.metanet4j.sdk.TestData;
 import com.metanet4j.sdk.bap.BapBase;
 import com.metanet4j.sdk.bap.RemoteBapBase;
 import com.metanet4j.sdk.exception.SignErrorException;
+import com.metanet4j.sdk.context.PreSignHashContext;
 import com.metanet4j.sdk.ordinals.OrdScriptBuilder;
 import com.metanet4j.sdk.utxo.UTXOProvider;
 import io.bitcoinsv.bitcoinjsv.core.Address;
 import io.bitcoinsv.bitcoinjsv.core.AddressLite;
 import io.bitcoinsv.bitcoinjsv.core.Coin;
+import io.bitcoinsv.bitcoinjsv.core.ECKey;
 import io.bitcoinsv.bitcoinjsv.core.Sha256Hash;
 import io.bitcoinsv.bitcoinjsv.core.UTXO;
 import io.bitcoinsv.bitcoinjsv.msg.protocol.Transaction;
@@ -29,6 +33,7 @@ import io.bitcoinsv.bitcoinjsv.temp.KeyBag;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
 import static org.mockito.Mockito.mock;
 
 class RemoteOrdTransactionTemplateContractTest {
@@ -48,6 +53,11 @@ class RemoteOrdTransactionTemplateContractTest {
         return List.of(new UTXO(Sha256Hash.wrap(hash), 0, Coin.valueOf(20_000),
                 0, false, null, paymentAddress.toBase58()));
     };
+
+    @AfterEach
+    void clearRemoteSignatures() {
+        PreSignHashUtils.clear();
+    }
 
     @Test
     void createsAnUnsignedOrdinalWithPendingHashesAndBalancedChange() {
@@ -204,6 +214,41 @@ class RemoteOrdTransactionTemplateContractTest {
         ScriptUtils_legacy.correctlySpends(tx.getInput(0).getScriptSig(), tx, 0,
                 tx.getInput(0).getConnectedOutput().getScriptPubKey(),
                 tx.getInput(0).getConnectedOutput().getValue(), ScriptVerifyFlag.GENESIS_SET);
+    }
+
+    @Test
+    void signsBsmThenInputFromTwoLocallyPreparedRemoteContexts() {
+        RemoteOrdTransactionTemplate template = new RemoteOrdTransactionTemplate(false, false);
+        OrdScriptBuilder.Inscription content = inscription("staged");
+        List<AddressLite> addresses = List.of(bap.getPayAccountAddress());
+        RemoteOrdTransactionBuilder unsigned = template.createOrdinal(addresses,
+                provider, destination, paymentAddress, 500, content, null,
+                remoteBap, RemoteSignType.CURRENT);
+        PreSignHashContext bsm = unsigned.getAllBsmSignHash(true, false, remoteBap).get(0);
+        bsm.setSigB64(EcKeyLiteExtend.fromPrivate(bap.getCurrentPrivateKey().getPrivKey())
+                .signHash(bsm.getPreSignHash()));
+        PreSignHashUtils.setPreSignHashContext(bsm);
+
+        template.setDoBsmSign(true);
+        RemoteOrdTransactionBuilder bsmSigned = template.createOrdinal(addresses,
+                provider, destination, paymentAddress, 500, content, null,
+                remoteBap, RemoteSignType.CURRENT);
+        assertTrue(bsmSigned.getSigma().verify());
+        PreSignHashContext payment = bsmSigned.getTxInputSignHash(false, remoteBap).get(0);
+        ECKey paymentKey = ECKey.fromPrivate(bap.getPayAccountKey().getPrivKeyBytes());
+        payment.setSigB64(Base64.encode(paymentKey.sign(payment.getPreSignHash()).encodeToDER()));
+        payment.setPublicKey(PublicKey.fromBytes(paymentKey.getPubKey()));
+        PreSignHashUtils.setPreSignHashContext(payment);
+
+        template.setDoInputSign(true);
+        Transaction signed = template.createOrdinal(addresses, provider, destination,
+                paymentAddress, 500, content, null, remoteBap,
+                RemoteSignType.CURRENT).build();
+
+        assertTrue(signed.getInput(0).getScriptBytes().length > 0);
+        ScriptUtils_legacy.correctlySpends(signed.getInput(0).getScriptSig(), signed, 0,
+                signed.getInput(0).getConnectedOutput().getScriptPubKey(),
+                signed.getInput(0).getConnectedOutput().getValue(), ScriptVerifyFlag.GENESIS_SET);
     }
 
     private UTXO paymentUtxo() {
