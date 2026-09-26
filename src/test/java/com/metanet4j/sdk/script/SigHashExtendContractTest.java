@@ -1,8 +1,10 @@
 package com.metanet4j.sdk.script;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import io.bitcoinsv.bitcoinjsv.bitcoin.api.BitcoinObject;
 import io.bitcoinsv.bitcoinjsv.bitcoin.bean.base.TxBean;
 import io.bitcoinsv.bitcoinjsv.core.Coin;
 import io.bitcoinsv.bitcoinjsv.core.Sha256Hash;
@@ -15,6 +17,7 @@ import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.security.MessageDigest;
+import java.util.ArrayList;
 import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 
@@ -48,6 +51,30 @@ class SigHashExtendContractTest {
                 SigHashExtend.hashForForkIdSignature(bean, 1, script, value, SigHash.Flags.SINGLE, false));
         assertThrows(IndexOutOfBoundsException.class,
                 () -> SigHashExtend.hashForForkIdSignature(bean, 2, script, value, SigHash.Flags.ALL, false));
+    }
+
+    @Test
+    void manuallyBuiltTransactionHashesBeforeItsSerializedSizeIsKnown() throws Exception {
+        Transaction original = transaction(2);
+        byte[] serialized = original.bitcoinSerialize();
+        TxBean parsed = new TxBean(serialized);
+        TxBean building = new TxBean((BitcoinObject) null);
+        building.setVersion(parsed.getVersion());
+        building.setLockTime(parsed.getLockTime());
+        building.setInputs(new ArrayList<>(parsed.getInputs()));
+        building.setOutputs(new ArrayList<>(parsed.getOutputs()));
+        assertEquals(BitcoinObject.UNKNOWN_MESSAGE_LENGTH, building.getMessageSize());
+
+        byte[] script = {2, 7, 8};
+        Coin value = Coin.valueOf(900);
+        Sha256Hash expected = referenceDigest(original, 1, script, value, SigHash.Flags.ALL, false);
+        assertEquals(expected, SigHashExtend.hashForForkIdSignature(
+                building, 1, script, value, SigHash.Flags.ALL, false));
+
+        assertArrayEquals(serialized, building.serialize());
+        assertEquals(serialized.length, building.getMessageSize());
+        assertEquals(expected, SigHashExtend.hashForForkIdSignature(
+                building, 1, script, value, SigHash.Flags.ALL, false));
     }
 
     private static Transaction transaction(int outputCount) {
