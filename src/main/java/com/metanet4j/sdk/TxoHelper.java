@@ -114,15 +114,9 @@ public class TxoHelper {
                 ScriptChunk scriptChunk = chunks.get(j);
 
                 if (ScriptHelper.hasPushData(scriptChunk)) {
-                    int length = scriptChunk.data.data().length;
-                    if(scriptChunk.data.length()<Integer.MAX_VALUE){
-                        outItem.put("s"+j,new String(scriptChunk.data.data(), Charset.forName("UTF-8")));
-                        outItem.put("b"+j, Base64.encode(scriptChunk.data.data()));
-                        outItem.put("h"+j, HexUtil.encodeHexStr(scriptChunk.data.data()));
-                    }else{
-                        outItem.put("f"+j, txId+".out"+i+"."+j);
-                    }
-
+                    outItem.put("s"+j,new String(scriptChunk.data.data(), Charset.forName("UTF-8")));
+                    outItem.put("b"+j, Base64.encode(scriptChunk.data.data()));
+                    outItem.put("h"+j, HexUtil.encodeHexStr(scriptChunk.data.data()));
                 }
                 if(scriptChunk.isPushData()&&scriptChunk.opcode==0){
                     outItem.put("o"+j, "OP_"+ ScriptOpCodes.getOpCodeName(scriptChunk.opcode) );

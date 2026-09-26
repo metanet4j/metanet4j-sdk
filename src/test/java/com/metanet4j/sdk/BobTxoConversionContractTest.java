@@ -81,6 +81,8 @@ class BobTxoConversionContractTest {
         assertEquals("false", field(item(BobHelper.toBob(hex), "out", 1), "e").get("a"));
         assertEquals("false", field(item(TxoHelper.toTxo(hex), "out", 1), "e").get("a"));
         assertEquals("alpha", txoOutput.get("s1"));
+        assertEquals("YWxwaGE=", txoOutput.get("b1"));
+        assertEquals("616c706861", txoOutput.get("h1"));
         assertEquals("|", txoOutput.get("s2"));
         assertEquals("beta", txoOutput.get("s3"));
 
@@ -88,6 +90,8 @@ class BobTxoConversionContractTest {
         assertEquals(3, tape.size());
         assertEquals(ScriptOpCodes.OP_RETURN, cell(tape.get(0), 0).get("op"));
         assertEquals("alpha", cell(tape.get(1), 0).get("s"));
+        assertEquals("YWxwaGE=", cell(tape.get(1), 0).get("b"));
+        assertEquals("616c706861", cell(tape.get(1), 0).get("h"));
         assertEquals(1, cells(tape.get(1)).size());
         assertEquals("beta", cell(tape.get(2), 0).get("s"));
 

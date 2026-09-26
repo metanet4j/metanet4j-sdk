@@ -168,7 +168,7 @@ public class BobHelper {
                     preCellLastItemIndex = globalCellItemIndex + 1;
                     currentCellItemIndex = -1;
                     tapeItems.add(tapeItem);
-                }else if(scriptChunk.opcode == ScriptOpCodes.OP_RETURN && globalCellItemIndex>1){
+                }else if(scriptChunk.opcode == ScriptOpCodes.OP_RETURN){
 
                     Map<String, Object> tapeItem = new LinkedHashMap<>();
                     //过滤掉OP_RETURN
@@ -202,34 +202,26 @@ public class BobHelper {
 
             }
             if (ScriptHelper.hasPushData(scriptChunk)) {
-                    if (scriptChunk.data.length() < Integer.MAX_VALUE) {
-                        String data = new String(scriptChunk.data.data(), Charset.forName("UTF-8"));
-                        cellItem.put("s", data);
-                        cellItem.put("b", Base64.encode(scriptChunk.data.data()));
-                        cellItem.put("h", HexUtil.encodeHexStr(scriptChunk.data.data()));
-                        cellItem.put("i", currentCellItemIndex);
-                        cellItem.put("ii", globalCellItemIndex);
-                        globalCellItems.add(cellItem);
+                String data = new String(scriptChunk.data.data(), Charset.forName("UTF-8"));
+                cellItem.put("s", data);
+                cellItem.put("b", Base64.encode(scriptChunk.data.data()));
+                cellItem.put("h", HexUtil.encodeHexStr(scriptChunk.data.data()));
+                cellItem.put("i", currentCellItemIndex);
+                cellItem.put("ii", globalCellItemIndex);
+                globalCellItems.add(cellItem);
 
-                        if (data.equals(spilter)) {
-                            Map<String, Object> tapeItem = new LinkedHashMap<>();
-                            //过滤掉"|"分隔符
-                            tapeItem.put("cell", Lists.newArrayList(globalCellItems.subList(preCellLastItemIndex,
-                                    globalCellItemIndex + 1)).stream().filter(o -> !Optional.ofNullable(o.get("s")).orElse("").equals(spilter)).collect(
-                                    Collectors.toList()));
-                            tapeItem.put("i", currentCellIndex);
-                            currentCellIndex++;
-                            preCellLastItemIndex = globalCellItemIndex + 1;
-                            currentCellItemIndex = -1;
-                            tapeItems.add(tapeItem);
-                        }
-                    } else {
-                        cellItem.put("f", txId + ".out." + i + "." + j);
-                        cellItem.put("i", currentCellItemIndex);
-                        cellItem.put("ii", globalCellItemIndex);
-                        globalCellItems.add(cellItem);
-                    }
-
+                if (data.equals(spilter)) {
+                    Map<String, Object> tapeItem = new LinkedHashMap<>();
+                    //过滤掉"|"分隔符
+                    tapeItem.put("cell", Lists.newArrayList(globalCellItems.subList(preCellLastItemIndex,
+                            globalCellItemIndex + 1)).stream().filter(o -> !Optional.ofNullable(o.get("s")).orElse("").equals(spilter)).collect(
+                            Collectors.toList()));
+                    tapeItem.put("i", currentCellIndex);
+                    currentCellIndex++;
+                    preCellLastItemIndex = globalCellItemIndex + 1;
+                    currentCellItemIndex = -1;
+                    tapeItems.add(tapeItem);
+                }
             }
 
             currentCellItemIndex++;
