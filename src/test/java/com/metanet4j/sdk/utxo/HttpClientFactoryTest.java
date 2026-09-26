@@ -7,9 +7,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.metanet4j.sdk.utxo.impl.HttpClientFactory;
@@ -18,8 +22,13 @@ import java.io.IOException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.List;
+import java.util.concurrent.Flow;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 
 class HttpClientFactoryTest {
 
@@ -71,6 +80,64 @@ class HttpClientFactoryTest {
         doThrow(new InterruptedException("cancelled")).when(client).send(eq(request), any());
         assertNull(HttpClientFactory.send(client, request, String.class));
         assertTrue(Thread.interrupted());
+    }
+
+    @Test
+    void rejectsInformationalResponseBelowSuccessRange() throws Exception {
+        HttpClient client = mock(HttpClient.class);
+        HttpRequest request = HttpClientFactory.createGetHttpRequest("http://127.0.0.1/early", 1000);
+        HttpResponse<String> response = mockResponse("{}");
+        when(response.statusCode()).thenReturn(199);
+        doReturn(response).when(client).send(eq(request), any());
+
+        RuntimeException error = assertThrows(RuntimeException.class,
+                () -> HttpClientFactory.send(client, request, String.class));
+        assertTrue(error.getMessage().contains("199"));
+        assertTrue(error.getMessage().contains("/early"));
+    }
+
+    @Test
+    void defaultSendUsesFactoryClientAndDecodesItsResponse() throws Exception {
+        HttpClient client = mock(HttpClient.class);
+        HttpRequest request = HttpClientFactory.createGetHttpRequest("http://127.0.0.1/default", 1000);
+        doReturn(mockResponse("{\"confirmed\":73}"))
+                .when(client).send(eq(request), any());
+
+        try (MockedStatic<HttpClientFactory> factory = mockStatic(
+                HttpClientFactory.class, CALLS_REAL_METHODS)) {
+            factory.when(HttpClientFactory::createHttpClient).thenReturn(client);
+
+            assertEquals(73, HttpClientFactory.send(request, AddressBalanceResDto.class).getConfirmed());
+            verify(client).send(eq(request), any());
+        }
+    }
+
+    @Test
+    void bodyHandlerDecodesUtf8AcrossByteBuffers() throws Exception {
+        HttpClient client = mock(HttpClient.class);
+        HttpRequest request = HttpClientFactory.createGetHttpRequest("http://127.0.0.1/utf8", 1000);
+        byte[] json = "\"余额\"".getBytes(StandardCharsets.UTF_8);
+        doAnswer(invocation -> {
+            HttpResponse.BodyHandler<String> handler = invocation.getArgument(1);
+            HttpResponse.BodySubscriber<String> subscriber = handler.apply(
+                    mock(HttpResponse.ResponseInfo.class));
+            subscriber.onSubscribe(new Flow.Subscription() {
+                @Override
+                public void request(long count) {
+                }
+
+                @Override
+                public void cancel() {
+                }
+            });
+            subscriber.onNext(List.of(ByteBuffer.wrap(json, 0, 3),
+                    ByteBuffer.wrap(json, 3, json.length - 3)));
+            subscriber.onComplete();
+            HttpResponse<String> response = mockResponse(subscriber.getBody().toCompletableFuture().join());
+            return response;
+        }).when(client).send(eq(request), any());
+
+        assertEquals("\"余额\"", HttpClientFactory.send(client, request, String.class));
     }
 
     private static HttpResponse<String> mockResponse(String body) {
