@@ -8,11 +8,13 @@ import com.google.common.base.Charsets;
 import io.bitcoinsv.bitcoinjsv.core.ECKeyLite;
 
 import org.jspecify.annotations.Nullable;
+import lombok.experimental.UtilityClass;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.Charset;
 
 
-public final class Ecies {
+@UtilityClass
+public class Ecies {
 
     public static  byte[] encrypt(byte [] bytes, ECKeyLite pubKey,@Nullable ECKeyLite privKey) throws Exception {
 

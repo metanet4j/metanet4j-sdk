@@ -5,7 +5,9 @@ import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import lombok.experimental.UtilityClass;
 
+@UtilityClass
 public class AesCBCUtil {
     private static final String AES_CBC_PKCS7 = "AES/CBC/PKCS7Padding";
 
@@ -45,4 +47,3 @@ public class AesCBCUtil {
         return decrypt;
     }
 }
-
