@@ -2,6 +2,7 @@ package com.metanet4j.sdk.remote;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -181,6 +182,47 @@ class RemoteTransactionContractTest {
         assertEquals(1, builder.getAllBsmSignHash(true, false, remoteBap).size());
         assertEquals(RemoteSignType.CURRENT,
                 builder.getAllBsmSignHash(true, false, remoteBap).get(0).getRemoteSignType());
+    }
+
+    @Test
+    void remoteSignerLeavesAnAlreadyDisconnectedInputUntouched() {
+        Transaction tx = new Transaction(Net.MAINNET);
+        byte[] hash = new byte[32];
+        hash[0] = 8;
+        tx.addInput(Sha256Hash.wrap(hash), 0, new ScriptBuilder().build());
+        tx.addOutput(Coin.valueOf(777), paymentAddress);
+        ExtendForSignTransaction proposed = new ExtendForSignTransaction(
+                TransactionExtend.toTransactionExtend(tx), SigHash.Flags.ALL, true, false);
+
+        assertTrue(new RemoteTransactionSigner().signInputs(proposed, null));
+        assertEquals(0, proposed.partialTx.getInput(0).getScriptBytes().length);
+    }
+
+    @Test
+    void fourArgumentRemoteOrdinalOutputUsesTheDefaultSigningIdentity() {
+        RemoteOrdTransactionBuilder builder = new RemoteOrdTransactionBuilder(remoteBap,
+                new RemoteTransactionSigner());
+        builder.addInput(paymentUtxo(9));
+        byte[] content = "default".getBytes(StandardCharsets.US_ASCII);
+
+        assertSame(builder, builder.addOrdOutput(bap.getOrdAddress(), content,
+                "text/plain", null));
+
+        assertArrayEquals(OrdScriptBuilder.buildInscription(bap.getOrdAddress(), content,
+                        "text/plain", null).getProgram(),
+                builder.build().getOutput(0).getScriptBytes());
+        assertEquals(RemoteSignType.CURRENT,
+                builder.getAllBsmSignHash(true, false, remoteBap).get(0).getRemoteSignType());
+    }
+
+    @Test
+    void remoteSignerHasNoSerializedPrivateState() {
+        RemoteTransactionSigner signer = new RemoteTransactionSigner();
+
+        assertFalse(signer.isReady());
+        assertArrayEquals(new byte[0], signer.serialize());
+        signer.deserialize(new byte[] {1, 2, 3});
+        assertArrayEquals(new byte[0], signer.serialize());
     }
 
     private UTXO paymentUtxo(int firstHashByte) {
