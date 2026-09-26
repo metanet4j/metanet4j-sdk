@@ -11,6 +11,7 @@ public class PandaBapBase extends MasterKeyBapBase {
     public PandaBapBase(MasterPrivateKey masterPrivateKey, List<ChildNumber> rootChildNumberList,
                         List<ChildNumber> currentNumberList, BapBaseConfig bapBaseConfig) {
         super(masterPrivateKey, rootChildNumberList, currentNumberList, bapBaseConfig);
+        this.appName = bapBaseConfig.getAppName();
     }
 
 }
