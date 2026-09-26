@@ -26,6 +26,7 @@ import io.bitcoinsv.bitcoinjsv.script.ScriptBuilder;
 import io.bitcoinsv.bitcoinjsv.script.ScriptUtils_legacy;
 import io.bitcoinsv.bitcoinjsv.script.ScriptVerifyFlag;
 import io.bitcoinsv.bitcoinjsv.script.SigHash;
+import io.bitcoinsv.bitcoinjsv.signers.LocalTransactionSigner;
 import io.bitcoinsv.bitcoinjsv.temp.KeyBag;
 import java.nio.ByteBuffer;
 import java.util.EnumSet;
@@ -60,6 +61,17 @@ class SignerTransactionContractTest {
         Transaction tx = new Transaction(Net.MAINNET);
         assertTrue(new ExtendForSignTransaction(tx, true).isUseForkId());
         assertFalse(new ExtendForSignTransaction(tx, false).isUseForkId());
+    }
+
+    @Test
+    void threeArgumentRequestPassesForkIdModeToTheStandardLocalSigner() {
+        BapBase bap = BapBase.fromOnlyMasterPrivateKey(TestData.masterPrivateKey);
+        TransactionExtend spending = TransactionExtend.toTransactionExtend(spending(bap));
+        ExtendForSignTransaction request = new ExtendForSignTransaction(spending, true, false);
+        assertTrue(new LocalTransactionSigner().signInputs(request, new BapBase.BapProviderKeyBag(bap)));
+        byte[] signature = spending.getInput(0).getScriptSig().getChunks().get(0).data();
+        assertEquals(0x41, signature[signature.length - 1] & 0xff);
+        verifySpends(spending, ScriptVerifyFlag.GENESIS_SET);
     }
 
     @Test

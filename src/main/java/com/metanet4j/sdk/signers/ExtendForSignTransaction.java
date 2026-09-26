@@ -21,7 +21,7 @@ public class ExtendForSignTransaction extends TransactionSigner.ProposedTransact
     }
 
     public ExtendForSignTransaction(Transaction partialTx, boolean useForkId, boolean anyoneCanPay) {
-        super(partialTx);
+        super(partialTx, useForkId);
         this.useForkId = useForkId;
         this.anyoneCanPay = anyoneCanPay;
     }
