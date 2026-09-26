@@ -89,38 +89,29 @@ public interface BapBaseCore {
     }
 
     default String getSignAddress(RemoteSignType remoteSignType) {
-        switch (remoteSignType) {
-            case CURRENT:
-                return getCurrentAddress().toBase58();
-            case PREVIOUS:
-                return getPreviouAddress().toBase58();
-            case ROOT:
-                return getRootAddress();
-            case ORD:
-                return getOrdAddress().toBase58();
-            case PAYMENT:
-                return getPayAccountAddress().toBase58();
-            default:
-                return null;
-        }
+        return switch (remoteSignType) {
+            case CURRENT -> getCurrentAddress().toBase58();
+            case PREVIOUS -> getPreviouAddress().toBase58();
+            case ROOT -> getRootAddress();
+            case ORD -> getOrdAddress().toBase58();
+            case PAYMENT -> getPayAccountAddress().toBase58();
+        };
     }
 
     default byte[] encrypt(byte[] bytes) {
         try {
             return Ecies.encrypt(bytes, ECKeyLite.fromPublicOnly(getEncryptKey().getPubKey()), null);
         } catch (Exception e) {
-            e.printStackTrace();
+            throw new IllegalStateException("BAP 字节加密失败", e);
         }
-        return null;
     }
 
     default String encrypt(String plainText) {
         try {
             return Ecies.encrypt(plainText, ECKeyLite.fromPublicOnly(getEncryptKey().getPubKey()), null);
         } catch (Exception e) {
-            e.printStackTrace();
+            throw new IllegalStateException("BAP 文本加密失败", e);
         }
-        return null;
     }
 
     default String decrypt(String encryptedPlainText) {
@@ -129,9 +120,8 @@ public interface BapBaseCore {
                     ECKeyLite.fromPrivate(getEncryptKey().getPrivKeyBytes()),
                     null), Charset.forName("UTF-8"));
         } catch (Exception e) {
-            e.printStackTrace();
+            throw new IllegalStateException("BAP 文本解密失败", e);
         }
-        return null;
     }
 
 }
