@@ -61,13 +61,9 @@ public class BobHelper {
                     this.put("h", txInput.getOutpoint().getHashAsString());
                     this.put("i", txInput.getOutpoint().getIndex());
                     if (chunks.size() == 2 && chunks.get(1).data() != null) {
-                        try {
-                            ScriptChunk scriptChunk = chunks.get(1);
-                            this.put("a", new BasicAddress(MainNetParams.get(),
-                                    Utils.sha256hash160(scriptChunk.data())).toBase58());
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
+                        ScriptChunk scriptChunk = chunks.get(1);
+                        this.put("a", new BasicAddress(MainNetParams.get(),
+                                Utils.sha256hash160(scriptChunk.data())).toBase58());
                     }else{
                         //script hash
 
