@@ -75,17 +75,15 @@ public class MasterPrivateKey {
     }
 
     public static List<String> generateWordList(int len) {
-        List<String> wordsList;
+        List<String> dictionary = MnemonicCode.INSTANCE.getWordList();
+        if (len < 0 || len > dictionary.size()) {
+            throw new IllegalArgumentException("word count out of range: " + len);
+        }
         Set<Integer> indexSet = new HashSet<>();
         while (indexSet.size() != len) {
-            indexSet.add(RandomUtil.randomInt(0, 2048 - 1));
+            indexSet.add(RandomUtil.randomInt(0, dictionary.size()));
         }
-
-        MnemonicCode mnemonicCode = MnemonicCode.INSTANCE;
-
-        wordsList = indexSet.stream().map(i -> mnemonicCode.getWordList().get(i))
-                .collect(Collectors.toList());
-        return wordsList;
+        return indexSet.stream().map(dictionary::get).collect(Collectors.toList());
     }
 
 }
