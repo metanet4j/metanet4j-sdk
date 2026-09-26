@@ -5,6 +5,7 @@ import com.metanet4j.sdk.PublicKey;
 import com.metanet4j.sdk.address.AddressEnhance;
 import io.bitcoinsv.bitcoinjsv.core.ECKey;
 import io.bitcoinsv.bitcoinjsv.core.ECKeyLite;
+import io.bitcoinsv.bitcoinjsv.core.Utils;
 import io.bitcoinsv.bitcoinjsv.temp.KeyBag;
 import io.bitcoinsv.bitcoinjsv.temp.RedeemData;
 
@@ -127,7 +128,7 @@ public class SpecifyBapBase extends BapBaseAbstract {
         @Nullable
         @Override
         public ECKey findKeyFromPubKey(byte[] pubkey) {
-            return null;
+            return findKeyFromPubHash(Utils.sha256hash160(pubkey));
         }
 
         @Nullable
