@@ -5,7 +5,6 @@ import com.metanet4j.sdk.context.PreSignHashContext;
 import com.metanet4j.sdk.script.ScriptExtend;
 import com.metanet4j.sdk.script.SigHashExtend;
 import com.metanet4j.sdk.signers.ExtendForSignTransaction;
-import io.bitcoinsv.bitcoinjsv.core.ECKey;
 import io.bitcoinsv.bitcoinjsv.core.Sha256Hash;
 import io.bitcoinsv.bitcoinjsv.ecc.ECDSASignature;
 import io.bitcoinsv.bitcoinjsv.ecc.TransactionSignature;
@@ -48,23 +47,16 @@ public class RemoteTransactionSigner implements TransactionSigner {
             }
             Script scriptPubKey = txIn.getConnectedOutput().getScriptPubKey();
 
-            try {
-//
-                Sha256Hash hash = SigHashExtend.hashForForkIdSignature(Translate.toTx(tx), i, scriptPubKey.getProgram(), tx.getInput(i).getConnectedOutput().getValue(), propTx.getHashFlags(), propTx.isAnyoneCanPay());
-                PreSignHashContext signedHashContext = PreSignHashUtils.getSignedHashContext(hash);
-                TransactionSignature signature = new TransactionSignature(ECDSASignature.decodeFromDER(Base64.decode(signedHashContext.getSigB64())), propTx.getHashFlags(), propTx.isAnyoneCanPay(), true);
+            Sha256Hash hash = SigHashExtend.hashForForkIdSignature(Translate.toTx(tx), i, scriptPubKey.getProgram(), tx.getInput(i).getConnectedOutput().getValue(), propTx.getHashFlags(), propTx.isAnyoneCanPay());
+            PreSignHashContext signedHashContext = PreSignHashUtils.getSignedHashContext(hash);
+            TransactionSignature signature = new TransactionSignature(ECDSASignature.decodeFromDER(Base64.decode(signedHashContext.getSigB64())), propTx.getHashFlags(), propTx.isAnyoneCanPay(), true);
 
-                txIn.setScriptSig(
-                        scriptPubKey.createEmptyInputScript(signedHashContext.getPublicKey().getPubKeyBytes(), scriptPubKey));
-                Script inputScript = txIn.getScriptSig();
-                int sigIndex = 0;
-                inputScript = new ScriptExtend(scriptPubKey.getProgram()).getScriptSigWithSignature(inputScript, signature.encodeToBitcoin(), sigIndex);
-                txIn.setScriptSig(inputScript);
-            } catch (ECKey.KeyIsEncryptedException e) {
-                throw e;
-            } catch (ECKey.MissingPrivateKeyException e) {
-                log.warn("No private key in keypair for input {}", i);
-            }
+            txIn.setScriptSig(
+                    scriptPubKey.createEmptyInputScript(signedHashContext.getPublicKey().getPubKeyBytes(), scriptPubKey));
+            Script inputScript = txIn.getScriptSig();
+            int sigIndex = 0;
+            inputScript = new ScriptExtend(scriptPubKey.getProgram()).getScriptSigWithSignature(inputScript, signature.encodeToBitcoin(), sigIndex);
+            txIn.setScriptSig(inputScript);
 
         }
         return true;
