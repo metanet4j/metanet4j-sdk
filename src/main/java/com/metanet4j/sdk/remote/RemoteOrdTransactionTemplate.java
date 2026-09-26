@@ -189,13 +189,8 @@ public class RemoteOrdTransactionTemplate {
         transactionBuilder.addOrdOutput(destinationAddress, bapBase.getIdentityKey().getBytes(StandardCharsets.UTF_8), "application/bap", null);
         BapDataLockBuilder bapDataLockBuilder = new BapDataLockBuilder(bapBase, true, remoteSignType);
         transactionBuilder.addDataOutput(bapDataLockBuilder.buildRoot());
-        transactionBuilder.addSigmaSign(bapBase, remoteSignType);
-        transactionBuilder.withFeeKb(Coin.valueOf(feePerKb))
-                .changeAddress(changeAddress);
-
-        boolean verify = transactionBuilder.getSigma().verify();
-        log.info("verify result:" + verify);
-        return transactionBuilder.signTx(null, true).build();
+        return postTxBuild(changeAddress, feePerKb, bapBase, remoteSignType,
+                this.doBsmSign, this.doInputSign, transactionBuilder).build();
     }
 
     public Transaction createPostOrdinal(List<AddressLite> payAddressLiteList,

@@ -161,6 +161,51 @@ class RemoteOrdTransactionTemplateContractTest {
                         500, null, null, keyBag, refusingSigner, null));
     }
 
+    @Test
+    void createsUnsignedBapOrdinalWhenBothSigningStagesAreDisabled() {
+        RemoteOrdTransactionTemplate template = new RemoteOrdTransactionTemplate(false, false);
+
+        Transaction tx = template.createBapOrdinal(List.of(bap.getPayAccountAddress()),
+                provider, destination, paymentAddress, 500, remoteBap,
+                new RemoteTransactionSigner(), RemoteSignType.CURRENT);
+
+        assertEquals(1, tx.getInputs().size());
+        assertEquals(3, tx.getOutputs().size());
+        assertEquals(Coin.SATOSHI, tx.getOutput(0).getValue());
+        assertEquals(0, tx.getInput(0).getScriptBytes().length);
+        assertTrue(tx.getInputSum().getValue() > tx.getOutputSum().getValue());
+    }
+
+    @Test
+    void defaultPostOverloadBuildsPostMetadataWithoutSigning() {
+        RemoteOrdTransactionTemplate template = new RemoteOrdTransactionTemplate(false, false);
+        OrdScriptBuilder.ORDMap metadata = new OrdScriptBuilder.ORDMap();
+        metadata.put("app", remoteBap.getAppName());
+        metadata.put("type", "post");
+
+        Transaction tx = template.createPostOrdinal(List.of(bap.getPayAccountAddress()),
+                provider, destination, paymentAddress, 500, inscription("post"),
+                remoteBap, RemoteSignType.CURRENT);
+
+        assertArrayEquals(OrdScriptBuilder.buildInscription(destination,
+                        "post".getBytes(StandardCharsets.US_ASCII), "text/plain", metadata).getProgram(),
+                tx.getOutput(0).getScriptBytes());
+    }
+
+    @Test
+    @SuppressWarnings("deprecation")
+    void deprecatedSendUtxosSpendsLocalPaymentInputWithoutBroadcast() throws Exception {
+        Transaction tx = new RemoteOrdTransactionTemplate(false, false).sendUtxos(
+                bap, List.of(paymentUtxo()), paymentAddress, 500, keyBag);
+
+        assertEquals(1, tx.getInputs().size());
+        assertEquals(1, tx.getOutputs().size());
+        assertTrue(tx.getInputSum().getValue() > tx.getOutputSum().getValue());
+        ScriptUtils_legacy.correctlySpends(tx.getInput(0).getScriptSig(), tx, 0,
+                tx.getInput(0).getConnectedOutput().getScriptPubKey(),
+                tx.getInput(0).getConnectedOutput().getValue(), ScriptVerifyFlag.GENESIS_SET);
+    }
+
     private UTXO paymentUtxo() {
         byte[] hash = new byte[32];
         hash[0] = 2;
