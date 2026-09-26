@@ -162,6 +162,24 @@ class RemoteOrdTransactionTemplateContractTest {
     }
 
     @Test
+    void incompleteReinscriptionFallsBackToAnOrdinaryTransfer() {
+        List<OrdScriptBuilder.Inscription> incomplete = List.of(
+                OrdScriptBuilder.Inscription.builder().dataB64("")
+                        .contentType("text/plain").build(),
+                OrdScriptBuilder.Inscription.builder().dataB64(Base64.encode("x".getBytes(StandardCharsets.US_ASCII)))
+                        .contentType("").build());
+
+        for (OrdScriptBuilder.Inscription attempt : incomplete) {
+            Transaction sent = new RemoteOrdTransactionTemplate(false, false).sendOrdinal(
+                    bap, ordinalUtxo(), paymentUtxo(), destination, paymentAddress,
+                    500, attempt, null, keyBag);
+            assertArrayEquals(ScriptBuilder.createOutputScript(destination).getProgram(),
+                    sent.getOutput(0).getScriptBytes());
+            assertEquals(Coin.SATOSHI, sent.getOutput(0).getValue());
+        }
+    }
+
+    @Test
     void sendOrdinalPropagatesSignerFailure() {
         TransactionSigner refusingSigner = mock(TransactionSigner.class);
 
