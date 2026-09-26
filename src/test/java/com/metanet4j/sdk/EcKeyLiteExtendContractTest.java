@@ -41,4 +41,22 @@ class EcKeyLiteExtendContractTest {
         assertNotEquals(signature, key.signMessage(new byte[] {0, (byte) 0xfe, 42}));
         assertFalse(key.verify(Sha256Hash.of(new byte[] {1}), decoded));
     }
+
+    @Test
+    void compactSignaturePreservesUncompressedPublicKeyFormat() {
+        EcKeyLiteExtend key = new EcKeyLiteExtend(BigInteger.TWO,
+                ECKeyLite.fromPrivate(BigInteger.TWO, false).getPubKeyPoint());
+        byte[] message = {1, 0, (byte) 0xff};
+        Sha256Hash hash = Sha256Hash.twiceOf(UtilsExtend.formatMessageForSigning(message));
+
+        assertFalse(key.isCompressed());
+        byte[] compact = Base64.getDecoder().decode(key.signMessage(message));
+        int header = Byte.toUnsignedInt(compact[0]);
+        assertTrue(header >= 27 && header <= 30);
+        ECDSASignature decoded = new ECDSASignature(
+                new BigInteger(1, Arrays.copyOfRange(compact, 1, 33)),
+                new BigInteger(1, Arrays.copyOfRange(compact, 33, 65)));
+        ECKeyLite recovered = ECKeyLite.recoverFromSignature(header - 27, decoded, hash, false);
+        assertArrayEquals(key.getPubKey(), recovered.getPubKey());
+    }
 }
