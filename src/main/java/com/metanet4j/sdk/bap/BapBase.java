@@ -403,7 +403,8 @@ public class BapBase extends MasterKeyBapBase {
         private BapBase bapBase;
 
         public BapProviderKeyBag(BapBase bapBase) {
-            this(bapBase.getMasterPrivateKey(), 100, new DefaultBapBaseConfig());
+            this.masterPrivateKey = bapBase.getMasterPrivateKey();
+            this.loop = 100;
             this.bapBase = bapBase;
         }
 
@@ -415,9 +416,7 @@ public class BapBase extends MasterKeyBapBase {
             Assert.isTrue(loop <= 1000);
             this.masterPrivateKey = masterPrivateKey;
             this.loop = loop;
-            if (this.bapBase == null) {
-                this.bapBase = BapBase.fromRootPath(masterPrivateKey, bapBaseConfig);
-            }
+            this.bapBase = BapBase.fromRootPath(masterPrivateKey, bapBaseConfig);
 
         }
 
@@ -459,7 +458,7 @@ public class BapBase extends MasterKeyBapBase {
         @Nullable
         @Override
         public ECKey findKeyFromPubKey(byte[] pubkey) {
-            return null;
+            return findKeyFromPubHash(Utils.sha256hash160(pubkey));
         }
 
         @Nullable
