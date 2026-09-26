@@ -65,7 +65,7 @@ public class PrivateKey  {
         String keyHex = Utils.HEX.encode(keyBytes);
         BigInteger d = new BigInteger(keyHex, 16);
 
-        ECKeyLite key = ECKeyLite.fromPrivate(d);
+        ECKeyLite key = ECKeyLite.fromPrivate(d, isCompressed);
 
         return new PrivateKey(key, isCompressed, networkType);
     }
@@ -115,17 +115,9 @@ public class PrivateKey  {
                 return Net.TESTNET3.params();
             }
             case 'L' : case 'K' : {
-                if (wifKey.length() != 52) {
-                    throw new InvalidKeyException("Compressed private keys have a length of 52 bytes");
-                }
-
                 return  Net.MAINNET.params();
             }
             case 'c' : {
-                if (wifKey.length() != 52) {
-                    throw new InvalidKeyException("Compressed private keys have a length of 52 bytes");
-                }
-
                 return  Net.TESTNET3.params();
             }
             default : {
