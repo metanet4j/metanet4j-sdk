@@ -95,7 +95,50 @@ public class RemoteOrdTransactionTemplate {
             OrdScriptBuilder.ORDMap metaData,
             RemoteSignType remoteSignType
     ) {
-        return sendOrdinal(bapBase, ordinalUtxo, paymentUtxo, destinationAddress, changeAddress, feePerKb, reInscription, metaData, null, new RemoteTransactionSigner(), remoteSignType);
+        return prepareSendOrdinal(bapBase, ordinalUtxo, paymentUtxo, destinationAddress, changeAddress, feePerKb, reInscription, metaData, new RemoteTransactionSigner(), remoteSignType).build();
+    }
+
+
+    public RemoteOrdTransactionBuilder prepareSendOrdinal(
+            RemoteBapBase bapBase,
+            UTXO ordinalUtxo,
+            UTXO paymentUtxo,
+            Address destinationAddress,
+            Address changeAddress,
+            long feePerKb,
+            OrdScriptBuilder.Inscription reInscription,
+            OrdScriptBuilder.ORDMap metaData,
+            RemoteSignType remoteSignType
+    ) {
+        return prepareSendOrdinal(bapBase, ordinalUtxo, paymentUtxo, destinationAddress, changeAddress, feePerKb, reInscription, metaData, new RemoteTransactionSigner(), remoteSignType);
+    }
+
+
+    public RemoteOrdTransactionBuilder prepareSendOrdinal(
+            RemoteBapBase bapBase,
+            UTXO ordinalUtxo,
+            UTXO paymentUtxo,
+            Address destinationAddress,
+            Address changeAddress,
+            long feePerKb,
+            OrdScriptBuilder.Inscription reInscription,
+            OrdScriptBuilder.ORDMap metaData,
+            RemoteTransactionSigner transactionSigner,
+            RemoteSignType remoteSignType
+    ) {
+        preTxBuild(transactionSigner, remoteSignType);
+
+        RemoteOrdTransactionBuilder transactionBuilder = new RemoteOrdTransactionBuilder(bapBase, transactionSigner);
+        transactionBuilder.addOrdInput(ordinalUtxo);
+        transactionBuilder.addInput(paymentUtxo);
+
+        if (reInscription != null && StrUtil.isNotEmpty(reInscription.getDataB64()) && StrUtil.isNotEmpty(reInscription.getContentType())) {
+            transactionBuilder.addOrdOutput(destinationAddress, Base64.decode(reInscription.getDataB64()), reInscription.getContentType(), metaData);
+        } else {
+            transactionBuilder.addOutput(Coin.SATOSHI, destinationAddress);
+        }
+
+        return postTxBuild(changeAddress, feePerKb, bapBase, remoteSignType, this.doBsmSign, this.doInputSign, transactionBuilder);
     }
 
 

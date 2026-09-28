@@ -21,6 +21,7 @@ import io.bitcoinsv.bitcoinjsv.core.Address;
 import io.bitcoinsv.bitcoinjsv.core.AddressLite;
 import io.bitcoinsv.bitcoinjsv.core.Coin;
 import io.bitcoinsv.bitcoinjsv.core.ECKey;
+import io.bitcoinsv.bitcoinjsv.core.ECKeyLite;
 import io.bitcoinsv.bitcoinjsv.core.Sha256Hash;
 import io.bitcoinsv.bitcoinjsv.core.UTXO;
 import io.bitcoinsv.bitcoinjsv.msg.protocol.Transaction;
@@ -31,6 +32,7 @@ import io.bitcoinsv.bitcoinjsv.script.ScriptVerifyFlag;
 import io.bitcoinsv.bitcoinjsv.signers.TransactionSigner;
 import io.bitcoinsv.bitcoinjsv.temp.KeyBag;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.AfterEach;
@@ -180,6 +182,110 @@ class RemoteOrdTransactionTemplateContractTest {
     }
 
     @Test
+    void remoteSendCanReturnAnUnsignedOrdinalTransferWhenSigningIsDisabled() {
+        RemoteOrdTransactionTemplate template = new RemoteOrdTransactionTemplate(false, false);
+
+        Transaction tx = template.sendOrdinal(remoteBap, ordinalUtxo(), paymentUtxo(),
+                destination, paymentAddress, 500, null, null, RemoteSignType.CURRENT);
+
+        assertEquals(2, tx.getInputs().size());
+        assertArrayEquals(ordinalUtxo().getScript().getProgram(),
+                tx.getInput(0).getConnectedOutput().getScriptBytes());
+        assertEquals(Coin.SATOSHI, tx.getOutput(0).getValue());
+        assertArrayEquals(ScriptBuilder.createOutputScript(destination).getProgram(),
+                tx.getOutput(0).getScriptBytes());
+        assertEquals(0, tx.getInput(0).getScriptBytes().length);
+        assertEquals(0, tx.getInput(1).getScriptBytes().length);
+    }
+
+    @Test
+    void stagedRemoteTransferSignsBothInputsFromExternallyPreparedHashes() {
+        RemoteOrdTransactionTemplate template = new RemoteOrdTransactionTemplate(false, false);
+        RemoteOrdTransactionBuilder unsigned = template.prepareSendOrdinal(remoteBap,
+                ordinalUtxo(), paymentUtxo(), destination, paymentAddress, 500, null, null,
+                RemoteSignType.CURRENT);
+
+        List<PreSignHashContext> pending = unsigned.getTxInputSignHash(false, remoteBap);
+        assertEquals(2, pending.size());
+        assertEquals(RemoteSignType.ORD, pending.get(0).getRemoteSignType());
+        assertEquals(bap.getOrdAddress().toBase58(), pending.get(0).getSignAddress());
+        assertEquals(RemoteSignType.PAYMENT, pending.get(1).getRemoteSignType());
+        assertEquals(bap.getPayAccountAddress().toBase58(), pending.get(1).getSignAddress());
+        signRemoteInputs(pending);
+
+        template.setDoInputSign(true);
+        RemoteOrdTransactionBuilder completed = template.prepareSendOrdinal(remoteBap,
+                ordinalUtxo(), paymentUtxo(), destination, paymentAddress, 500, null, null,
+                RemoteSignType.CURRENT);
+        Transaction signed = completed.build();
+
+        assertEquals(2, signed.getInputs().size());
+        assertArrayEquals(ScriptBuilder.createOutputScript(destination).getProgram(),
+                signed.getOutput(0).getScriptBytes());
+        assertEquals(Coin.SATOSHI, signed.getOutput(0).getValue());
+        assertEquals(signed.getInputSum(), signed.getOutputSum().add(completed.getFee()));
+        assertSpendable(signed);
+    }
+
+    @Test
+    void reinscribedRemoteTransferSignsBsmThenBothInputs() {
+        RemoteOrdTransactionTemplate template = new RemoteOrdTransactionTemplate(false, false);
+        OrdScriptBuilder.Inscription reinscription = inscription("second");
+        OrdScriptBuilder.ORDMap metadata = new OrdScriptBuilder.ORDMap();
+        metadata.put("app", "test");
+        metadata.put("type", "ord");
+
+        RemoteOrdTransactionBuilder unsigned = template.prepareSendOrdinal(remoteBap,
+                ordinalUtxo(), paymentUtxo(), destination, paymentAddress, 500,
+                reinscription, metadata, RemoteSignType.CURRENT);
+        List<PreSignHashContext> bsm = unsigned.getAllBsmSignHash(true, false, remoteBap);
+        assertEquals(1, bsm.size());
+        assertEquals(RemoteSignType.CURRENT, bsm.get(0).getRemoteSignType());
+        bsm.get(0).setSigB64(EcKeyLiteExtend.fromPrivate(bap.getCurrentPrivateKey().getPrivKey())
+                .signHash(bsm.get(0).getPreSignHash()));
+        PreSignHashUtils.setPreSignHashContext(bsm.get(0));
+
+        template.setDoBsmSign(true);
+        RemoteOrdTransactionBuilder bsmSigned = template.prepareSendOrdinal(remoteBap,
+                ordinalUtxo(), paymentUtxo(), destination, paymentAddress, 500,
+                reinscription, metadata, RemoteSignType.CURRENT);
+        assertTrue(bsmSigned.getSigma().verify());
+        signRemoteInputs(bsmSigned.getTxInputSignHash(false, remoteBap));
+
+        template.setDoInputSign(true);
+        Transaction signed = template.prepareSendOrdinal(remoteBap, ordinalUtxo(), paymentUtxo(),
+                destination, paymentAddress, 500, reinscription, metadata,
+                RemoteSignType.CURRENT).build();
+
+        byte[] inscriptionScript = OrdScriptBuilder.buildInscription(destination,
+                "second".getBytes(StandardCharsets.US_ASCII), "text/plain", metadata).getProgram();
+        assertArrayEquals(inscriptionScript, Arrays.copyOf(signed.getOutput(0).getScriptBytes(),
+                inscriptionScript.length));
+        assertEquals(Coin.SATOSHI, signed.getOutput(0).getValue());
+        assertSpendable(signed);
+    }
+
+    @Test
+    void prepareSendOrdinalFallsBackToAnOrdinaryTransferForIncompleteReinscriptions() {
+        List<OrdScriptBuilder.Inscription> incomplete = List.of(
+                OrdScriptBuilder.Inscription.builder().dataB64("")
+                        .contentType("text/plain").build(),
+                OrdScriptBuilder.Inscription.builder()
+                        .dataB64(Base64.encode("x".getBytes(StandardCharsets.US_ASCII)))
+                        .contentType("").build());
+
+        for (OrdScriptBuilder.Inscription attempt : incomplete) {
+            RemoteOrdTransactionBuilder builder = new RemoteOrdTransactionTemplate(false, false)
+                    .prepareSendOrdinal(remoteBap, ordinalUtxo(), paymentUtxo(), destination,
+                            paymentAddress, 500, attempt, null, RemoteSignType.CURRENT);
+            assertEquals(2, builder.build().getInputs().size());
+            assertEquals(Coin.SATOSHI, builder.build().getOutput(0).getValue());
+            assertArrayEquals(ScriptBuilder.createOutputScript(destination).getProgram(),
+                    builder.build().getOutput(0).getScriptBytes());
+        }
+    }
+
+    @Test
     void sendOrdinalPropagatesSignerFailure() {
         TransactionSigner refusingSigner = mock(TransactionSigner.class);
 
@@ -267,6 +373,26 @@ class RemoteOrdTransactionTemplateContractTest {
         ScriptUtils_legacy.correctlySpends(signed.getInput(0).getScriptSig(), signed, 0,
                 signed.getInput(0).getConnectedOutput().getScriptPubKey(),
                 signed.getInput(0).getConnectedOutput().getValue(), ScriptVerifyFlag.GENESIS_SET);
+    }
+
+    private void signRemoteInputs(List<PreSignHashContext> pending) {
+        for (PreSignHashContext context : pending) {
+            ECKeyLite key = context.getRemoteSignType() == RemoteSignType.ORD
+                    ? bap.getOrdPrivateKey() : bap.getPayAccountKey();
+            context.setSigB64(Base64.encode(key.sign(context.getPreSignHash()).encodeToDER()));
+            context.setPublicKey(PublicKey.fromHex(key.getPublicKeyAsHex()));
+            PreSignHashUtils.setPreSignHashContext(context);
+        }
+    }
+
+    private void assertSpendable(Transaction signed) {
+        for (int i = 0; i < signed.getInputs().size(); i++) {
+            assertTrue(signed.getInput(i).getScriptBytes().length > 0);
+            ScriptUtils_legacy.correctlySpends(signed.getInput(i).getScriptSig(), signed, i,
+                    signed.getInput(i).getConnectedOutput().getScriptPubKey(),
+                    signed.getInput(i).getConnectedOutput().getValue(),
+                    ScriptVerifyFlag.GENESIS_SET);
+        }
     }
 
     private UTXO paymentUtxo() {

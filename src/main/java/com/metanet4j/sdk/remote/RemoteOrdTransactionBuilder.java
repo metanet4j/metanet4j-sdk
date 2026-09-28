@@ -4,12 +4,16 @@ import com.metanet4j.sdk.bap.BapBaseCore;
 import com.metanet4j.sdk.bap.RemoteBapBase;
 import com.metanet4j.sdk.context.PreSignHashContext;
 import com.metanet4j.sdk.exception.SignErrorException;
+import com.metanet4j.sdk.input.TransactionInputEnhance;
+import com.metanet4j.sdk.input.TransactionOutPointEnhance;
 import com.metanet4j.sdk.ordinals.OrdScriptBuilder;
+import com.metanet4j.sdk.output.TransactionOutputEnhance;
 import com.metanet4j.sdk.sigma.Sigma;
 import com.metanet4j.sdk.signers.ExtendForSignTransaction;
 import com.metanet4j.sdk.signers.TransactionExtend;
 import io.bitcoinsv.bitcoinjsv.core.Address;
 import io.bitcoinsv.bitcoinjsv.core.Coin;
+import io.bitcoinsv.bitcoinjsv.core.UTXO;
 import io.bitcoinsv.bitcoinjsv.msg.protocol.Transaction;
 import io.bitcoinsv.bitcoinjsv.msg.protocol.TransactionOutput;
 import io.bitcoinsv.bitcoinjsv.script.SigHash;
@@ -19,6 +23,15 @@ public class RemoteOrdTransactionBuilder extends RemoteTransactionBuilder {
 
     public RemoteOrdTransactionBuilder(RemoteBapBase bapBaseCore, RemoteTransactionSigner transactionSigner) {
         super(bapBaseCore, transactionSigner);
+    }
+
+
+    public RemoteOrdTransactionBuilder addOrdInput(UTXO utxo) {
+        TransactionOutputEnhance output = new TransactionOutputEnhance(this.getNet(), null, utxo.getValue(), utxo.getScript().getProgram(), (int) utxo.getIndex());
+        TransactionOutPointEnhance transactionOutPointEnhance = new TransactionOutPointEnhance(this.getNet(), output, utxo.getHash());
+        TransactionInputEnhance transactionInputEnhance = new TransactionInputEnhance(this.getNet(), this.getTargetTransaction(), transactionOutPointEnhance, utxo.getValue());
+        this.getTargetTransaction().addInput(transactionInputEnhance);
+        return this;
     }
 
 

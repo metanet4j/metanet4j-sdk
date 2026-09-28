@@ -5,6 +5,7 @@ import com.metanet4j.sdk.context.PreSignHashContext;
 import com.metanet4j.sdk.script.ScriptExtend;
 import com.metanet4j.sdk.script.SigHashExtend;
 import com.metanet4j.sdk.signers.ExtendForSignTransaction;
+import com.metanet4j.sdk.utils.TxHelperExtend;
 import io.bitcoinsv.bitcoinjsv.core.Sha256Hash;
 import io.bitcoinsv.bitcoinjsv.ecc.ECDSASignature;
 import io.bitcoinsv.bitcoinjsv.ecc.TransactionSignature;
@@ -12,6 +13,7 @@ import io.bitcoinsv.bitcoinjsv.msg.Translate;
 import io.bitcoinsv.bitcoinjsv.msg.protocol.Transaction;
 import io.bitcoinsv.bitcoinjsv.msg.protocol.TransactionInput;
 import io.bitcoinsv.bitcoinjsv.script.Script;
+import io.bitcoinsv.bitcoinjsv.script.ScriptBuilder;
 import io.bitcoinsv.bitcoinjsv.script.ScriptVerifyFlag;
 import io.bitcoinsv.bitcoinjsv.script.SigHash;
 import io.bitcoinsv.bitcoinjsv.signers.TransactionSigner;
@@ -51,8 +53,10 @@ public class RemoteTransactionSigner implements TransactionSigner {
             PreSignHashContext signedHashContext = PreSignHashUtils.getSignedHashContext(hash);
             TransactionSignature signature = new TransactionSignature(ECDSASignature.decodeFromDER(Base64.decode(signedHashContext.getSigB64())), propTx.getHashFlags(), propTx.isAnyoneCanPay(), true);
 
-            txIn.setScriptSig(
-                    scriptPubKey.createEmptyInputScript(signedHashContext.getPublicKey().getPubKeyBytes(), scriptPubKey));
+            byte[] pubKeyBytes = signedHashContext.getPublicKey().getPubKeyBytes();
+            txIn.setScriptSig(TxHelperExtend.isSentToOrdinals(scriptPubKey)
+                    ? ScriptBuilder.createInputScript(null, pubKeyBytes)
+                    : scriptPubKey.createEmptyInputScript(pubKeyBytes, scriptPubKey));
             Script inputScript = txIn.getScriptSig();
             int sigIndex = 0;
             inputScript = new ScriptExtend(scriptPubKey.getProgram()).getScriptSigWithSignature(inputScript, signature.encodeToBitcoin(), sigIndex);

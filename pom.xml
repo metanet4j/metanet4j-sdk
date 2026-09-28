@@ -14,6 +14,14 @@
 
     <name>metanet4j-sdk</name>
 
+    <properties>
+        <!-- jacoco:check 类级例外（2026-09-28 用户批准，共 12 行）：
+             10 个无业务行为的隐式默认构造器 + SigHashExtend 固定内存流不可达的 IOException 包装 2 行。
+             清单与理由见任务根目录 unit-coverage-exceptions.json，由 verify-unit.py 严格模式双向核对；
+             jacoco:check 的类名是点号 Java 名（内部类写作 Outer.Inner），冒号分隔 -->
+        <jacoco.unit.check.excludes>com.metanet4j.sdk.BobHelper:com.metanet4j.sdk.TxoHelper:com.metanet4j.sdk.bap.TaggedDerivation:com.metanet4j.sdk.ordinals.OrdScriptBuilder:com.metanet4j.sdk.ordinals.OrdScriptBuilder.LocalSigner:com.metanet4j.sdk.ordinals.OrdScriptBuilder.RemoteSigner:com.metanet4j.sdk.script.SigHashExtend:com.metanet4j.sdk.utils.TxHelperExtend:com.metanet4j.sdk.utxo.impl.bitails.BitailsClient:com.metanet4j.sdk.utxo.impl.gorillapool.GorillaClient</jacoco.unit.check.excludes>
+    </properties>
+
     <dependencies>
 
         <!-- 注解：javax.annotation.Nullable/Nonnull 的替代（版本随 Boot BOM 1.0.1） -->
