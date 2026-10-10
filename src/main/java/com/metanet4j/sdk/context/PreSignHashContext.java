@@ -2,8 +2,8 @@ package com.metanet4j.sdk.context;
 
 import com.metanet4j.sdk.PublicKey;
 import com.metanet4j.sdk.remote.RemoteSignType;
-import io.bitcoinsv.bitcoinjsv.core.Coin;
-import io.bitcoinsv.bitcoinjsv.core.Sha256Hash;
+import com.metanet4j.base.bsv.BsvAmount;
+import com.metanet4j.base.bsv.BsvHashBytes;
 import lombok.Data;
 
 import java.util.LinkedHashMap;
@@ -12,9 +12,9 @@ import java.util.LinkedHashMap;
 public class PreSignHashContext {
     private String signAddress;
     private String sigB64;
-    private Sha256Hash preSignHash;
+    private BsvHashBytes preSignHash;
     private RemoteSignType remoteSignType;
-    private Coin fee;
+    private BsvAmount fee;
     private PublicKey publicKey;
 
     public LinkedHashMap toMap() {
@@ -39,10 +39,10 @@ public class PreSignHashContext {
         this.signAddress = (String) map.get("signAddress");
         this.sigB64 = (String) map.get("sigB64");
         Object hashValue = map.get("preSignHash");
-        this.preSignHash = hashValue == null ? null : Sha256Hash.wrap((String) hashValue);
+        this.preSignHash = hashValue == null ? null : BsvHashBytes.fromDisplayHex((String) hashValue);
         this.remoteSignType = RemoteSignType.valueOf((String) map.get("remoteSignType"));
         Object feeValue = map.get("fee");
-        this.fee = feeValue == null ? null : Coin.valueOf(((Number) feeValue).longValue());
+        this.fee = feeValue == null ? null : BsvAmount.valueOf(((Number) feeValue).longValue());
         Object keyValue = map.get("publicKey");
         this.publicKey = keyValue == null ? null : PublicKey.fromHex(keyValue.toString());
         return this;

@@ -1,7 +1,6 @@
 package com.metanet4j.sdk.sigma;
 
 
-import io.bitcoinsv.bitcoinjsv.core.Address;
 import lombok.Data;
 
 @Data

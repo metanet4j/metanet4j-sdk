@@ -16,17 +16,15 @@ import com.metanet4j.sdk.remote.PreSignHashUtils;
 import com.metanet4j.sdk.remote.RemoteSignType;
 import com.metanet4j.sdk.utils.ScriptHelper;
 import com.metanet4j.sdk.utils.UtilsExtend;
-import io.bitcoinsv.bitcoinjsv.core.AddressLite;
-import io.bitcoinsv.bitcoinjsv.core.Sha256Hash;
-import io.bitcoinsv.bitcoinjsv.msg.protocol.Transaction;
-import io.bitcoinsv.bitcoinjsv.msg.protocol.TransactionInput;
-import io.bitcoinsv.bitcoinjsv.msg.protocol.TransactionOutput;
-import io.bitcoinsv.bitcoinjsv.params.MainNetParams;
-import io.bitcoinsv.bitcoinjsv.params.Net;
-import io.bitcoinsv.bitcoinjsv.script.Script;
-import io.bitcoinsv.bitcoinjsv.script.ScriptBuilder;
-import io.bitcoinsv.bitcoinjsv.script.ScriptChunk;
-import io.bitcoinsv.bitcoinjsv.script.ScriptOpCodes;
+import com.metanet4j.base.bsv.BsvAddress;
+import com.metanet4j.base.bsv.BsvHashBytes;
+import com.metanet4j.base.bsv.BsvNetwork;
+import com.metanet4j.bsv.script.OP;
+import com.metanet4j.bsv.script.Script;
+import com.metanet4j.bsv.script.ScriptChunk;
+import com.metanet4j.bsv.transaction.Transaction;
+import com.metanet4j.bsv.transaction.TransactionInput;
+import com.metanet4j.bsv.transaction.TransactionOutput;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.spongycastle.pqc.math.linearalgebra.ByteUtils;
@@ -43,8 +41,8 @@ import java.util.Objects;
 public class Sigma implements PreSignHash {
 
     public static final String SIGMA_PREFIX = "5349474D41";
-    private Sha256Hash inputHash;
-    private Sha256Hash dataHash;
+    private BsvHashBytes inputHash;
+    private BsvHashBytes dataHash;
     private Transaction transaction;
     private int sigmaInstance;
     private int refVin;
@@ -108,17 +106,15 @@ public class Sigma implements PreSignHash {
     private SignResponse sigM(String signature, String address) {
         int vin = (this.refVin == -1) ? this.targetVout : this.refVin;
 
-        ScriptBuilder asmScriptBuilder = new ScriptBuilder();
-        Script signedScript = asmScriptBuilder
-                .data(HexUtil.decodeHex(SIGMA_PREFIX))
-                .data(Algorithm.BSM.toString().getBytes())
-                .data(address.getBytes())
-                .data(Base64.decode(signature))
-                .data(String.valueOf(vin).getBytes())
-                .build();
+        Script signedScript = new Script()
+                .writeBin(toBoxed(HexUtil.decodeHex(SIGMA_PREFIX)))
+                .writeBin(toBoxed(Algorithm.BSM.toString().getBytes()))
+                .writeBin(toBoxed(address.getBytes()))
+                .writeBin(toBoxed(Base64.decode(signature)))
+                .writeBin(toBoxed(String.valueOf(vin).getBytes()));
 
         this.sig = new Sig(address, signature, Algorithm.BSM.toString(), vin, this.targetVout);
-        List<ScriptChunk> newScriptAsm = new ArrayList<>(this.getTargetTxOut().getScriptPubKey().getChunks());
+        List<ScriptChunk> newScriptAsm = new ArrayList<>(this.getTargetTxOut().lockingScript.getChunks());
         int existingCount = getSigInstanceCount();
         if (sigmaInstance > existingCount) {
             throw new IllegalArgumentException("Sigma instance is out of range: " + sigmaInstance);
@@ -130,24 +126,20 @@ public class Sigma implements PreSignHash {
             }
         } else {
             boolean containsOpReturn = newScriptAsm.stream()
-                    .anyMatch(chunk -> chunk.opcode == ScriptOpCodes.OP_RETURN);
+                    .anyMatch(chunk -> chunk.op == OP.OP_RETURN);
             String separator = containsOpReturn ? "|" : "OP_RETURN";
-            newScriptAsm.addAll(new ScriptBuilder().data(separator.getBytes()).build().getChunks());
+            newScriptAsm.addAll(new Script().writeBin(toBoxed(separator.getBytes())).getChunks());
             newScriptAsm.addAll(signedScript.getChunks());
         }
 
         // Clone the transaction and set the output script.
         Transaction signedTx = this.transaction;
-        ScriptBuilder scriptBuilder = new ScriptBuilder();
-        for (ScriptChunk chunk : newScriptAsm) {
-            scriptBuilder.addChunk(chunk);
-        }
-
-        Script script = scriptBuilder.build();
-        TransactionOutput signedTxOut = new TransactionOutput(Net.MAINNET, null, transaction.getOutput(targetVout).getValue(), script.getProgram());
-        ArrayList<TransactionOutput> transactionOutputs = Lists.newArrayList(signedTx.getOutputs());
+        Script script = new Script(new ArrayList<>(newScriptAsm));
+        TransactionOutput signedTxOut = new TransactionOutput(script,
+                transaction.outputs.get(targetVout).satoshis);
+        ArrayList<TransactionOutput> transactionOutputs = new ArrayList<>(signedTx.outputs);
         transactionOutputs.set(targetVout, signedTxOut);
-        signedTx.setOutputs(transactionOutputs);
+        signedTx.outputs = transactionOutputs;
 
 
         SignResponse response = new SignResponse();
@@ -191,7 +183,7 @@ public class Sigma implements PreSignHash {
             throw new IllegalArgumentException("No signature provided");
         }
 
-        AddressLite address = AddressLite.fromBase58(MainNetParams.get(), this.sig.getAddress());
+        BsvAddress address = BsvAddress.fromBase58(BsvNetwork.MAINNET, this.sig.getAddress());
         log.info("verify sigma sign the ,inputhash:" + this.inputHash.toString());
         log.info("verify sigma sign the ,datashash:" + this.dataHash.toString());
         log.info("verify sigma sign the ,message:" + getMessageHash().toString());
@@ -199,7 +191,7 @@ public class Sigma implements PreSignHash {
         log.info("verify sigma sign the ,sig:" + this.sig.getSignature());
         log.info("verify sigma sign the ,vin:" + this.sig.getVin());
 
-        return AipHelper.verifySign(address.toString(), this.sig.getSignature(), getMessageHash().getBytes());
+        return AipHelper.verifySign(address.toBase58(), this.sig.getSignature(), getMessageHash().getBytes());
 
     }
 
@@ -207,8 +199,8 @@ public class Sigma implements PreSignHash {
     public Sig getSig() {
 
         List<Sig> instances = new ArrayList<>();
-        TransactionOutput output = transaction.getOutput(targetVout);
-        Script outputScript = output.getScriptPubKey();
+        TransactionOutput output = transaction.outputs.get(targetVout);
+        Script outputScript = output.lockingScript;
 
         List<ScriptChunk> chunks = outputScript.getChunks();
 
@@ -216,13 +208,13 @@ public class Sigma implements PreSignHash {
             if (!ScriptHelper.hasPushData(chunks.get(i))) {
                 continue;
             }
-            if (HexUtil.encodeHexStr(chunks.get(i).data()).equalsIgnoreCase(SIGMA_PREFIX)) {
+            if (HexUtil.encodeHexStr(ScriptHelper.getPushData(chunks.get(i))).equalsIgnoreCase(SIGMA_PREFIX)) {
                 //TODO
-                String algorithm = new String(chunks.get(i + 1).data(), StandardCharsets.UTF_8);
-                String address = new String(chunks.get(i + 2).data(), StandardCharsets.UTF_8);
-                String signature = Base64.encode(chunks.get(i + 3).data());
+                String algorithm = new String(ScriptHelper.getPushData(chunks.get(i + 1)), StandardCharsets.UTF_8);
+                String address = new String(ScriptHelper.getPushData(chunks.get(i + 2)), StandardCharsets.UTF_8);
+                String signature = Base64.encode(ScriptHelper.getPushData(chunks.get(i + 3)));
 
-                int vin = Integer.parseInt(new String(chunks.get(i + 4).data(), StandardCharsets.UTF_8));
+                int vin = Integer.parseInt(new String(ScriptHelper.getPushData(chunks.get(i + 4)), StandardCharsets.UTF_8));
                 instances.add(new Sig(address, signature, algorithm, vin, targetVout));
                 // fast forward to the next possible instance position
                 // 3 fields + 1 extra for the "|" separator
@@ -240,7 +232,7 @@ public class Sigma implements PreSignHash {
     }
 
     public int getSigInstanceCount() {
-        Script scriptPubKey = getTargetTxOut().getScriptPubKey();
+        Script scriptPubKey = getTargetTxOut().lockingScript;
         List<ScriptChunk> chunks = scriptPubKey.getChunks();
 
         int count = 0;
@@ -248,7 +240,7 @@ public class Sigma implements PreSignHash {
             if (!ScriptHelper.hasPushData(chunk)) {
                 continue;
             }
-            if (HexUtil.encodeHexStr(chunk.data.data()).equalsIgnoreCase(SIGMA_PREFIX)) {
+            if (HexUtil.encodeHexStr(ScriptHelper.getPushData(chunk)).equalsIgnoreCase(SIGMA_PREFIX)) {
                 count++;
             }
         }
@@ -256,7 +248,7 @@ public class Sigma implements PreSignHash {
     }
 
     public int getSigInstancePosition() {
-        Script scriptPubKey = getTargetTxOut().getScriptPubKey();
+        Script scriptPubKey = getTargetTxOut().lockingScript;
         List<ScriptChunk> chunks = scriptPubKey.getChunks();
 
         int instance = 0;
@@ -264,7 +256,7 @@ public class Sigma implements PreSignHash {
             if (!ScriptHelper.hasPushData(chunks.get(i))) {
                 continue;
             }
-            if (HexUtil.encodeHexStr(chunks.get(i).data()).equalsIgnoreCase(SIGMA_PREFIX)) {
+            if (HexUtil.encodeHexStr(ScriptHelper.getPushData(chunks.get(i))).equalsIgnoreCase(SIGMA_PREFIX)) {
                 if (instance == sigmaInstance) {
                     return i;
                 }
@@ -292,14 +284,14 @@ public class Sigma implements PreSignHash {
     }
 
     public TransactionOutput getTargetTxOut() {
-        return this.transaction.getOutput(targetVout);
+        return this.transaction.outputs.get(targetVout);
     }
 
     @Override
     public PreSignHashContext getPreSignHashContext() {
         PreSignHashContext context = new PreSignHashContext();
         byte[] data = UtilsExtend.formatMessageForSigning(this.getMessageHash().getBytes());
-        Sha256Hash hash = Sha256Hash.twiceOf(data);
+        BsvHashBytes hash = BsvHashBytes.twiceOf(data);
         context.setPreSignHash(hash);
         context.setSignAddress(this.bapBaseCore.getSignAddress(remoteSignType));
         context.setRemoteSignType(this.remoteSignType);
@@ -307,7 +299,7 @@ public class Sigma implements PreSignHash {
     }
 
 
-    public Sha256Hash getMessageHash() {
+    public BsvHashBytes getMessageHash() {
 
         if (this.inputHash == null || this.dataHash == null) {
             throw new IllegalStateException("Input hash and data hash must be set");
@@ -316,14 +308,14 @@ public class Sigma implements PreSignHash {
         byte[] combined = ByteUtils.concatenate(this.inputHash.getBytes(),
                 this.dataHash.getBytes());
 
-        return Sha256Hash.of(combined);
+        return BsvHashBytes.of(combined);
 
     }
 
-    public Sha256Hash getDataHash() {
+    public BsvHashBytes getDataHash() {
 
-        TransactionOutput output = this.transaction.getOutput(this.targetVout);
-        Script scriptPubKey = output.getScriptPubKey();
+        TransactionOutput output = this.transaction.outputs.get(this.targetVout);
+        Script scriptPubKey = output.lockingScript;
         List<ScriptChunk> scriptChunks = scriptPubKey.getChunks();
 
         int occurrences = 0;
@@ -331,25 +323,21 @@ public class Sigma implements PreSignHash {
             if (!ScriptHelper.hasPushData(scriptChunks.get(i))) {
                 continue;
             }
-            if (HexUtil.encodeHexStr(scriptChunks.get(i).data()).equalsIgnoreCase(SIGMA_PREFIX)) {
+            if (HexUtil.encodeHexStr(ScriptHelper.getPushData(scriptChunks.get(i))).equalsIgnoreCase(SIGMA_PREFIX)) {
                 if (occurrences == this.sigmaInstance) {
                     List<ScriptChunk> dataChunks = scriptChunks.subList(0, i - 1);
-                    ScriptBuilder builder = new ScriptBuilder();
-                    for (ScriptChunk scriptChunk : dataChunks) {
-                        builder.addChunk(scriptChunk);
-                    }
-                    return Sha256Hash.of(builder.build().getProgram());
+                    return BsvHashBytes.of(new Script(new ArrayList<>(dataChunks)).toUint8Array());
                 }
                 occurrences++;
             }
         }
 
         // Use full script if index not found
-        return Sha256Hash.of(scriptPubKey.getProgram());
+        return BsvHashBytes.of(scriptPubKey.toUint8Array());
 
     }
 
-    public Sha256Hash getInputHash() {
+    public BsvHashBytes getInputHash() {
         int vin;
         if (this.refVin == -1) {
             vin = this.targetVout;
@@ -359,19 +347,19 @@ public class Sigma implements PreSignHash {
         return getInputHashByVin(vin);
     }
 
-    private Sha256Hash getInputHashByVin(int vin) {
-        if (vin >= 0 && vin < transaction.getInputs().size()) {
-            TransactionInput input = transaction.getInput(vin);
+    private BsvHashBytes getInputHashByVin(int vin) {
+        if (vin >= 0 && vin < transaction.inputs.size()) {
+            TransactionInput input = transaction.inputs.get(vin);
             if (input != null) {
                 byte[] outpoint = ByteBuffer.allocate(36).order(ByteOrder.LITTLE_ENDIAN)
-                        .put(input.getOutpoint().getHash().getBytes())
-                        .putInt((int) input.getOutpoint().getIndex()).array();
-                return Sha256Hash.of(outpoint);
+                        .put(sourceTxidBytes(input.sourceTXID))
+                        .putInt(input.sourceOutputIndex).array();
+                return BsvHashBytes.of(outpoint);
             }
         }
         // Use a dummy hash.
         byte[] dummy = new byte[32];
-        return Sha256Hash.of(dummy);
+        return BsvHashBytes.of(dummy);
     }
 
     /**
@@ -379,9 +367,56 @@ public class Sigma implements PreSignHash {
      *
      * @return
      */
-    public PreSignHashContext getSigByRemote(Sha256Hash hash) {
+    public PreSignHashContext getSigByRemote(BsvHashBytes hash) {
         return PreSignHashUtils.getSignedHashContext(hash);
     }
 
 
+
+    /** 新 SDK 脚本写入需要 {@code List<Double>} 形式的字节。 */
+    private static List<Double> toBoxed(byte[] data) {
+        if (data == null) {
+            return List.of();
+        }
+        Double[] values = new Double[data.length];
+        for (int i = 0; i < data.length; i++) {
+            values[i] = (double) (data[i] & 0xFF);
+        }
+        return List.of(values);
+    }
+
+    /** 金额字段可能是 {@code Undefined}、数字或字符串。 */
+    private static long satoshisOf(Object satoshis) {
+        if (satoshis instanceof Number number) {
+            return number.longValue();
+        }
+        if (satoshis instanceof String text && !text.isEmpty()) {
+            return Long.parseLong(text);
+        }
+        return 0L;
+    }
+
+    /** {@code sourceTXID} 可能是 hex 串、字节数组或字节列表；统一取内部字节序（与旧 getHash().getBytes() 一致）。 */
+    private static byte[] sourceTxidBytes(Object sourceTXID) {
+        if (sourceTXID == null) {
+            return new byte[32];
+        }
+        if (sourceTXID instanceof BsvHashBytes hash) {
+            return hash.getBytes();
+        }
+        if (sourceTXID instanceof byte[] bytes) {
+            return bytes.length == 32 ? bytes : new BsvHashBytes(bytes).getBytes();
+        }
+        if (sourceTXID instanceof String text) {
+            return BsvHashBytes.fromDisplayHex(text).getBytes();
+        }
+        if (sourceTXID instanceof List<?> list) {
+            byte[] bytes = new byte[list.size()];
+            for (int i = 0; i < bytes.length; i++) {
+                bytes[i] = (byte) ((Number) list.get(i)).intValue();
+            }
+            return bytes.length == 32 ? bytes : new BsvHashBytes(bytes).getBytes();
+        }
+        throw new IllegalArgumentException("不支持的 sourceTXID 类型：" + sourceTXID.getClass().getName());
+    }
 }

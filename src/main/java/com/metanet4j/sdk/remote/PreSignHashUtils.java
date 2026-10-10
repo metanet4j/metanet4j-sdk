@@ -2,7 +2,7 @@ package com.metanet4j.sdk.remote;
 
 import com.google.common.collect.Lists;
 import com.metanet4j.sdk.context.PreSignHashContext;
-import io.bitcoinsv.bitcoinjsv.core.Sha256Hash;
+import com.metanet4j.base.bsv.BsvHashBytes;
 import lombok.experimental.UtilityClass;
 
 import java.util.List;
@@ -20,7 +20,7 @@ public class PreSignHashUtils {
         STORE.get().add(preSignHashContext);
     }
 
-    public static PreSignHashContext getSignedHashContext(Sha256Hash hash) {
+    public static PreSignHashContext getSignedHashContext(BsvHashBytes hash) {
         PreSignHashContext preSignHashContext = STORE.get().stream().filter(o -> o.getPreSignHash().equals(hash)).findFirst().orElse(null);
         if (preSignHashContext == null) {
             throw new RuntimeException("get preSignHashContext is null,the hash is " + hash.toString());

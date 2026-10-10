@@ -1,9 +1,8 @@
 package com.metanet4j.sdk.sigma;
 
 
-import io.bitcoinsv.bitcoinjsv.core.Address;
-import io.bitcoinsv.bitcoinjsv.msg.protocol.Transaction;
-import io.bitcoinsv.bitcoinjsv.script.Script;
+import com.metanet4j.bsv.script.Script;
+import com.metanet4j.bsv.transaction.Transaction;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
