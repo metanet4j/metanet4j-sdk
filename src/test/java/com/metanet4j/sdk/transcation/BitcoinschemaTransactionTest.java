@@ -10,10 +10,9 @@ import com.metanet4j.sdk.TestData;
 import com.metanet4j.sdk.bap.BapBase.BapProviderKeyBag;
 import com.metanet4j.sdk.exception.SignErrorException;
 import com.metanet4j.sdk.utxo.impl.bitails.BitailsUtxoProvider;
-import io.bitcoinsv.bitcoinjsv.core.Address;
-import io.bitcoinsv.bitcoinjsv.core.Coin;
-import io.bitcoinsv.bitcoinjsv.msg.protocol.Transaction;
-import io.bitcoinsv.bitcoinjsv.params.MainNetParams;
+import com.metanet4j.sdk.address.AddressEnhance;
+import com.metanet4j.base.bsv.BsvAmount;
+import com.metanet4j.bsv.transaction.Transaction;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -209,12 +208,12 @@ public class BitcoinschemaTransactionTest extends TransactionContextTest {
         TransactionBuilder transactionBuilder = new TransactionBuilder(this.bapBase, new BapProviderKeyBag(TestData.masterPrivateKey
                 , 100));
         Transaction transaction = transactionBuilder
-                .addInputs(Lists.newArrayList(paymentAddress),
+                .addInputs(java.util.List.<AddressEnhance>of(paymentAddress),
                         new BitailsUtxoProvider())
 
-                .withFeeKb(Coin.valueOf(500L))
+                .withFeeKb(BsvAmount.valueOf(500L))
                 .changeAddress(changeAddress)
-                .completeAndSignTx(transactionBuilder.getKeyBag(), true);
+                .completeAndSignTx(transactionBuilder.getKeyProvider(), true);
 
         correctlySpends(transaction);
         broadcast(transaction);
@@ -227,14 +226,14 @@ public class BitcoinschemaTransactionTest extends TransactionContextTest {
         TransactionBuilder transactionBuilder = new TransactionBuilder(this.bapBase, new BapProviderKeyBag(TestData.masterPrivateKey
                 , 100));
         Transaction transaction = transactionBuilder
-                .addInputs(Lists.newArrayList(paymentAddress),
+                .addInputs(java.util.List.<AddressEnhance>of(paymentAddress),
                         new BitailsUtxoProvider())
-                .withFeeKb(Coin.valueOf(500L))
-                .addOutput(Coin.valueOf(777L), Address.fromBase58(MainNetParams.get(), bapBase.getRootAddress()))
-                .addOutput(Coin.valueOf(888L), Address.fromBase58(MainNetParams.get(), bapBase.getRootAddress()))
-                .addOutput(Coin.valueOf(999L), Address.fromBase58(MainNetParams.get(), bapBase.getRootAddress()))
+                .withFeeKb(BsvAmount.valueOf(500L))
+                .addOutput(BsvAmount.valueOf(777L), AddressEnhance.fromBase58(bapBase.getRootAddress()))
+                .addOutput(BsvAmount.valueOf(888L), AddressEnhance.fromBase58(bapBase.getRootAddress()))
+                .addOutput(BsvAmount.valueOf(999L), AddressEnhance.fromBase58(bapBase.getRootAddress()))
                 .changeAddress(changeAddress)
-                .completeAndSignTx(transactionBuilder.getKeyBag(), true);
+                .completeAndSignTx(transactionBuilder.getKeyProvider(), true);
         correctlySpends(transaction);
         broadcast(transaction);
         parseTx(transaction);
@@ -252,12 +251,12 @@ public class BitcoinschemaTransactionTest extends TransactionContextTest {
         TransactionBuilder transactionBuilder = new TransactionBuilder(this.bapBase, new BapProviderKeyBag(TestData.masterPrivateKey
                 , 100));
         Transaction transaction = transactionBuilder
-                .addInputs(Lists.newArrayList(paymentAddress),
+                .addInputs(java.util.List.<AddressEnhance>of(paymentAddress),
                         new BitailsUtxoProvider())
                 .addDataOutput(dataLockBuilder)
-                .withFeeKb(Coin.valueOf(5L))
+                .withFeeKb(BsvAmount.valueOf(5L))
                 .changeAddress(changeAddress)
-                .completeAndSignTx(transactionBuilder.getKeyBag(), true);
+                .completeAndSignTx(transactionBuilder.getKeyProvider(), true);
         correctlySpends(transaction);
         broadcast(transaction);
         parseTx(transaction);
