@@ -125,19 +125,20 @@ class TransactionBuilderContractTest {
         Transaction signed = builder.completeAndSignTx(keyProvider, true);
 
         assertNotNull(signed.inputs.get(0).unlockingScript);
-        assertTrue(signed.inputs.get(0).lockingScript.toUint8Array().length > 0);
+        assertTrue(unlockingScriptBytes(signed, 0).length > 0);
         assertEquals(inputSum(signed), outputSum(signed).add(builder.getFee()));
         assertUnlockingScriptValid(signed, 0);
     }
 
     @Test
     void reportsSignerFailureInsteadOfReturningAnUnsignedTransaction() {
-        TransactionSigner refusingSigner = mock(TransactionSigner.class);
-        TransactionBuilder builder = new TransactionBuilder(bap, keyProvider, refusingSigner);
+        // 新架构没有可注入的签名器：以「密钥提供者解析不到密钥」触发同类的签名失败
+        SigningKeyProvider noKeys = pubkeyHash -> null;
+        TransactionBuilder builder = new TransactionBuilder(bap, noKeys);
         builder.addInput(utxo(7, 0, 20_000))
                 .addOutput(BsvAmount.valueOf(777), paymentAddress);
 
-        assertThrows(SignErrorException.class, () -> builder.completeAndSignTx(keyProvider, true));
+        assertThrows(SignErrorException.class, () -> builder.completeAndSignTx(noKeys, true));
     }
 
     @Test
@@ -154,26 +155,20 @@ class TransactionBuilderContractTest {
     }
 
     @Test
-    void constructorsPreserveTheSelectedNetworkAndExistingTransaction() {
-        AddressEnhance testAddress = new AddressEnhance(Net.TESTNET3.params(), bap.getPayAccountKey().getPubKeyHash());
+    void constructorsPreserveTheExistingTransactionAndKeyProvider() {
+        AddressEnhance testAddress = bap.getPayAccountAddress();
         Transaction existing = new Transaction();
-        existing.addOutput(BsvAmount.valueOf(11), testAddress);
-        TransactionBuilder builder = new TransactionBuilder(bap, Net.TESTNET3, existing, keyProvider);
+        existing.outputs.add(new TransactionOutput(new P2PKH().lock(testAddress.getHash160()), 11d));
+
+        TransactionBuilder builder = new TransactionBuilder(bap, existing, keyProvider);
         assertSame(existing, builder.getTargetTransaction());
-        assertEquals(Net.TESTNET3, builder.getNet());
-        assertSame(keyProvider, builder.getKeyBag());
-        assertInstanceOf(LocalTransactionSigner.class, builder.getTransactionSigner());
+        assertSame(keyProvider, builder.getKeyProvider());
         builder.addOutput(BsvAmount.valueOf(22), testAddress);
         assertEquals(BsvAmount.valueOf(33), outputSum(existing));
         assertEquals(BsvAmount.valueOf(11), BsvAmount.fromSdkValue(existing.outputs.get(0).satoshis));
 
-        TransactionSigner signer = mock(TransactionSigner.class);
-        TransactionBuilder explicit = new TransactionBuilder(bap, Net.TESTNET3, existing, signer, keyProvider);
-        assertSame(existing, explicit.getTargetTransaction());
-        assertSame(signer, explicit.getTransactionSigner());
-        TransactionBuilder empty = new TransactionBuilder(bap, Net.TESTNET3, keyProvider);
-        assertEquals(Net.TESTNET3, empty.getNet());
-        assertEquals(0, empty.getTargetTransaction().outputs.size());
+        TransactionBuilder empty = new TransactionBuilder(bap, keyProvider);
+        assertEquals(0, empty.getTargetTransaction().outputs.size(), "未传交易时应给出空交易");
     }
 
     @Test
@@ -181,8 +176,8 @@ class TransactionBuilderContractTest {
         BapDataLockBuilder data = new BapDataLockBuilder(bap).buildAlias("profile");
         TransactionBuilder builder = new TransactionBuilder(bap, keyProvider)
                 .addInput(utxo(8, 0, 20_000)).addDataOutput(data);
-        List<byte[]> payload = builder.getTargetTransaction().outputs.get(0).getScriptPubKey().getChunks()
-                .stream().skip(2).map(chunk -> chunk.writeBin(toBoxed())).toList();
+        List<byte[]> payload = builder.getTargetTransaction().outputs.get(0).lockingScript.getChunks()
+                .stream().skip(2).map(com.metanet4j.sdk.utils.ScriptHelper::getPushData).toList();
         assertNull(builder.getSigma());
         assertSame(builder, builder.addSigmaSign(bap));
         Sigma sigma = builder.getSigma();
@@ -219,7 +214,7 @@ class TransactionBuilderContractTest {
 
     @Test
     void completionForwardsTheRequestedForkIdModeToTheSigner() {
-        TransactionSigner signer = mock(TransactionSigner.class);
+        SigningKeyProvider signer = mock(TransactionSigner.class);
         when(signer.signInputs(any(), eq(keyProvider))).thenReturn(true);
         TransactionBuilder builder = new TransactionBuilder(bap, keyProvider, signer)
                 .addInput(utxo(10, 0, 20_000)).addOutput(BsvAmount.valueOf(777), paymentAddress);
@@ -259,6 +254,10 @@ class TransactionBuilderContractTest {
             return Script.fromBinary(bytes);
         }
         return new Script();
+    }
+
+    private static byte[] unlockingScriptBytes(Transaction tx, int index) {
+        return asScript(tx.inputs.get(index).unlockingScript).toUint8Array();
     }
 
     private static TransactionOutput sourceOutput(Transaction tx, int index) {
