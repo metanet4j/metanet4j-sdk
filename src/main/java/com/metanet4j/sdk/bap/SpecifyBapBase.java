@@ -98,7 +98,7 @@ public class SpecifyBapBase extends BapBaseAbstract {
     }
 
 
-    public static class SpecifyProviderKeyBag implements KeyBag {
+    public static class SpecifyProviderKeyBag implements SigningKeyProvider {
 
         private SpecifyBapBase specifyBapBase;
 
@@ -108,7 +108,7 @@ public class SpecifyBapBase extends BapBaseAbstract {
 
         @Nullable
         @Override
-        public ECKey findKeyFromPubHash(byte[] pubkeyHash) {
+        public PrivateKey findKeyFromPubHash(byte[] pubkeyHash) {
 
             //find payAccountKey
             if (AddressEnhance.fromPubKeyHash(pubkeyHash).toBase58()
@@ -128,14 +128,8 @@ public class SpecifyBapBase extends BapBaseAbstract {
 
         @Nullable
         @Override
-        public ECKey findKeyFromPubKey(byte[] pubkey) {
-            return findKeyFromPubHash(Utils.sha256hash160(pubkey));
-        }
-
-        @Nullable
-        @Override
-        public RedeemData findRedeemDataFromScriptHash(byte[] scriptHash) {
-            return null;
+        public PrivateKey findKeyFromPubKey(byte[] pubkey) {
+            return SigningKeyProvider.super.findKeyFromPubKey(pubkey);
         }
     }
 }

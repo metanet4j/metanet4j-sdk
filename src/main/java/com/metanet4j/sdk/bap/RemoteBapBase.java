@@ -2,7 +2,6 @@ package com.metanet4j.sdk.bap;
 
 import com.metanet4j.base.bap.BapHelper;
 import com.metanet4j.sdk.address.AddressEnhance;
-import io.bitcoinsv.bitcoinjsv.core.Address;
 
 /**
  * Necessary information for remote signing.
@@ -13,12 +12,12 @@ public class RemoteBapBase extends BapBaseAbstract {
     private AddressEnhance previouAddress;
     private AddressEnhance currentAddress;
     private AddressEnhance payAccountAddress;
-    private Address ordAddress;
+    private AddressEnhance ordAddress;
 
     public RemoteBapBase() {
     }
 
-    public RemoteBapBase(String rootAddress, AddressEnhance previouAddress, AddressEnhance currentAddress, AddressEnhance payAccountAddress, Address ordAddress, String appName) {
+    public RemoteBapBase(String rootAddress, AddressEnhance previouAddress, AddressEnhance currentAddress, AddressEnhance payAccountAddress, AddressEnhance ordAddress, String appName) {
         this.rootAddress = rootAddress;
         this.identityKey = BapHelper.getIdentityKey(this.rootAddress);
         this.previouAddress = previouAddress;
@@ -56,7 +55,7 @@ public class RemoteBapBase extends BapBaseAbstract {
     }
 
     @Override
-    public Address getOrdAddress() {
+    public AddressEnhance getOrdAddress() {
         return this.ordAddress;
     }
 
