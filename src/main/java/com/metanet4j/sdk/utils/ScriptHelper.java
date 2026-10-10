@@ -30,6 +30,21 @@ public class ScriptHelper {
     }
 
     /**
+     * 取推送数据的字节；非推送 chunk 返回 {@code null}。
+     *
+     * <p>对应旧库 {@code scriptChunk.data.data()}；新 SDK 的 {@code data} 为 {@code List<Integer>}。
+     */
+    public static byte[] getPushData(ScriptChunk scriptChunk) {
+        return hasPushData(scriptChunk) ? toBytes(scriptChunk.data) : null;
+    }
+
+    /** 取推送数据的 UTF-8 文本；非推送 chunk 返回 {@code null}。 */
+    public static String getPushDataAsString(ScriptChunk scriptChunk) {
+        byte[] data = getPushData(scriptChunk);
+        return data == null ? null : new String(data, java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    /**
      * 操作码是否直接推送数据：{@code 1..75}（直接长度）、{@code OP_PUSHDATA1/2/4}。
      * 对应新 SDK {@code Script.isPushOnly()} 的边界（{@code op <= OP_16}）。
      */
