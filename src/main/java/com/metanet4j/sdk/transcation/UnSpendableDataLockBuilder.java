@@ -15,7 +15,7 @@ import com.metanet4j.sdk.remote.PreSignHashUtils;
 import com.metanet4j.sdk.remote.RemoteSignType;
 import com.metanet4j.sdk.utils.UtilsExtend;
 import com.metanet4j.base.bsv.BsvHashBytes;
-import io.bitcoinsv.bitcoinjsv.script.Script;
+import com.metanet4j.bsv.script.Script;
 import io.bitcoinsv.bitcoinjsv.script.ScriptBuilder;
 import io.bitcoinsv.bitcoinjsv.script.ScriptChunk;
 import io.bitcoinsv.bitcoinjsv.script.ScriptOpCodes;
