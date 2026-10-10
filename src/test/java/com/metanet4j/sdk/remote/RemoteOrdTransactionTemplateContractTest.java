@@ -29,7 +29,6 @@ import com.metanet4j.bsv.script.templates.P2PKH;
 import com.metanet4j.bsv.transaction.Transaction;
 import com.metanet4j.bsv.transaction.TransactionOutput;
 import io.bitcoinsv.bitcoinjsv.script.Script;
-import io.bitcoinsv.bitcoinjsv.signers.TransactionSigner;
 import com.metanet4j.sdk.bap.SigningKeyProvider;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -81,7 +80,7 @@ class RemoteOrdTransactionTemplateContractTest {
                         "first".getBytes(StandardCharsets.US_ASCII), "text/plain", metadata).toUint8Array(),
                 builder.build().outputs.get(0).lockingScript.toUint8Array());
         assertEquals(inputSum(builder.build()), outputSum(builder.build()).add(builder.getFee()));
-        assertEquals(0, builder.build().inputs.get(0).lockingScript.toUint8Array().length);
+        assertEquals(0, builder.build().inputs.get(0).unlockingScript.toUint8Array().length);
         assertNull(builder.getSigma());
         assertEquals(RemoteSignType.CURRENT,
                 builder.getAllBsmSignHash(true, false, remoteBap).get(0).getRemoteSignType());
@@ -190,8 +189,8 @@ class RemoteOrdTransactionTemplateContractTest {
         assertEquals(BsvAmount.SATOSHI, BsvAmount.fromSdkValue(tx.outputs.get(0).satoshis));
         assertArrayEquals(new P2PKH().lock(destination.getHash160()).toUint8Array(),
                 tx.outputs.get(0).lockingScript.toUint8Array());
-        assertEquals(0, tx.inputs.get(0).unlockingScript.toUint8Array().length);
-        assertEquals(0, tx.inputs.get(1).unlockingScript.toUint8Array().length);
+        assertEquals(0, unlockingScriptBytes(tx, 0).length);
+        assertEquals(0, unlockingScriptBytes(tx, 1).length);
     }
 
     @Test
@@ -219,7 +218,7 @@ class RemoteOrdTransactionTemplateContractTest {
         assertArrayEquals(new P2PKH().lock(destination.getHash160()).toUint8Array(),
                 signed.outputs.get(0).lockingScript.toUint8Array());
         assertEquals(BsvAmount.SATOSHI, BsvAmount.fromSdkValue(signed.outputs.get(0).satoshis));
-        assertEquals(signed.getInputSum(), signed.getOutputSum().add(completed.getFee()));
+        assertEquals(inputSum(signed), outputSum(signed).add(completed.getFee()));
         assertSpendable(signed);
     }
 
@@ -283,12 +282,13 @@ class RemoteOrdTransactionTemplateContractTest {
 
     @Test
     void sendOrdinalPropagatesSignerFailure() {
-        TransactionSigner refusingSigner = mock(TransactionSigner.class);
+        // 新架构没有可注入的签名器：以「密钥提供者解析不到任何密钥」触发同类的签名失败
+        SigningKeyProvider noKeys = pubkeyHash -> null;
 
         assertThrows(SignErrorException.class, () ->
                 new RemoteOrdTransactionTemplate(false, false).sendOrdinal(
                         bap, ordinalUtxo(), paymentUtxo(), destination, paymentAddress,
-                        500, null, null, keyBag, refusingSigner, null));
+                        500, null, null, noKeys, null, null));
     }
 
     @Test
@@ -303,7 +303,7 @@ class RemoteOrdTransactionTemplateContractTest {
         assertEquals(3, tx.outputs.size());
         assertEquals(BsvAmount.SATOSHI, BsvAmount.fromSdkValue(tx.outputs.get(0).satoshis));
         assertEquals(0, tx.inputs.get(0).unlockingScript.toUint8Array().length);
-        assertTrue(tx.getInputSum().satoshis > tx.getOutputSum().satoshis);
+        assertTrue(inputSum(tx).getValue() > outputSum(tx).getValue());
     }
 
     @Test
@@ -330,7 +330,7 @@ class RemoteOrdTransactionTemplateContractTest {
 
         assertEquals(1, tx.inputs.size());
         assertEquals(1, tx.outputs.size());
-        assertTrue(tx.getInputSum().satoshis > tx.getOutputSum().satoshis);
+        assertTrue(inputSum(tx).getValue() > outputSum(tx).getValue());
         assertUnlockingScriptValid(tx, 0);
     }
 
@@ -420,6 +420,18 @@ class RemoteOrdTransactionTemplateContractTest {
         assertNotNull(signature, "解锁脚本首项应为签名");
         int scope = signature[signature.length - 1] & 0xFF;
         assertTrue((scope & 0x40) != 0 || (scope & 0x1F) >= 1, "签名尾字节应含合法 SIGHASH 范围：" + scope);
+    }
+
+    /** 解锁脚本字节（字段为 Object：可能是 Script、byte[] 或字节列表）。 */
+    private static byte[] unlockingScriptBytes(Transaction tx, int index) {
+        Object unlocking = tx.inputs.get(index).unlockingScript;
+        if (unlocking instanceof Script script) {
+            return script.toUint8Array();
+        }
+        if (unlocking instanceof byte[] bytes) {
+            return bytes;
+        }
+        return new byte[0];
     }
 
     private static TransactionOutput sourceOutput(Transaction tx, int index) {
