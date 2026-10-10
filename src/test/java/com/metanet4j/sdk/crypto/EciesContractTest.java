@@ -5,7 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import cn.hutool.core.codec.Base64;
-import io.bitcoinsv.bitcoinjsv.core.ECKeyLite;
+import com.metanet4j.sdk.PublicKey;
+import com.metanet4j.sdk.PrivateKey;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -36,17 +37,17 @@ class EciesContractTest {
 
     @Test
     void explicitEphemeralKeyProducesAuthenticatedRoundTrip() throws Exception {
-        ECKeyLite recipient = ECKeyLite.fromPrivate(BigInteger.valueOf(3));
-        ECKeyLite ephemeral = ECKeyLite.fromPrivate(BigInteger.TWO);
+        PrivateKey recipient = PrivateKey.of(BigInteger.valueOf(3));
+        PrivateKey ephemeral = PrivateKey.of(BigInteger.TWO);
         byte[] plain = "fixed message".getBytes(StandardCharsets.UTF_8);
-        byte[] encrypted = Ecies.encrypt(plain, recipient, ephemeral);
+        byte[] encrypted = Ecies.encrypt(plain, recipient.getPublicKey().getPublicKey(), ephemeral.getKey());
         assertArrayEquals("BIE1".getBytes(StandardCharsets.US_ASCII), Arrays.copyOf(encrypted, 4));
         assertArrayEquals(ephemeral.getPubKey(), Arrays.copyOfRange(encrypted, 4, 37));
-        assertArrayEquals(plain, Ecies.decrypt(encrypted, recipient, null));
+        assertArrayEquals(plain, Ecies.decrypt(encrypted, recipient.getKey(), null));
         assertArrayEquals(plain,
-                Ecies.decrypt(encrypted, recipient, ECKeyLite.fromPublicOnly(ephemeral.getPubKey())));
+                Ecies.decrypt(encrypted, recipient.getKey(), PublicKey.fromBytes(ephemeral.getPubKey()).getPublicKey()));
 
-        String encoded = Ecies.encrypt("fixed message", recipient, ephemeral);
+        String encoded = Ecies.encrypt("fixed message", recipient.getPublicKey().getPublicKey(), ephemeral.getKey());
         assertArrayEquals(encrypted, Base64.decode(encoded));
         assertArrayEquals(MessageDigest.getInstance("SHA-512").digest(plain),
                 DigestUtilExtend.sha512(plain));
@@ -54,19 +55,19 @@ class EciesContractTest {
 
     @Test
     void randomEphemeralKeyAndTamperingAreHandled() throws Exception {
-        ECKeyLite recipient = ECKeyLite.fromPrivate(BigInteger.valueOf(3));
+        PrivateKey recipient = PrivateKey.of(BigInteger.valueOf(3));
         byte[] plain = "random message".getBytes(StandardCharsets.UTF_8);
-        byte[] encrypted = Ecies.encrypt(plain, recipient, null);
-        assertArrayEquals(plain, Ecies.decrypt(encrypted, recipient, null));
+        byte[] encrypted = Ecies.encrypt(plain, recipient.getPublicKey().getPublicKey(), null);
+        assertArrayEquals(plain, Ecies.decrypt(encrypted, recipient.getKey(), null));
 
         byte[] badMagic = encrypted.clone();
         badMagic[0] ^= 1;
         assertTrue(assertThrows(RuntimeException.class,
-                () -> Ecies.decrypt(badMagic, recipient, null)).getMessage().contains("magic"));
+                () -> Ecies.decrypt(badMagic, recipient.getKey(), null)).getMessage().contains("magic"));
 
         byte[] badMac = encrypted.clone();
         badMac[badMac.length - 1] ^= 1;
         assertTrue(assertThrows(RuntimeException.class,
-                () -> Ecies.decrypt(badMac, recipient, null)).getMessage().contains("mac"));
+                () -> Ecies.decrypt(badMac, recipient.getKey(), null)).getMessage().contains("mac"));
     }
 }

@@ -8,7 +8,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.bitcoinsv.bitcoinjsv.crypto.MnemonicCode;
-import io.bitcoinsv.bitcoinjsv.params.MainNetParams;
 import java.util.HashSet;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -31,7 +30,7 @@ class MasterPrivateKeyContractTest {
     void bip39VectorAndSerializationRoundTrip() {
         List<String> words = List.of("abandon", "abandon", "abandon", "abandon", "abandon", "abandon",
                 "abandon", "abandon", "abandon", "abandon", "abandon", "about");
-        MasterPrivateKey fixed = MasterPrivateKey.fromSeed(words, "TREZOR", MainNetParams.get());
+        MasterPrivateKey fixed = MasterPrivateKey.fromSeed(words, "TREZOR");
         assertEquals("xprv9s21ZrQH143K3h3fDYiay8mocZ3afhfULfb5GX8kCBdno77K4HiA15Tg23wpbeF1pLfs1c5SPmYHrEpTuuRhxMwvKDwqdKiGJS9XFKzUsAF",
                 fixed.toXprv());
         assertNotNull(fixed.getMasterDeterministicKey());
@@ -42,6 +41,6 @@ class MasterPrivateKeyContractTest {
         assertEquals(noSalt.toXprv(), MasterPrivateKey.fromSeed(String.join(" ", words)).toXprv());
         assertNotEquals(fixed.toXprv(), noSalt.toXprv());
         assertFalse(MasterPrivateKey.fromSeed().toXprv().isEmpty());
-        assertFalse(MasterPrivateKey.fromSeed(List.of(), "", MainNetParams.get()).toXprv().isEmpty());
+        assertFalse(MasterPrivateKey.fromSeed(List.of(), "").toXprv().isEmpty());
     }
 }
