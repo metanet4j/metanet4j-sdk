@@ -1,94 +1,161 @@
 package com.metanet4j.sdk.utils;
 
 import cn.hutool.core.codec.Base64;
-import io.bitcoinsv.bitcoinjsv.core.AddressLite;
-import io.bitcoinsv.bitcoinjsv.msg.protocol.TransactionOutPoint;
-import io.bitcoinsv.bitcoinjsv.msg.protocol.TransactionOutput;
-import io.bitcoinsv.bitcoinjsv.msg.protocol.TxHelper;
-import io.bitcoinsv.bitcoinjsv.params.MainNetParams;
-import io.bitcoinsv.bitcoinjsv.script.Script;
-import io.bitcoinsv.bitcoinjsv.script.ScriptChunk;
-import io.bitcoinsv.bitcoinjsv.script.interpreter.ScriptExecutionException;
-import io.bitcoinsv.bitcoinjsv.temp.KeyBag;
-
-import org.jspecify.annotations.Nullable;
+import com.metanet4j.base.bsv.BsvAddress;
+import com.metanet4j.base.bsv.BsvNetwork;
+import com.metanet4j.bsv.script.OP;
+import com.metanet4j.bsv.script.Script;
+import com.metanet4j.bsv.script.ScriptChunk;
+import com.metanet4j.sdk.PrivateKey;
+import com.metanet4j.sdk.bap.SigningKeyProvider;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-import static io.bitcoinsv.bitcoinjsv.script.ScriptOpCodes.*;
-
-public class TxHelperExtend extends TxHelper {
+/**
+ * Ordinals 脚本识别与地址解析（业务工具）。
+ *
+ * <p>旧实现继承 bitcoinj 的 {@code TxHelper} 并提供 {@code getConnectedRedeemDataExtend}
+ * （按 {@code KeyBag} 反查密钥）。按迁移计划 §3，KeyBag／RedeemData 反查抽象已取消：
+ * 该入口改由调用方按 {@link com.metanet4j.sdk.bap.SigningKeyProvider} 显式取得私钥，
+ * 再注入解锁模板，因此本类只保留脚本识别与地址解析。
+ *
+ * <p>脚本判定与新 SDK（com.metanet4j.bsv）的 {@code ScriptChunk} 对齐：
+ * opcode 字段为 {@code op}，推送数据为 {@code data}（{@code List<Integer>}）。
+ */
+public final class TxHelperExtend {
 
     private static final int ADDRESS_LENGTH = 20;
 
-    @Nullable
-    public static RedeemDataExtend getConnectedRedeemDataExtend(TransactionOutPoint transactionOutPoint, KeyBag keyBag) throws ScriptExecutionException {
-        TransactionOutput connectedOutput = transactionOutPoint.getConnectedOutput();
-        checkNotNull(connectedOutput, "Input is not connected so cannot retrieve key");
-        Script connectedScript = connectedOutput.getScriptPubKey();
-
-        RedeemDataExtend redeemData = null;
-        try {
-            byte[] bytes = getPubKeyHashByOrdinalScript(connectedScript);
-            if (bytes.length != 0) {
-                redeemData = RedeemDataExtend.of(keyBag.findKeyFromPubHash(bytes), connectedScript);
-            }
-
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-        if (redeemData == null) {
-            return RedeemDataExtend.of(TxHelper.getConnectedRedeemData(transactionOutPoint, keyBag));
-        } else {
-            return redeemData;
-        }
-
+    private TxHelperExtend() {
     }
 
+    /**
+     * 是否为 Ordinals 铭文脚本：
+     * {@code OP_DUP OP_HASH160 <20> OP_EQUALVERIFY OP_CHECKSIG OP_0 OP_IF "ord" OP_1 <媒体类型> OP_0 <内容> OP_ENDIF}。
+     */
     public static boolean isSentToOrdinals(Script connectedScript) {
         try {
             List<ScriptChunk> chunks = connectedScript.getChunks();
-            return
-                    chunks.get(0).equalsOpCode(OP_DUP) &&
-                            chunks.get(1).equalsOpCode(OP_HASH160) &&
-                            chunks.get(2).data.length() == ADDRESS_LENGTH &&
-                            chunks.get(3).equalsOpCode(OP_EQUALVERIFY) &&
-                            chunks.get(4).equalsOpCode(OP_CHECKSIG) &&
-                            chunks.get(5).equalsOpCode(OP_FALSE) &&
-                            chunks.get(6).equalsOpCode(OP_IF) &&
-                            Arrays.equals(chunks.get(7).data(), "ord".getBytes()) &&
-                            chunks.get(8).equalsOpCode(OP_TRUE) &&
-                            chunks.get(9).isPushData() &&
-                            chunks.get(10).equalsOpCode(OP_FALSE) &&
-                            chunks.get(11).isPushData() &&
-                            chunks.get(12).equalsOpCode(OP_ENDIF);
+            return chunks.size() >= 13
+                    && chunks.get(0).op == OP.OP_DUP
+                    && chunks.get(1).op == OP.OP_HASH160
+                    && dataOf(chunks.get(2)) != null && dataOf(chunks.get(2)).length == ADDRESS_LENGTH
+                    && chunks.get(3).op == OP.OP_EQUALVERIFY
+                    && chunks.get(4).op == OP.OP_CHECKSIG
+                    && chunks.get(5).op == OP.OP_0
+                    && chunks.get(6).op == OP.OP_IF
+                    && Arrays.equals(dataOf(chunks.get(7)), "ord".getBytes(StandardCharsets.UTF_8))
+                    && chunks.get(8).op == OP.OP_1
+                    && isPushData(chunks.get(9))
+                    && chunks.get(10).op == OP.OP_0
+                    && isPushData(chunks.get(11))
+                    && chunks.get(12).op == OP.OP_ENDIF;
         } catch (Exception e) {
             return false;
         }
     }
 
+    /** 由 Ordinals 脚本（Base64）取公钥哈希；非 Ordinals 脚本返回空数组。 */
     public static byte[] getPubKeyHashByOrdinalScript(String scriptB64) {
-        Script script = new Script(Base64.decode(scriptB64));
-        return getPubKeyHashByOrdinalScript(script);
+        return getPubKeyHashByOrdinalScript(Script.fromBinary(Base64.decode(scriptB64)));
     }
 
+    /** 由 Ordinals 脚本取公钥哈希；非 Ordinals 脚本返回空数组。 */
     public static byte[] getPubKeyHashByOrdinalScript(Script script) {
-
-        boolean b = isSentToOrdinals(script);
-        if (!b) {
+        if (!isSentToOrdinals(script)) {
             return new byte[0];
         }
-        byte[] pubKeyHash = script.getChunks().get(2).data();
-        return pubKeyHash;
+        return dataOf(script.getChunks().get(2));
     }
 
+    /** 由 Ordinals 脚本（Base64）解析 P2PKH 地址。 */
     public static String getAddressByOrdinalScript(String scriptB64) {
-        Script script = new Script(Base64.decode(scriptB64));
-        return getAddressByOrdinalScript(script);
+        return getAddressByOrdinalScript(Script.fromBinary(Base64.decode(scriptB64)));
     }
 
+    /** 由 Ordinals 脚本解析 P2PKH 地址。 */
     public static String getAddressByOrdinalScript(Script script) {
-        return new AddressLite(MainNetParams.get(), getPubKeyHashByOrdinalScript(script)).toBase58();
+        return BsvAddress.fromPubKeyHash(BsvNetwork.MAINNET, getPubKeyHashByOrdinalScript(script))
+                .toBase58();
+    }
+
+    /** 推送数据的字节形式；无数据时返回 {@code null}。 */
+    private static byte[] dataOf(ScriptChunk chunk) {
+        if (chunk == null || chunk.data == null) {
+            return null;
+        }
+        byte[] bytes = new byte[chunk.data.size()];
+        for (int i = 0; i < bytes.length; i++) {
+            bytes[i] = (byte) (int) chunk.data.get(i);
+        }
+        return bytes;
+    }
+
+    /** 是否为直接推送数据的 chunk（opcode 处于推送范围且非 0）。 */
+    private static boolean isPushData(ScriptChunk chunk) {
+        int op = chunk.op;
+        return chunk.data != null && !chunk.data.isEmpty() && op != 0
+                && (op == OP.OP_PUSHDATA1 || op == OP.OP_PUSHDATA2 || op == OP.OP_PUSHDATA4
+                || op < OP.OP_PUSHDATA1);
+    }
+
+
+    /**
+     * 取某输入的可花费信息（签名私钥 + 赎回脚本）。
+     *
+     * <p>按迁移计划 §3，旧实现按 {@code KeyBag.findKeyFromPubHash} 反查密钥；
+     * 现改为经 {@link SigningKeyProvider} 显式派生取得私钥，
+     * 公钥哈希优先取 Ordinals 铭文脚本中的地址哈希，否则取连接输出锁定脚本的 P2PKH 哈希。
+     *
+     * @param connectedOutput 连接输出（新 SDK 输出）
+     * @param keyProvider     显式密钥提供者
+     * @return 可花费信息；锁定脚本无法识别或找不到密钥时返回 {@code null}
+     */
+    public static RedeemDataExtend getConnectedRedeemDataExtend(
+            com.metanet4j.bsv.transaction.TransactionOutput connectedOutput,
+            SigningKeyProvider keyProvider) {
+        if (connectedOutput == null || connectedOutput.lockingScript == null) {
+            return null;
+        }
+        Script lockingScript = connectedOutput.lockingScript;
+        byte[] pubKeyHash = getPubKeyHashByOrdinalScript(lockingScript);
+        if (pubKeyHash.length == 0) {
+            pubKeyHash = pubKeyHashOfP2pkh(lockingScript);
+        }
+        if (pubKeyHash.length == 0) {
+            return null;
+        }
+        PrivateKey key = keyProvider.findKeyFromPubHash(pubKeyHash);
+        if (key == null) {
+            return null;
+        }
+        // P2SH 输入的赎回脚本由调用方按业务规则提供；此处保留 null 表示非 P2SH
+        return RedeemDataExtend.of(key, null);
+    }
+
+    /** P2PKH 锁定脚本的公钥哈希；非 P2PKH 返回空数组。 */
+    private static byte[] pubKeyHashOfP2pkh(Script script) {
+        List<ScriptChunk> chunks = script.getChunks();
+        if (chunks.size() == 5
+                && chunks.get(0).op == OP.OP_DUP
+                && chunks.get(1).op == OP.OP_HASH160
+                && dataOf(chunks.get(2)) != null && dataOf(chunks.get(2)).length == ADDRESS_LENGTH
+                && chunks.get(3).op == OP.OP_EQUALVERIFY
+                && chunks.get(4).op == OP.OP_CHECKSIG) {
+            return dataOf(chunks.get(2));
+        }
+        return new byte[0];
+    }
+
+    /** 按脚本取公钥哈希字节列表（便于调用方复用）。 */
+    public static List<Integer> pubKeyHashList(Script script) {
+        byte[] hash = getPubKeyHashByOrdinalScript(script);
+        List<Integer> out = new ArrayList<>(hash.length);
+        for (byte b : hash) {
+            out.add(b & 0xFF);
+        }
+        return out;
     }
 }

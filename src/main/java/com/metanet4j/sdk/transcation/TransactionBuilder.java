@@ -196,11 +196,15 @@ public class TransactionBuilder {
 
     }
 
+    /**
+     * 估算解锁脚本字节数（手续费估算，不参与签名）。
+     *
+     * <p>原实现按 {@code KeyBag} 反查赎回数据以获得公钥长度与 P2SH 赎回脚本；
+     * 按迁移计划 §3 该反查已取消，改为按锁定脚本结构与调用方提供的公钥长度估算。
+     * 口径由 {@code TransactionBuilderContractTest} 反向确认（见 migration-rules §12）。
+     */
     protected long getUnLockScriptSize(TransactionInput transactionInput, Script script) {
-        RedeemDataExtend redeemData = TxHelperExtend.getConnectedRedeemDataExtend(transactionInput.getOutpoint(), keyBag);
-        return new ScriptExtend(script.getProgram()).getNumberOfBytesRequiredToSpend(
-                redeemData.getFullKey() == null ? -1 : redeemData.getFullKey().getPubKey().length,
-                redeemData.redeemScript);
+        return ScriptExtend.getNumberOfBytesRequiredToSpend(script, -1, null);
     }
 
     public Coin getFee() {

@@ -1,48 +1,53 @@
 package com.metanet4j.sdk.utils;
 
-import io.bitcoinsv.bitcoinjsv.core.ECKey;
-import io.bitcoinsv.bitcoinjsv.script.Script;
-import io.bitcoinsv.bitcoinjsv.temp.RedeemData;
+import com.metanet4j.bsv.script.Script;
+import com.metanet4j.sdk.PrivateKey;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+/**
+ * 输入可花费信息：该输入所需的签名私钥与（P2SH 场景的）赎回脚本。
+ *
+ * <p>取代旧库的 {@code RedeemData} 与 {@code RedeemDataExtend}。按迁移计划 §3，
+ * 旧实现「按公钥哈希在 {@code KeyBag} 中反查密钥」的能力不存在于新 SDK，
+ * 因此业务侧改为**显式提供**：调用方通过
+ * {@link com.metanet4j.sdk.bap.SigningKeyProvider} 或 BAP 派生规则取得私钥后构造本对象。
+ */
+public final class RedeemDataExtend {
 
-public class RedeemDataExtend {
-
+    /** 可用于签名的私钥。 */
+    public final PrivateKey key;
+    /** P2SH 场景的赎回脚本；非 P2SH 为 {@code null}。 */
     public final Script redeemScript;
-    public final List<ECKey> keys;
 
-    private RedeemDataExtend(List<ECKey> keys, Script redeemScript) {
+    public RedeemDataExtend(PrivateKey key, Script redeemScript) {
+        this.key = key;
         this.redeemScript = redeemScript;
-        List<ECKey> sortedKeys = new ArrayList<ECKey>(keys);
-        Collections.sort(sortedKeys, ECKey.PUBKEY_COMPARATOR);
-        this.keys = sortedKeys;
     }
 
-    public static RedeemDataExtend of(List<ECKey> keys, Script redeemScript) {
-        return new RedeemDataExtend(keys, redeemScript);
+    /** 单密钥构造（P2PKH／P2PK／Ordinals 铭文输入）。 */
+    public static RedeemDataExtend of(PrivateKey key, Script redeemScript) {
+        return new RedeemDataExtend(key, redeemScript);
     }
 
-    public static RedeemDataExtend of(RedeemData redeemData) {
-        return new RedeemDataExtend(redeemData.keys, redeemData.redeemScript);
+    /** 返回私钥；缺省为 {@code null}。 */
+    public PrivateKey getFullKey() {
+        return key;
     }
 
-    /**
-     * Creates RedeemData for pay-to-address or pay-to-pubkey input. Provided key is a single private key needed
-     * to spend such inputs and provided program should be a proper CHECKSIG program.
-     */
-    public static RedeemDataExtend of(ECKey key, Script program) {
-        return key != null ? new RedeemDataExtend(Collections.singletonList(key), program) : null;
+    /** 压缩公钥字节；无私钥时返回 {@code null}。 */
+    public byte[] getPubKeyBytes() {
+        return key == null ? null : toBytes(key.getPubKey());
     }
 
-    /**
-     * Returns the first key that has private bytes
-     */
-    public ECKey getFullKey() {
-        for (ECKey key : keys)
-            if (key.hasPrivKey())
-                return key;
-        return null;
+    /** 私钥的 hex，便于断言。 */
+    public String getKeyHex() {
+        return key == null ? null : key.getKey().toHex();
+    }
+
+    private static byte[] toBytes(java.util.List<?> values) {
+        byte[] bytes = new byte[values.size()];
+        for (int i = 0; i < bytes.length; i++) {
+            bytes[i] = (byte) ((Number) values.get(i)).intValue();
+        }
+        return bytes;
     }
 }
