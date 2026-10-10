@@ -1,10 +1,10 @@
 package com.metanet4j.sdk.bap;
 
 import cn.hutool.core.util.HexUtil;
-import io.bitcoinsv.bitcoinjsv.core.Sha256Hash;
-import lombok.Data;
-
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import lombok.Data;
 
 /**
  * see https://yours-wallet.gitbook.io/provider-api/tools-and-utilities/tagged-derivation-keys-tm
@@ -18,12 +18,21 @@ public class TaggedDerivation {
     }
 
     public static String getTaggedDerivation(DerivationTag tag) {
-        String labelHex = HexUtil.encodeHexStr(Sha256Hash.hash(tag.getLabel().getBytes(StandardCharsets.UTF_8)));
-        String idHex = HexUtil.encodeHexStr(Sha256Hash.hash(tag.getId().getBytes(StandardCharsets.UTF_8)));
+        String labelHex = HexUtil.encodeHexStr(sha256(tag.getLabel().getBytes(StandardCharsets.UTF_8)));
+        String idHex = HexUtil.encodeHexStr(sha256(tag.getId().getBytes(StandardCharsets.UTF_8)));
         long labelNumber = Long.parseLong(labelHex.substring(labelHex.length() - 8), 16) % (long) Math.pow(2, 31);
         long idNumber = Long.parseLong(idHex.substring(idHex.length() - 8), 16) % (long) Math.pow(2, 31);
         //"M/424150H/0H/0H/0H/0H/0H";
         return String.format("M/44H/236H/218H/%d/%d", labelNumber, idNumber);
+    }
+
+    /** 单次 SHA-256（旧库 {@code Sha256Hash.hash} 的等价实现）。 */
+    private static byte[] sha256(byte[] data) {
+        try {
+            return MessageDigest.getInstance("SHA-256").digest(data);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("JVM 不支持 SHA-256", e);
+        }
     }
 
     @Data
