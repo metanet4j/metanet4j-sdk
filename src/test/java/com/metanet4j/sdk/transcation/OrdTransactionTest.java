@@ -130,11 +130,11 @@ public class OrdTransactionTest extends TransactionContextTest {
     @Test
     public void testTransactionOrdSigmaDeserialize() {
         String ordTx = FileUtil.readString("ord/040c6d48c.hex", Charsets.UTF_8);
-        Transaction transaction = new Transaction(Net.MAINNET, HexUtil.decodeHex(ordTx));
+        Transaction transaction = Transaction.fromBinary(HexUtil.decodeHex(ordTx));
         Sigma sigma = new Sigma(bapBase, transaction);
         boolean b = sigma.verify();
         System.out.println(b);
-        System.out.println(transaction.getHashAsString());
+        System.out.println(transaction.id("hex"));
 
     }
 
@@ -189,7 +189,9 @@ public class OrdTransactionTest extends TransactionContextTest {
 
     @Test
     public void testSighashType() {
-        int sighashType = SigHash.Flags.SINGLE.value | SigHash.Flags.FORKID.value | SigHash.Flags.ANYONECANPAY.value;
+        int sighashType = com.metanet4j.bsv.primitives.TransactionSignature.SIGHASH_SINGLE
+                | com.metanet4j.bsv.primitives.TransactionSignature.SIGHASH_FORKID
+                | com.metanet4j.bsv.primitives.TransactionSignature.SIGHASH_ANYONECANPAY;
         System.out.println(sighashType);
     }
 
