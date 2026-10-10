@@ -1,269 +1,304 @@
 package com.metanet4j.sdk.transcation;
 
 import com.google.common.collect.Lists;
+import com.metanet4j.base.bsv.BsvAmount;
+import com.metanet4j.base.bsv.BsvUtxo;
+import com.metanet4j.bsv.script.OP;
+import com.metanet4j.bsv.script.Script;
+import com.metanet4j.bsv.script.ScriptChunk;
+import com.metanet4j.bsv.script.templates.P2PKH;
+import com.metanet4j.bsv.primitives.Writer;
+import com.metanet4j.bsv.transaction.Transaction;
+import com.metanet4j.bsv.transaction.TransactionInput;
+import com.metanet4j.bsv.transaction.TransactionOutput;
 import com.metanet4j.sdk.SignType;
+import com.metanet4j.sdk.address.AddressEnhance;
 import com.metanet4j.sdk.bap.BapBaseCore;
+import com.metanet4j.sdk.bap.SigningKeyProvider;
 import com.metanet4j.sdk.exception.SignErrorException;
-import com.metanet4j.sdk.input.TransactionInputEnhance;
-import com.metanet4j.sdk.input.TransactionOutPointEnhance;
-import com.metanet4j.sdk.output.TransactionOutputEnhance;
-import com.metanet4j.sdk.remote.RemoteTransactionSigner;
 import com.metanet4j.sdk.script.ScriptExtend;
 import com.metanet4j.sdk.sigma.Sigma;
-import com.metanet4j.sdk.signers.ExtendForSignTransaction;
-import com.metanet4j.sdk.utils.RedeemDataExtend;
-import com.metanet4j.sdk.utils.TxHelperExtend;
 import com.metanet4j.sdk.utxo.UTXOProvider;
-import io.bitcoinsv.bitcoinjsv.core.*;
-import io.bitcoinsv.bitcoinjsv.msg.protocol.*;
-import io.bitcoinsv.bitcoinjsv.params.Net;
-import io.bitcoinsv.bitcoinjsv.script.Script;
-import io.bitcoinsv.bitcoinjsv.script.SigHash;
-import io.bitcoinsv.bitcoinjsv.script.interpreter.ScriptExecutionException;
-import io.bitcoinsv.bitcoinjsv.signers.LocalTransactionSigner;
-import io.bitcoinsv.bitcoinjsv.signers.TransactionSigner;
-import io.bitcoinsv.bitcoinjsv.temp.KeyBag;
-import io.bitcoinsv.bitcoinjsv.temp.RedeemData;
+import java.util.List;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.List;
-
-import static com.google.common.base.Preconditions.checkNotNull;
-
-
+/**
+ * 交易构建器。
+ *
+ * <p>旧实现基于 bitcoinj 的交易模型、{@code KeyBag} 反查与 {@code TransactionSigner} 遍历签名；
+ * 按迁移计划 §3 全部替换为：新 SDK（com.metanet4j.bsv）交易模型、{@link SigningKeyProvider}
+ * 显式取密钥、每输入注入 {@code unlockingScriptTemplate} 后调用 {@code Transaction.sign()}；
+ * 金额统一 {@link BsvAmount}（整数 satoshi）。
+ */
 @Data
 @Slf4j
 public class TransactionBuilder {
 
     protected BapBaseCore bapBaseCore;
 
-    protected Net net;
-
-    protected KeyBag keyBag;
+    /** 签名密钥提供者（取代旧 {@code KeyBag} 反查）。 */
+    protected SigningKeyProvider keyProvider;
 
     protected Transaction targetTransaction;
 
-    protected TransactionSigner transactionSigner;
+    protected AddressEnhance changeAddress;
 
-    protected Address changeAddress;
-
-    protected Coin feePerKb = Coin.valueOf(500);
+    protected BsvAmount feePerKb = BsvAmount.valueOf(500);
 
     protected Sigma sigma;
 
+    private BsvAmount changeAmount = BsvAmount.ZERO;
+    private BsvAmount fee = BsvAmount.ZERO;
 
-    private RemoteTransactionSigner remoteTransactionSigner;
-
-    private Coin changeAmount = Coin.ZERO;
-    private Coin fee = Coin.ZERO;
-
-    public TransactionBuilder(BapBaseCore bapBaseCore, KeyBag keyBag) {
-        this(bapBaseCore, Net.MAINNET, keyBag);
-
+    public TransactionBuilder(BapBaseCore bapBaseCore, SigningKeyProvider keyProvider) {
+        this(bapBaseCore, null, keyProvider);
     }
 
-    public TransactionBuilder(BapBaseCore bapBaseCore, KeyBag keyBag, TransactionSigner transactionSigner) {
-        this(bapBaseCore, Net.MAINNET, null, transactionSigner, keyBag);
-
-    }
-
-    public TransactionBuilder(BapBaseCore bapBaseCore, Net net, KeyBag keyBag) {
-        this(bapBaseCore, net, null, keyBag);
-    }
-
-    public TransactionBuilder(BapBaseCore bapBaseCore, Net net, Transaction targetTransaction, KeyBag keyBag) {
-        this(bapBaseCore, net, targetTransaction, null, keyBag);
-
-    }
-
-    public TransactionBuilder(BapBaseCore bapBaseCore, Net net, Transaction targetTransaction, TransactionSigner transactionSigner,
-                              KeyBag keyBag) {
+    public TransactionBuilder(BapBaseCore bapBaseCore, Transaction targetTransaction,
+                              SigningKeyProvider keyProvider) {
         this.bapBaseCore = bapBaseCore;
-        this.net = net;
-        if (targetTransaction == null) {
-            this.targetTransaction = new Transaction(net);
-        } else {
-            this.targetTransaction = targetTransaction;
+        this.targetTransaction = targetTransaction == null ? new Transaction() : targetTransaction;
+        this.keyProvider = keyProvider;
+    }
+
+    public TransactionBuilder addInput(AddressEnhance address,
+                                       UTXOProvider<AddressEnhance, BsvUtxo> utxoProvider) {
+        addInputs(utxoProvider.listUxtos(Lists.newArrayList(address)));
+        return this;
+    }
+
+    public TransactionBuilder addInputs(List<AddressEnhance> addressList,
+                                        UTXOProvider<AddressEnhance, BsvUtxo> utxoProvider) {
+        addInputs(utxoProvider.listUxtos(addressList));
+        return this;
+    }
+
+    public TransactionBuilder addInputs(List<BsvUtxo> utxoList) {
+        utxoList.forEach(this::addInput);
+        return this;
+    }
+
+    /**
+     * 由 UTXO 追加输入：锁定脚本按 UTXO 地址生成 P2PKH（无地址时取脚本，均无则留空）。
+     * 金额与 outpoint 直接取自 UTXO（整数 satoshi + 显示序 txid）。
+     */
+    public TransactionBuilder addInput(BsvUtxo utxo) {
+        Script lockingScript = new Script();
+        if (utxo.getAddress() != null) {
+            try {
+                AddressEnhance address = AddressEnhance.fromBase58(utxo.getAddress());
+                lockingScript = new P2PKH().lock(address.getHash160());
+            } catch (RuntimeException e) {
+                log.warn("UTXO 地址无法解析，输入锁定脚本留空：{}", utxo.getAddress());
+            }
+        } else if (utxo.getScript() != null) {
+            lockingScript = Script.fromBinary(utxo.getScript());
         }
-        if (transactionSigner == null) {
-            this.transactionSigner = new LocalTransactionSigner();
-        } else {
-            this.transactionSigner = transactionSigner;
-        }
-        this.keyBag = keyBag;
-
-    }
-
-
-    public TransactionBuilder addInput(AddressLite addressLite, UTXOProvider utxoProvider) {
-        addInputs(utxoProvider.listUxtos(Lists.newArrayList(addressLite)));
+        TransactionInput input = new TransactionInput(utxo.getHash().toString(), (int) utxo.getIndex(),
+                new Script());
+        input.sequence = 0xffff_ffffL;
+        attachSourceOutput(input, new TransactionOutput(lockingScript, utxo.getSatoshis()));
+        targetTransaction.addInput(input);
         return this;
     }
 
-    public TransactionBuilder addInputs(List<AddressLite> addressLiteList, UTXOProvider utxoProvider) {
-        addInputs(utxoProvider.listUxtos(addressLiteList));
-        return this;
-    }
-
-    public TransactionBuilder addInputs(List<UTXO> utxo) {
-        utxo.stream().forEach(o -> {
-            addInput(o);
-
-        });
-        return this;
-    }
-
-    public TransactionBuilder addInput(UTXO o) {
-        TransactionOutput output = new TransactionOutputEnhance(this.net, null, o.getValue(),
-                Address.fromBase58(this.net.params(),
-                        o.getAddress()), (int) o.getIndex()
-        );
-
-        TransactionOutPoint transactionOutPointEnhance = new TransactionOutPointEnhance(net, output, o.getHash());
-        TransactionInputEnhance transactionInputEnhance = new TransactionInputEnhance(net, this.targetTransaction,
-                transactionOutPointEnhance, o.getValue());
-
-        targetTransaction.addInput(transactionInputEnhance);
-        return this;
-    }
-
+    /** 追加一个已有输出作为花费来源。 */
     public TransactionBuilder addInput(TransactionOutput output) {
-        targetTransaction.addInput(output);
+        TransactionInput input = new TransactionInput(null, 0, new Script());
+        input.sequence = 0xffff_ffffL;
+        attachSourceOutput(input, output);
+        targetTransaction.addInput(input);
         return this;
     }
 
-
-    public TransactionBuilder addOutput(Coin value, Address address) {
-        targetTransaction.addOutput(new TransactionOutput(net, targetTransaction, value, address));
+    public TransactionBuilder addOutput(BsvAmount value, AddressEnhance address) {
+        targetTransaction.addOutput(new TransactionOutput(new P2PKH().lock(address.getHash160()),
+                value.toSdkValue()));
         return this;
     }
 
     public TransactionBuilder addDataOutput(LockingScriptBuilder lockingScriptBuilder) {
-        targetTransaction.addOutput(new TransactionOutput(net, targetTransaction, Coin.ZERO,
-                lockingScriptBuilder.getLockingScript().getProgram()));
-
+        targetTransaction.addOutput(new TransactionOutput(lockingScriptBuilder.getLockingScript(), 0d));
         return this;
     }
-
 
     public TransactionBuilder addSigmaSign(BapBaseCore bapBase) {
-        Sigma sigma = new Sigma(bapBase, targetTransaction, SignType.CURRENT);
-        targetTransaction = sigma.sign().getSignedTx();
-        this.sigma = sigma;
+        Sigma localSigma = new Sigma(bapBase, targetTransaction, SignType.CURRENT);
+        targetTransaction = localSigma.sign().getSignedTx();
+        this.sigma = localSigma;
         return this;
     }
 
-
-
-
-    public TransactionBuilder changeAddress(Address address) {
+    public TransactionBuilder changeAddress(AddressEnhance address) {
         addChangeOutput(address);
         return this;
     }
 
-    public void addChangeOutput(Address address) {
+    public void addChangeOutput(AddressEnhance address) {
         this.changeAddress = address;
-
-        Coin changeAmount = calculateChangeAmount(targetTransaction, address, this.feePerKb);
-        targetTransaction.addOutput(new TransactionOutput(net, targetTransaction, changeAmount, address));
+        BsvAmount change = calculateChangeAmount(targetTransaction, address, this.feePerKb);
+        targetTransaction.addOutput(new TransactionOutput(new P2PKH().lock(address.getHash160()),
+                change.toSdkValue()));
     }
 
     /**
-     * @param targetTransaction
-     * @param address
-     * @param feePerKb
-     * @return
+     * 计算找零：出大小 = 找零输出字节 + 输出数的 CompactSize + 交易序列化长度 + 各输入解锁脚本估算。
+     * 金额全程用 {@link BsvAmount} 保证整数精度。
      */
-    public Coin calculateChangeAmount(Transaction targetTransaction, Address address, Coin feePerKb) {
-
+    public BsvAmount calculateChangeAmount(Transaction transaction, AddressEnhance address,
+                                           BsvAmount feePerKb) {
         long size = 0;
-        TransactionOutput changeOutput = new TransactionOutput(net, targetTransaction, changeAmount, address);
-
-        size += changeOutput.getMessageSize() + VarInt.sizeOf(targetTransaction.getOutputs().size() + 1);
-        size += targetTransaction.unsafeBitcoinSerialize().length;
-
-        for (TransactionInput transactionInput : targetTransaction.getInputs()) {
-
-            Script script = transactionInput.getConnectedOutput().getScriptPubKey();
-            size += getUnLockScriptSize(transactionInput, script);
+        size += outputSize(new TransactionOutput(new P2PKH().lock(address.getHash160()), 0d));
+        size += Writer.varIntNum(transaction.outputs.size() + 1).size();
+        size += transaction.toBinary().size();
+        for (TransactionInput transactionInput : transaction.inputs) {
+            size += getUnLockScriptSize(transactionInput, lockingScriptOf(transactionInput));
         }
-        Coin fee = Coin.valueOf((long) Math.ceil(size * feePerKb.value / 1000));
-        this.fee = fee;
-        this.changeAmount = targetTransaction.getInputSum().subtract(targetTransaction.getOutputSum()).subtract(fee);
+        BsvAmount localFee = BsvAmount.valueOf((long) Math.ceil(size * feePerKb.getValue() / 1000.0));
+        this.fee = localFee;
+        this.changeAmount = inputSum(transaction).subtract(outputSum(transaction)).subtract(localFee);
         return this.changeAmount;
-
     }
 
     /**
      * 估算解锁脚本字节数（手续费估算，不参与签名）。
      *
-     * <p>原实现按 {@code KeyBag} 反查赎回数据以获得公钥长度与 P2SH 赎回脚本；
-     * 按迁移计划 §3 该反查已取消，改为按锁定脚本结构与调用方提供的公钥长度估算。
-     * 口径由 {@code TransactionBuilderContractTest} 反向确认（见 migration-rules §12）。
+     * <p>口径由 {@code TransactionBuilderContractTest} 反向确认（见 migration-rules §12）。
      */
     protected long getUnLockScriptSize(TransactionInput transactionInput, Script script) {
         return ScriptExtend.getNumberOfBytesRequiredToSpend(script, -1, null);
     }
 
-    public Coin getFee() {
+    public BsvAmount getFee() {
         return this.fee;
     }
 
-    public TransactionBuilder withFeeKb(Coin feePerKb) {
+    public TransactionBuilder withFeeKb(BsvAmount feePerKb) {
         this.feePerKb = feePerKb;
         return this;
     }
 
-
-    public Transaction completeAndSignTx(KeyBag keyBag, boolean useForkId) throws SignErrorException {
-        setEmptyInputScript(targetTransaction, keyBag);
-        final ExtendForSignTransaction proposedTransaction = new ExtendForSignTransaction(this.getTargetTransaction(), TransactionSignature.SIGHASH_ALL, useForkId, false);
-        boolean b = transactionSigner.signInputs(proposedTransaction, keyBag);
-        if (b) {
-            return proposedTransaction.partialTx;
+    /**
+     * 完成并签名：为每个可签名输入注入解锁模板，再交给新 SDK 签名。
+     *
+     * @throws SignErrorException 任一输入缺少可用密钥或签名失败
+     */
+    public Transaction completeAndSignTx(SigningKeyProvider provider, boolean useForkId)
+            throws SignErrorException {
+        prepareInputsForSigning(targetTransaction, provider);
+        try {
+            targetTransaction.sign().toCompletableFuture().join();
+        } catch (RuntimeException e) {
+            throw new SignErrorException();
         }
-        throw new SignErrorException();
+        return targetTransaction;
     }
 
-
-
-
+    /** 为每个输入注入解锁模板（取代旧 {@code setEmptyInputScript}）。 */
+    protected void prepareInputsForSigning(Transaction transaction, SigningKeyProvider provider) {
+        if (provider == null) {
+            throw new IllegalArgumentException("签名密钥提供者不能为空");
+        }
+        for (int i = 0; i < transaction.inputs.size(); i++) {
+            TransactionInput input = transaction.inputs.get(i);
+            byte[] pubKeyHash = pubKeyHashOf(lockingScriptOf(input));
+            if (pubKeyHash.length == 0) {
+                continue;
+            }
+            com.metanet4j.sdk.PrivateKey key = provider.findKeyFromPubHash(pubKeyHash);
+            if (key == null) {
+                throw new SignErrorException("交易输入 " + i + " 找不到可签名密钥");
+            }
+            input.unlockingScriptTemplate = new P2PKH().unlock(key.getKey(), "all", false,
+                    satoshisOf(input));
+        }
+    }
 
     public static String broadcast(String raw, Broadcaster broadcaster) {
         return broadcaster.broadcast(raw);
-    }
-
-
-
-    /**
-     * @param outputTransaction
-     * @param bag
-     * @throws ScriptExecutionException
-     */
-    protected void setEmptyInputScript(final Transaction outputTransaction, final KeyBag bag)
-            throws ScriptExecutionException {
-        int numInputs = outputTransaction.getInputs().size();
-        for (int i = 0; i < numInputs; i++) {
-            TransactionInput txIn = outputTransaction.getInput(i);
-            Script scriptPubKey = txIn.getConnectedOutput().getScriptPubKey();
-            RedeemData redeemData = TxHelper.getConnectedRedeemData(txIn, bag);
-            checkNotNull(redeemData, "Transaction exists in wallet that we cannot redeem: %s",
-                    txIn.getOutpoint().getHash());
-            txIn.setScriptSig(
-                    scriptPubKey.createEmptyInputScript(redeemData.keys.get(0).getPubKey(), redeemData.redeemScript));
-        }
     }
 
     public Sigma getSigma() {
         return sigma;
     }
 
-    @FunctionalInterface
-    public interface Broadcaster{
-
-        String broadcast(String raw);
+    /** 序列化一个输出所占字节数：金额 8 字节 + CompactSize 长度 + 锁定脚本。 */
+    private static long outputSize(TransactionOutput output) {
+        byte[] script = output.lockingScript == null ? new byte[0] : output.lockingScript.toUint8Array();
+        return 8L + Writer.varIntNum(script.length).size() + script.length;
     }
 
+    /** 把来源输出挂到输入上（新 SDK 用 sourceTransaction 携带连接输出）。 */
+    private static void attachSourceOutput(TransactionInput input, TransactionOutput output) {
+        Transaction source = new Transaction();
+        source.outputs = Lists.newArrayList(output);
+        input.sourceTransaction = source;
+    }
 
+    /** 输入的连接输出锁定脚本；无可解析输出时返回空脚本。 */
+    private static Script lockingScriptOf(TransactionInput input) {
+        TransactionOutput output = sourceOutputOf(input);
+        return output == null || output.lockingScript == null ? new Script() : output.lockingScript;
+    }
+
+    /** 输入的连接输出金额；未知返回 {@code null}。 */
+    private static Double satoshisOf(TransactionInput input) {
+        TransactionOutput output = sourceOutputOf(input);
+        if (output != null && output.satoshis instanceof Number number) {
+            return number.doubleValue();
+        }
+        return null;
+    }
+
+    private static TransactionOutput sourceOutputOf(TransactionInput input) {
+        if (input.sourceTransaction instanceof Transaction source && source.outputs != null
+                && !source.outputs.isEmpty()) {
+            return source.outputs.get(0);
+        }
+        return null;
+    }
+
+    /** P2PKH 锁定脚本的公钥哈希；非 P2PKH 返回空数组。 */
+    private static byte[] pubKeyHashOf(Script script) {
+        List<ScriptChunk> chunks = script.getChunks();
+        if (chunks.size() == 5
+                && chunks.get(0).op == OP.OP_DUP
+                && chunks.get(1).op == OP.OP_HASH160
+                && chunks.get(2).data != null && chunks.get(2).data.size() == 20
+                && chunks.get(3).op == OP.OP_EQUALVERIFY
+                && chunks.get(4).op == OP.OP_CHECKSIG) {
+            byte[] hash = new byte[20];
+            for (int i = 0; i < hash.length; i++) {
+                hash[i] = (byte) (int) chunks.get(2).data.get(i);
+            }
+            return hash;
+        }
+        return new byte[0];
+    }
+
+    /** 输入金额合计（整数 satoshi）。 */
+    private static BsvAmount inputSum(Transaction transaction) {
+        BsvAmount sum = BsvAmount.ZERO;
+        for (TransactionInput input : transaction.inputs) {
+            Double satoshis = satoshisOf(input);
+            sum = sum.add(BsvAmount.valueOf(satoshis == null ? 0L : satoshis.longValue()));
+        }
+        return sum;
+    }
+
+    /** 输出金额合计（整数 satoshi）。 */
+    private static BsvAmount outputSum(Transaction transaction) {
+        BsvAmount sum = BsvAmount.ZERO;
+        for (TransactionOutput output : transaction.outputs) {
+            long satoshis = output.satoshis instanceof Number number ? number.longValue() : 0L;
+            sum = sum.add(BsvAmount.valueOf(satoshis));
+        }
+        return sum;
+    }
+
+    @FunctionalInterface
+    public interface Broadcaster {
+        String broadcast(String raw);
+    }
 }
