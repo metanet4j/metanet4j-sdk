@@ -8,17 +8,25 @@ import com.metanet4j.sdk.EcKeyLiteExtend;
 import com.metanet4j.sdk.SignType;
 import com.metanet4j.sdk.TestData;
 import com.metanet4j.sdk.address.AddressEnhance;
+import com.metanet4j.sdk.utils.ScriptHelper;
+
 import com.metanet4j.sdk.bap.BapBase;
 import com.metanet4j.sdk.context.PreSignHashContext;
 import com.metanet4j.sdk.remote.PreSignHashUtils;
 import com.metanet4j.sdk.remote.RemoteSignType;
-import io.bitcoinsv.bitcoinjsv.core.Coin;
-import io.bitcoinsv.bitcoinjsv.core.Sha256Hash;
-import io.bitcoinsv.bitcoinjsv.msg.protocol.Transaction;
-import io.bitcoinsv.bitcoinjsv.params.Net;
-import io.bitcoinsv.bitcoinjsv.script.ScriptBuilder;
-import io.bitcoinsv.bitcoinjsv.script.ScriptOpCodes;
+import com.metanet4j.base.bsv.BsvAmount;
+import com.metanet4j.base.bsv.BsvHashBytes;
+import com.metanet4j.bsv.script.OP;
+
+import com.metanet4j.bsv.script.Script;
+
+import com.metanet4j.bsv.transaction.TransactionInput;
+
+import com.metanet4j.bsv.transaction.TransactionOutput;
+
+import com.metanet4j.bsv.transaction.Transaction;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
@@ -40,7 +48,7 @@ class SigmaSignContractTest {
 
         for (SignType type : SignType.values()) {
             Sigma sigma = new Sigma(bap, transaction(), type);
-            Sha256Hash messageHash = sigma.getMessageHash();
+            BsvHashBytes messageHash = sigma.getMessageHash();
             SignResponse response = sigma.sign();
             assertEquals(expectedAddresses.get(type), sigma.getSig().getAddress());
             assertEquals(messageHash, sigma.getMessageHash());
@@ -117,23 +125,38 @@ class SigmaSignContractTest {
     @Test
     void existingOpReturnUsesPipeSeparatorAndKeepsPriorData() {
         BapBase bap = BapBase.fromOnlyMasterPrivateKey(TestData.masterPrivateKey);
-        Transaction tx = new Transaction(Net.MAINNET);
-        tx.addInput(Sha256Hash.wrap(new byte[32]), 0, new ScriptBuilder().build());
-        tx.addOutput(Coin.valueOf(100), new ScriptBuilder()
-                .op(ScriptOpCodes.OP_RETURN)
-                .data("payload".getBytes(StandardCharsets.US_ASCII)).build());
+        Transaction tx = newTransaction();
+        tx.outputs.add(new TransactionOutput(new Script().writeOpCode(OP.OP_RETURN)
+                .writeBin(toBoxed("payload".getBytes(StandardCharsets.US_ASCII))), 100d));
         Sigma sigma = new Sigma(bap, tx, SignType.CURRENT);
         sigma.sign();
-        assertEquals("|", new String(tx.getOutput(0).getScriptPubKey().getChunks().get(2).data(),
+        assertEquals("|", new String(ScriptHelper.getPushData(tx.outputs.get(0).lockingScript.getChunks().get(2)),
                 StandardCharsets.US_ASCII));
         assertTrue(sigma.verify());
     }
 
+    /** 单个零哈希输入（sequence 全 F）的空交易。 */
+    private static Transaction newTransaction() {
+        Transaction tx = new Transaction();
+        TransactionInput input = new TransactionInput(new BsvHashBytes(new byte[32]).toString(), 0,
+                new Script());
+        input.sequence = 0xffff_ffffL;
+        tx.inputs.add(input);
+        return tx;
+    }
+
+    private static List<Integer> toBoxed(byte[] data) {
+        List<Integer> out = new java.util.ArrayList<>(data.length);
+        for (byte b : data) {
+            out.add(b & 0xFF);
+        }
+        return out;
+    }
+
     private static Transaction transaction() {
-        Transaction tx = new Transaction(Net.MAINNET);
-        tx.addInput(Sha256Hash.wrap(new byte[32]), 0, new ScriptBuilder().build());
-        tx.addOutput(Coin.valueOf(100), new ScriptBuilder()
-                .data("payload".getBytes(StandardCharsets.US_ASCII)).build());
+        Transaction tx = newTransaction();
+        tx.outputs.add(new TransactionOutput(new Script()
+                .writeBin(toBoxed("payload".getBytes(StandardCharsets.US_ASCII))), 100d));
         return tx;
     }
 }
