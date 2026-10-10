@@ -55,9 +55,9 @@ class OrdTransactionTemplateContractTest {
                 500, inscription, bap, keyBag, signer);
 
         byte[] inscriptionScript = OrdScriptBuilder.buildInscription(destination,
-                "post".getBytes(StandardCharsets.US_ASCII), "text/plain", metadata).getProgram();
+                "post".getBytes(StandardCharsets.US_ASCII), "text/plain", metadata).toUint8Array();
         assertArrayEquals(inscriptionScript,
-                Arrays.copyOf(transaction.getOutput(0).getScriptBytes(), inscriptionScript.length));
+                Arrays.copyOf(transaction.outputs.get(0).lockingScript.toUint8Array(), inscriptionScript.length));
     }
 
     @Test
@@ -74,8 +74,8 @@ class OrdTransactionTemplateContractTest {
                 keyBag, signer);
 
         assertArrayEquals(OrdScriptBuilder.buildInscription(destination,
-                "new".getBytes(StandardCharsets.US_ASCII), "text/plain", metadata).getProgram(),
-                transaction.getOutput(0).getScriptBytes());
+                "new".getBytes(StandardCharsets.US_ASCII), "text/plain", metadata).toUint8Array(),
+                transaction.outputs.get(0).lockingScript.toUint8Array());
     }
 
     @Test
@@ -95,7 +95,7 @@ class OrdTransactionTemplateContractTest {
                 500, inscription("first", "text/plain"), null, bap, keyBag);
 
         Transaction signed = builder.build();
-        assertEquals(Coin.SATOSHI, signed.getOutput(0).getValue());
+        assertEquals(Coin.SATOSHI, signedBsvAmount.fromSdkValue(.outputs.get(0).satoshis));
         assertEquals(signed.getInputSum(), signed.getOutputSum().add(builder.getFee()));
         assertSpendable(signed);
     }
@@ -106,9 +106,9 @@ class OrdTransactionTemplateContractTest {
                 ordinalUtxo(6), paymentUtxo(7), destination, payment, 500,
                 null, null, keyBag);
 
-        assertEquals(Coin.SATOSHI, signed.getOutput(0).getValue());
-        assertArrayEquals(ScriptBuilder.createOutputScript(destination).getProgram(),
-                signed.getOutput(0).getScriptBytes());
+        assertEquals(Coin.SATOSHI, signedBsvAmount.fromSdkValue(.outputs.get(0).satoshis));
+        assertArrayEquals(ScriptBuilder.createOutputScript(destination).toUint8Array(),
+                signed.outputs.get(0).lockingScript.toUint8Array());
         assertSpendable(signed);
     }
 
@@ -123,9 +123,9 @@ class OrdTransactionTemplateContractTest {
                 ordinalUtxo(10), paymentUtxo(11), destination, payment, 500,
                 inscription("", "text/plain"), null, keyBag, signer);
 
-        byte[] ordinaryOutput = ScriptBuilder.createOutputScript(destination).getProgram();
-        assertArrayEquals(ordinaryOutput, missingContent.getOutput(0).getScriptBytes());
-        assertArrayEquals(ordinaryOutput, missingData.getOutput(0).getScriptBytes());
+        byte[] ordinaryOutput = ScriptBuilder.createOutputScript(destination).toUint8Array();
+        assertArrayEquals(ordinaryOutput, missingContent.outputs.get(0).lockingScript.toUint8Array());
+        assertArrayEquals(ordinaryOutput, missingData.outputs.get(0).lockingScript.toUint8Array());
     }
 
     @Test
@@ -134,8 +134,8 @@ class OrdTransactionTemplateContractTest {
         Transaction signed = new OrdTransactionTemplate().sendUtxos(bap,
                 List.of(paymentUtxo(12)), payment, 500, keyBag);
 
-        assertEquals(1, signed.getInputs().size());
-        assertEquals(1, signed.getOutputs().size());
+        assertEquals(1, signed.inputs.size());
+        assertEquals(1, signed.outputs.size());
         assertTrue(signed.getOutputSum().isLessThan(signed.getInputSum()));
         assertSpendable(signed);
     }
@@ -146,19 +146,19 @@ class OrdTransactionTemplateContractTest {
                 List.of(bap.getPayAccountAddress()), provider, destination,
                 payment, 500, bap, keyBag);
 
-        assertEquals(Coin.SATOSHI, signed.getOutput(0).getValue());
-        assertTrue(signed.getOutputs().size() >= 3);
-        assertTrue(new String(signed.getOutput(1).getScriptBytes(), StandardCharsets.UTF_8)
+        assertEquals(Coin.SATOSHI, signedBsvAmount.fromSdkValue(.outputs.get(0).satoshis));
+        assertTrue(signed.outputs.size() >= 3);
+        assertTrue(new String(signed.outputs.get(1).lockingScript.toUint8Array(), StandardCharsets.UTF_8)
                 .contains("1BAPSuaPnfGnSBM3GLV9yhxUdYe4vGbdM"));
         assertSpendable(signed);
     }
 
     private void assertSpendable(Transaction signed) {
-        for (int i = 0; i < signed.getInputs().size(); i++) {
-            assertTrue(signed.getInput(i).getScriptBytes().length > 0);
+        for (int i = 0; i < signed.inputs.size(); i++) {
+            assertTrue(signed.getInput(i).lockingScript.toUint8Array().length > 0);
             ScriptUtils_legacy.correctlySpends(signed.getInput(i).getScriptSig(), signed, i,
                     signed.getInput(i).getConnectedOutput().getScriptPubKey(),
-                    signed.getInput(i).getConnectedOutput().getValue(),
+                    signed.getInput(i).getConnectedOutput().satoshis,
                     ScriptVerifyFlag.GENESIS_SET);
         }
     }

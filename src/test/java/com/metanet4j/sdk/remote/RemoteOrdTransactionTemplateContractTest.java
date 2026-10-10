@@ -17,20 +17,20 @@ import com.metanet4j.sdk.exception.SignErrorException;
 import com.metanet4j.sdk.context.PreSignHashContext;
 import com.metanet4j.sdk.ordinals.OrdScriptBuilder;
 import com.metanet4j.sdk.utxo.UTXOProvider;
-import io.bitcoinsv.bitcoinjsv.core.Address;
-import io.bitcoinsv.bitcoinjsv.core.AddressLite;
-import io.bitcoinsv.bitcoinjsv.core.Coin;
+import com.metanet4j.sdk.address.AddressEnhance;
+import com.metanet4j.base.bsv.BsvAmount;
 import io.bitcoinsv.bitcoinjsv.core.ECKey;
 import io.bitcoinsv.bitcoinjsv.core.ECKeyLite;
 import io.bitcoinsv.bitcoinjsv.core.Sha256Hash;
-import io.bitcoinsv.bitcoinjsv.core.UTXO;
-import io.bitcoinsv.bitcoinjsv.msg.protocol.Transaction;
+import com.metanet4j.base.bsv.BsvHashBytes;
+import com.metanet4j.base.bsv.BsvUtxo;
+import com.metanet4j.bsv.transaction.Transaction;
 import io.bitcoinsv.bitcoinjsv.script.Script;
 import io.bitcoinsv.bitcoinjsv.script.ScriptBuilder;
 import io.bitcoinsv.bitcoinjsv.script.ScriptUtils_legacy;
 import io.bitcoinsv.bitcoinjsv.script.ScriptVerifyFlag;
 import io.bitcoinsv.bitcoinjsv.signers.TransactionSigner;
-import io.bitcoinsv.bitcoinjsv.temp.KeyBag;
+import com.metanet4j.sdk.bap.SigningKeyProvider;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
@@ -44,16 +44,15 @@ class RemoteOrdTransactionTemplateContractTest {
     private final RemoteBapBase remoteBap = new RemoteBapBase(bap.getRootAddress(),
             bap.getPreviouAddress(), bap.getCurrentAddress(), bap.getPayAccountAddress(),
             bap.getOrdAddress(), bap.getAppName());
-    private final Address paymentAddress = new Address(bap.getPayAccountAddress());
-    private final Address destination = bap.getOrdAddress();
-    private final KeyBag keyBag = new BapBase.BapProviderKeyBag(bap);
-    private final UTXOProvider<AddressLite, UTXO> provider = addresses -> {
+    private final AddressEnhance paymentAddress = bap.getPayAccountAddress();
+    private final AddressEnhance destination = bap.getOrdAddress();
+    private final SigningKeyProvider keyBag = new BapBase.BapProviderKeyBag(bap);
+    private final UTXOProvider<AddressEnhance, BsvUtxo> provider = addresses -> {
         assertEquals(List.of(paymentAddress.toBase58()),
-                addresses.stream().map(AddressLite::toBase58).toList());
+                addresses.stream().map(AddressEnhance::toBase58).toList());
         byte[] hash = new byte[32];
         hash[0] = 1;
-        return List.of(new UTXO(Sha256Hash.wrap(hash), 0, Coin.valueOf(20_000),
-                0, false, null, paymentAddress.toBase58()));
+        return List.of(new BsvUtxo(BsvHashBytes.of(hash), 0, 20_000L, 0, false, paymentAddress.toBase58(), null));
     };
 
     @AfterEach
@@ -75,14 +74,14 @@ class RemoteOrdTransactionTemplateContractTest {
 
         assertFalse(template.isDoBsmSign());
         assertFalse(template.isDoInputSign());
-        assertEquals(1, builder.build().getInputs().size());
-        assertEquals(2, builder.build().getOutputs().size());
-        assertEquals(Coin.SATOSHI, builder.build().getOutput(0).getValue());
+        assertEquals(1, builder.build().inputs.size());
+        assertEquals(2, builder.build().outputs.size());
+        assertEquals(BsvAmount.SATOSHI, builder.build()BsvAmount.fromSdkValue(.outputs.get(0).satoshis));
         assertArrayEquals(OrdScriptBuilder.buildInscription(destination,
-                        "first".getBytes(StandardCharsets.US_ASCII), "text/plain", metadata).getProgram(),
-                builder.build().getOutput(0).getScriptBytes());
+                        "first".getBytes(StandardCharsets.US_ASCII), "text/plain", metadata).toUint8Array(),
+                builder.build().outputs.get(0).lockingScript.toUint8Array());
         assertEquals(builder.build().getInputSum(), builder.build().getOutputSum().add(builder.getFee()));
-        assertEquals(0, builder.build().getInput(0).getScriptBytes().length);
+        assertEquals(0, builder.build().getInput(0).lockingScript.toUint8Array().length);
         assertNull(builder.getSigma());
         assertEquals(RemoteSignType.CURRENT,
                 builder.getAllBsmSignHash(true, false, remoteBap).get(0).getRemoteSignType());
@@ -99,10 +98,10 @@ class RemoteOrdTransactionTemplateContractTest {
 
         byte[] expected = OrdScriptBuilder.buildInscription(destination,
                 "post".getBytes(StandardCharsets.US_ASCII), "text/plain",
-                expectedMetadata).getProgram();
+                expectedMetadata).toUint8Array();
         byte[] actual = template.createPostOrdinal(List.of(bap.getPayAccountAddress()),
                 provider, destination, paymentAddress, 500, inscription, remoteBap,
-                new RemoteTransactionSigner(), RemoteSignType.CURRENT).getOutput(0).getScriptBytes();
+                new RemoteTransactionSigner(), RemoteSignType.CURRENT).outputs.get(0).lockingScript.toUint8Array();
 
         assertArrayEquals(expected, actual);
     }
@@ -134,15 +133,15 @@ class RemoteOrdTransactionTemplateContractTest {
                 bap, ordinalUtxo(), paymentUtxo(), destination, paymentAddress,
                 500, null, null, keyBag);
 
-        assertEquals(2, sent.getInputs().size());
-        assertEquals(Coin.SATOSHI, sent.getOutput(0).getValue());
-        assertArrayEquals(ScriptBuilder.createOutputScript(destination).getProgram(),
-                sent.getOutput(0).getScriptBytes());
-        assertTrue(sent.getInputSum().getValue() > sent.getOutputSum().getValue());
-        for (int i = 0; i < sent.getInputs().size(); i++) {
+        assertEquals(2, sent.inputs.size());
+        assertEquals(BsvAmount.SATOSHI, sentBsvAmount.fromSdkValue(.outputs.get(0).satoshis));
+        assertArrayEquals(ScriptBuilder.createOutputScript(destination).toUint8Array(),
+                sent.outputs.get(0).lockingScript.toUint8Array());
+        assertTrue(sent.getInputSum().satoshis > sent.getOutputSum().satoshis);
+        for (int i = 0; i < sent.inputs.size(); i++) {
             ScriptUtils_legacy.correctlySpends(sent.getInput(i).getScriptSig(), sent, i,
                     sent.getInput(i).getConnectedOutput().getScriptPubKey(),
-                    sent.getInput(i).getConnectedOutput().getValue(),
+                    sent.getInput(i).getConnectedOutput().satoshis,
                     ScriptVerifyFlag.GENESIS_SET);
         }
     }
@@ -159,8 +158,8 @@ class RemoteOrdTransactionTemplateContractTest {
                 500, reinscription, metadata, keyBag);
 
         assertArrayEquals(OrdScriptBuilder.buildInscription(destination,
-                        "second".getBytes(StandardCharsets.US_ASCII), "text/plain", metadata).getProgram(),
-                sent.getOutput(0).getScriptBytes());
+                        "second".getBytes(StandardCharsets.US_ASCII), "text/plain", metadata).toUint8Array(),
+                sent.outputs.get(0).lockingScript.toUint8Array());
     }
 
     @Test
@@ -175,9 +174,9 @@ class RemoteOrdTransactionTemplateContractTest {
             Transaction sent = new RemoteOrdTransactionTemplate(false, false).sendOrdinal(
                     bap, ordinalUtxo(), paymentUtxo(), destination, paymentAddress,
                     500, attempt, null, keyBag);
-            assertArrayEquals(ScriptBuilder.createOutputScript(destination).getProgram(),
-                    sent.getOutput(0).getScriptBytes());
-            assertEquals(Coin.SATOSHI, sent.getOutput(0).getValue());
+            assertArrayEquals(ScriptBuilder.createOutputScript(destination).toUint8Array(),
+                    sent.outputs.get(0).lockingScript.toUint8Array());
+            assertEquals(BsvAmount.SATOSHI, sentBsvAmount.fromSdkValue(.outputs.get(0).satoshis));
         }
     }
 
@@ -188,14 +187,14 @@ class RemoteOrdTransactionTemplateContractTest {
         Transaction tx = template.sendOrdinal(remoteBap, ordinalUtxo(), paymentUtxo(),
                 destination, paymentAddress, 500, null, null, RemoteSignType.CURRENT);
 
-        assertEquals(2, tx.getInputs().size());
-        assertArrayEquals(ordinalUtxo().getScript().getProgram(),
-                tx.getInput(0).getConnectedOutput().getScriptBytes());
-        assertEquals(Coin.SATOSHI, tx.getOutput(0).getValue());
-        assertArrayEquals(ScriptBuilder.createOutputScript(destination).getProgram(),
-                tx.getOutput(0).getScriptBytes());
-        assertEquals(0, tx.getInput(0).getScriptBytes().length);
-        assertEquals(0, tx.getInput(1).getScriptBytes().length);
+        assertEquals(2, tx.inputs.size());
+        assertArrayEquals(ordinalUtxo().getScript().toUint8Array(),
+                tx.getInput(0).getConnectedOutput().lockingScript.toUint8Array());
+        assertEquals(BsvAmount.SATOSHI, txBsvAmount.fromSdkValue(.outputs.get(0).satoshis));
+        assertArrayEquals(ScriptBuilder.createOutputScript(destination).toUint8Array(),
+                tx.outputs.get(0).lockingScript.toUint8Array());
+        assertEquals(0, tx.getInput(0).lockingScript.toUint8Array().length);
+        assertEquals(0, tx.getInput(1).lockingScript.toUint8Array().length);
     }
 
     @Test
@@ -219,10 +218,10 @@ class RemoteOrdTransactionTemplateContractTest {
                 RemoteSignType.CURRENT);
         Transaction signed = completed.build();
 
-        assertEquals(2, signed.getInputs().size());
-        assertArrayEquals(ScriptBuilder.createOutputScript(destination).getProgram(),
-                signed.getOutput(0).getScriptBytes());
-        assertEquals(Coin.SATOSHI, signed.getOutput(0).getValue());
+        assertEquals(2, signed.inputs.size());
+        assertArrayEquals(ScriptBuilder.createOutputScript(destination).toUint8Array(),
+                signed.outputs.get(0).lockingScript.toUint8Array());
+        assertEquals(BsvAmount.SATOSHI, signedBsvAmount.fromSdkValue(.outputs.get(0).satoshis));
         assertEquals(signed.getInputSum(), signed.getOutputSum().add(completed.getFee()));
         assertSpendable(signed);
     }
@@ -258,10 +257,10 @@ class RemoteOrdTransactionTemplateContractTest {
                 RemoteSignType.CURRENT).build();
 
         byte[] inscriptionScript = OrdScriptBuilder.buildInscription(destination,
-                "second".getBytes(StandardCharsets.US_ASCII), "text/plain", metadata).getProgram();
-        assertArrayEquals(inscriptionScript, Arrays.copyOf(signed.getOutput(0).getScriptBytes(),
+                "second".getBytes(StandardCharsets.US_ASCII), "text/plain", metadata).toUint8Array();
+        assertArrayEquals(inscriptionScript, Arrays.copyOf(signed.outputs.get(0).lockingScript.toUint8Array(),
                 inscriptionScript.length));
-        assertEquals(Coin.SATOSHI, signed.getOutput(0).getValue());
+        assertEquals(BsvAmount.SATOSHI, signedBsvAmount.fromSdkValue(.outputs.get(0).satoshis));
         assertSpendable(signed);
     }
 
@@ -278,10 +277,10 @@ class RemoteOrdTransactionTemplateContractTest {
             RemoteOrdTransactionBuilder builder = new RemoteOrdTransactionTemplate(false, false)
                     .prepareSendOrdinal(remoteBap, ordinalUtxo(), paymentUtxo(), destination,
                             paymentAddress, 500, attempt, null, RemoteSignType.CURRENT);
-            assertEquals(2, builder.build().getInputs().size());
-            assertEquals(Coin.SATOSHI, builder.build().getOutput(0).getValue());
-            assertArrayEquals(ScriptBuilder.createOutputScript(destination).getProgram(),
-                    builder.build().getOutput(0).getScriptBytes());
+            assertEquals(2, builder.build().inputs.size());
+            assertEquals(BsvAmount.SATOSHI, builder.build()BsvAmount.fromSdkValue(.outputs.get(0).satoshis));
+            assertArrayEquals(ScriptBuilder.createOutputScript(destination).toUint8Array(),
+                    builder.build().outputs.get(0).lockingScript.toUint8Array());
         }
     }
 
@@ -303,11 +302,11 @@ class RemoteOrdTransactionTemplateContractTest {
                 provider, destination, paymentAddress, 500, remoteBap,
                 new RemoteTransactionSigner(), RemoteSignType.CURRENT);
 
-        assertEquals(1, tx.getInputs().size());
-        assertEquals(3, tx.getOutputs().size());
-        assertEquals(Coin.SATOSHI, tx.getOutput(0).getValue());
-        assertEquals(0, tx.getInput(0).getScriptBytes().length);
-        assertTrue(tx.getInputSum().getValue() > tx.getOutputSum().getValue());
+        assertEquals(1, tx.inputs.size());
+        assertEquals(3, tx.outputs.size());
+        assertEquals(BsvAmount.SATOSHI, txBsvAmount.fromSdkValue(.outputs.get(0).satoshis));
+        assertEquals(0, tx.getInput(0).lockingScript.toUint8Array().length);
+        assertTrue(tx.getInputSum().satoshis > tx.getOutputSum().satoshis);
     }
 
     @Test
@@ -322,8 +321,8 @@ class RemoteOrdTransactionTemplateContractTest {
                 remoteBap, RemoteSignType.CURRENT);
 
         assertArrayEquals(OrdScriptBuilder.buildInscription(destination,
-                        "post".getBytes(StandardCharsets.US_ASCII), "text/plain", metadata).getProgram(),
-                tx.getOutput(0).getScriptBytes());
+                        "post".getBytes(StandardCharsets.US_ASCII), "text/plain", metadata).toUint8Array(),
+                tx.outputs.get(0).lockingScript.toUint8Array());
     }
 
     @Test
@@ -332,12 +331,12 @@ class RemoteOrdTransactionTemplateContractTest {
         Transaction tx = new RemoteOrdTransactionTemplate(false, false).sendUtxos(
                 bap, List.of(paymentUtxo()), paymentAddress, 500, keyBag);
 
-        assertEquals(1, tx.getInputs().size());
-        assertEquals(1, tx.getOutputs().size());
-        assertTrue(tx.getInputSum().getValue() > tx.getOutputSum().getValue());
+        assertEquals(1, tx.inputs.size());
+        assertEquals(1, tx.outputs.size());
+        assertTrue(tx.getInputSum().satoshis > tx.getOutputSum().satoshis);
         ScriptUtils_legacy.correctlySpends(tx.getInput(0).getScriptSig(), tx, 0,
                 tx.getInput(0).getConnectedOutput().getScriptPubKey(),
-                tx.getInput(0).getConnectedOutput().getValue(), ScriptVerifyFlag.GENESIS_SET);
+                tx.getInput(0).getConnectedOutput().satoshis, ScriptVerifyFlag.GENESIS_SET);
     }
 
     @Test
@@ -369,10 +368,10 @@ class RemoteOrdTransactionTemplateContractTest {
                 paymentAddress, 500, content, null, remoteBap,
                 RemoteSignType.CURRENT).build();
 
-        assertTrue(signed.getInput(0).getScriptBytes().length > 0);
+        assertTrue(signed.getInput(0).lockingScript.toUint8Array().length > 0);
         ScriptUtils_legacy.correctlySpends(signed.getInput(0).getScriptSig(), signed, 0,
                 signed.getInput(0).getConnectedOutput().getScriptPubKey(),
-                signed.getInput(0).getConnectedOutput().getValue(), ScriptVerifyFlag.GENESIS_SET);
+                signed.getInput(0).getConnectedOutput().satoshis, ScriptVerifyFlag.GENESIS_SET);
     }
 
     private void signRemoteInputs(List<PreSignHashContext> pending) {
@@ -386,28 +385,27 @@ class RemoteOrdTransactionTemplateContractTest {
     }
 
     private void assertSpendable(Transaction signed) {
-        for (int i = 0; i < signed.getInputs().size(); i++) {
-            assertTrue(signed.getInput(i).getScriptBytes().length > 0);
+        for (int i = 0; i < signed.inputs.size(); i++) {
+            assertTrue(signed.getInput(i).lockingScript.toUint8Array().length > 0);
             ScriptUtils_legacy.correctlySpends(signed.getInput(i).getScriptSig(), signed, i,
                     signed.getInput(i).getConnectedOutput().getScriptPubKey(),
-                    signed.getInput(i).getConnectedOutput().getValue(),
+                    signed.getInput(i).getConnectedOutput().satoshis,
                     ScriptVerifyFlag.GENESIS_SET);
         }
     }
 
-    private UTXO paymentUtxo() {
+    private BsvUtxo paymentUtxo() {
         byte[] hash = new byte[32];
         hash[0] = 2;
-        return new UTXO(Sha256Hash.wrap(hash), 0, Coin.valueOf(20_000),
-                0, false, null, paymentAddress.toBase58());
+        return new BsvUtxo(BsvHashBytes.of(hash), 0, 20_000L, 0, false, paymentAddress.toBase58(), null);
     }
 
-    private UTXO ordinalUtxo() {
+    private BsvUtxo ordinalUtxo() {
         byte[] hash = new byte[32];
         hash[0] = 3;
         Script prior = OrdScriptBuilder.buildInscription(destination,
                 "prior".getBytes(StandardCharsets.US_ASCII), "text/plain", null);
-        return new UTXO(Sha256Hash.wrap(hash), 0, Coin.SATOSHI, 0, false, prior);
+        return new UTXO(Sha256Hash.wrap(hash), 0, BsvAmount.SATOSHI, 0, false, prior);
     }
 
     private OrdScriptBuilder.Inscription inscription(String value) {
