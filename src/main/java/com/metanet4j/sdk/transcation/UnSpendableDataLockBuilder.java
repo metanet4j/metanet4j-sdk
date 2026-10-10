@@ -15,10 +15,8 @@ import com.metanet4j.sdk.remote.PreSignHashUtils;
 import com.metanet4j.sdk.remote.RemoteSignType;
 import com.metanet4j.sdk.utils.UtilsExtend;
 import com.metanet4j.base.bsv.BsvHashBytes;
+import com.metanet4j.bsv.script.OP;
 import com.metanet4j.bsv.script.Script;
-import io.bitcoinsv.bitcoinjsv.script.ScriptBuilder;
-import io.bitcoinsv.bitcoinjsv.script.ScriptChunk;
-import io.bitcoinsv.bitcoinjsv.script.ScriptOpCodes;
 import org.spongycastle.util.encoders.Base64;
 
 import java.io.ByteArrayOutputStream;
@@ -64,14 +62,22 @@ public abstract class UnSpendableDataLockBuilder<T extends UnSpendableDataLockBu
 
     @Override
     public Script getLockingScript() {
-        ScriptBuilder builder = new ScriptBuilder();
-        builder.addChunk(new ScriptChunk(ScriptOpCodes.OP_FALSE, null));
-        builder.op(ScriptOpCodes.OP_RETURN);
+        Script builder = new Script();
+        builder.writeOpCode(OP.OP_0).writeOpCode(OP.OP_RETURN);
         for (ByteBuffer buffer : dataList) {
-            builder.data(buffer.array());
+            builder.writeBin(toBoxed(buffer.array()));
         }
-        return Script.fromBinary(builder.build().getProgram());
+        return builder;
 
+    }
+
+    /** 字节数组转为新 SDK 脚本推送所需的字节列表。 */
+    private static List<Integer> toBoxed(byte[] data) {
+        List<Integer> out = new java.util.ArrayList<>(data.length);
+        for (byte b : data) {
+            out.add(b & 0xFF);
+        }
+        return out;
     }
 
     private T addSig() {

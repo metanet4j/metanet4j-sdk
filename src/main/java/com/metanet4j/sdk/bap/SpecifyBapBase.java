@@ -5,10 +5,6 @@ import com.metanet4j.sdk.PrivateKey;
 import cn.hutool.core.util.HexUtil;
 import com.metanet4j.sdk.PublicKey;
 import com.metanet4j.sdk.address.AddressEnhance;
-import io.bitcoinsv.bitcoinjsv.core.ECKey;
-import io.bitcoinsv.bitcoinjsv.core.Utils;
-import io.bitcoinsv.bitcoinjsv.temp.KeyBag;
-import io.bitcoinsv.bitcoinjsv.temp.RedeemData;
 
 import org.jspecify.annotations.Nullable;
 
