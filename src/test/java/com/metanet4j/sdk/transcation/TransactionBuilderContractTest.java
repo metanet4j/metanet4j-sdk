@@ -188,8 +188,8 @@ class TransactionBuilderContractTest {
         assertEquals(BsvAmount.valueOf(20_000), inputSum(builder.getTargetTransaction()));
         assertEquals(BsvAmount.ZERO, BsvAmount.fromSdkValue(builder.getTargetTransaction().outputs.get(0).satoshis));
         for (int i = 0; i < payload.size(); i++) {
-            assertArrayEquals(payload.get(i), builder.getTargetTransaction().outputs.get(0)
-                    .getScriptPubKey().getChunks().get(i + 2).writeBin(toBoxed()));
+            assertArrayEquals(payload.get(i), com.metanet4j.sdk.utils.ScriptHelper.getPushData(
+                    builder.getTargetTransaction().outputs.get(0).lockingScript.getChunks().get(i + 2)));
         }
     }
 
