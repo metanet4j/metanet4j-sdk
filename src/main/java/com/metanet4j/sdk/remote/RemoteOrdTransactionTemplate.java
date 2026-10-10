@@ -11,14 +11,11 @@ import com.metanet4j.sdk.ordinals.OrdTransactionBuilder;
 import com.metanet4j.sdk.signers.OrdinalsTransactionSigner;
 import com.metanet4j.sdk.transcation.BapDataLockBuilder;
 import com.metanet4j.sdk.utxo.UTXOProvider;
-import io.bitcoinsv.bitcoinjsv.core.Address;
-import io.bitcoinsv.bitcoinjsv.core.AddressLite;
-import io.bitcoinsv.bitcoinjsv.core.Coin;
-import io.bitcoinsv.bitcoinjsv.core.UTXO;
-import io.bitcoinsv.bitcoinjsv.msg.protocol.Transaction;
-import io.bitcoinsv.bitcoinjsv.script.SigHash;
-import io.bitcoinsv.bitcoinjsv.signers.TransactionSigner;
-import io.bitcoinsv.bitcoinjsv.temp.KeyBag;
+import com.metanet4j.sdk.address.AddressEnhance;
+import com.metanet4j.base.bsv.BsvAmount;
+import com.metanet4j.base.bsv.BsvUtxo;
+import com.metanet4j.bsv.transaction.Transaction;
+import com.metanet4j.sdk.bap.SigningKeyProvider;
 import lombok.extern.slf4j.Slf4j;
 
 import java.nio.charset.StandardCharsets;
@@ -41,10 +38,10 @@ public class RemoteOrdTransactionTemplate {
 
 
     public RemoteOrdTransactionBuilder createOrdinal(
-            List<AddressLite> payAddressLiteList,
-            UTXOProvider utxoProvider,
-            Address destinationAddress,
-            Address changeAddress,
+            List<AddressEnhance> payAddressEnhanceList,
+            UTXOProvider<AddressEnhance, BsvUtxo> utxoProvider,
+            AddressEnhance destinationAddress,
+            AddressEnhance changeAddress,
             long feePerKb,
             OrdScriptBuilder.Inscription inscription,
             OrdScriptBuilder.ORDMap metaData,
@@ -53,15 +50,15 @@ public class RemoteOrdTransactionTemplate {
 
     ) {
 
-        return createOrdinal(payAddressLiteList, utxoProvider, destinationAddress, changeAddress, feePerKb, inscription, metaData, remoteBapBase, new RemoteTransactionSigner(), remoteSignType);
+        return createOrdinal(payAddressEnhanceList, utxoProvider, destinationAddress, changeAddress, feePerKb, inscription, metaData, remoteBapBase, new RemoteTransactionSigner(), remoteSignType);
     }
 
 
     public RemoteOrdTransactionBuilder createOrdinal(
-            List<AddressLite> payAddressLiteList,
-            UTXOProvider utxoProvider,
-            Address destinationAddress,
-            Address changeAddress,
+            List<AddressEnhance> payAddressEnhanceList,
+            UTXOProvider<AddressEnhance, BsvUtxo> utxoProvider,
+            AddressEnhance destinationAddress,
+            AddressEnhance changeAddress,
             long feePerKb,
             OrdScriptBuilder.Inscription inscription,
             OrdScriptBuilder.ORDMap metaData,
@@ -74,7 +71,7 @@ public class RemoteOrdTransactionTemplate {
 
         RemoteOrdTransactionBuilder transactionBuilder = new RemoteOrdTransactionBuilder(bapBase, transactionSigner);
         transactionBuilder
-                .addInputs(utxoProvider.listUxtos(payAddressLiteList));
+                .addInputs(utxoProvider.listUxtos(payAddressEnhanceList));
         transactionBuilder.addOrdOutput(destinationAddress, Base64.decode(inscription.getDataB64()), inscription.getContentType(), metaData, RemoteSignType.CURRENT);
 
 
@@ -86,10 +83,10 @@ public class RemoteOrdTransactionTemplate {
 
     public Transaction sendOrdinal(
             RemoteBapBase bapBase,
-            UTXO ordinalUtxo,
-            UTXO paymentUtxo,
-            Address destinationAddress,
-            Address changeAddress,
+            BsvUtxo ordinalUtxo,
+            BsvUtxo paymentUtxo,
+            AddressEnhance destinationAddress,
+            AddressEnhance changeAddress,
             long feePerKb,
             OrdScriptBuilder.Inscription reInscription,
             OrdScriptBuilder.ORDMap metaData,
@@ -101,10 +98,10 @@ public class RemoteOrdTransactionTemplate {
 
     public RemoteOrdTransactionBuilder prepareSendOrdinal(
             RemoteBapBase bapBase,
-            UTXO ordinalUtxo,
-            UTXO paymentUtxo,
-            Address destinationAddress,
-            Address changeAddress,
+            BsvUtxo ordinalUtxo,
+            BsvUtxo paymentUtxo,
+            AddressEnhance destinationAddress,
+            AddressEnhance changeAddress,
             long feePerKb,
             OrdScriptBuilder.Inscription reInscription,
             OrdScriptBuilder.ORDMap metaData,
@@ -116,10 +113,10 @@ public class RemoteOrdTransactionTemplate {
 
     public RemoteOrdTransactionBuilder prepareSendOrdinal(
             RemoteBapBase bapBase,
-            UTXO ordinalUtxo,
-            UTXO paymentUtxo,
-            Address destinationAddress,
-            Address changeAddress,
+            BsvUtxo ordinalUtxo,
+            BsvUtxo paymentUtxo,
+            AddressEnhance destinationAddress,
+            AddressEnhance changeAddress,
             long feePerKb,
             OrdScriptBuilder.Inscription reInscription,
             OrdScriptBuilder.ORDMap metaData,
@@ -135,7 +132,7 @@ public class RemoteOrdTransactionTemplate {
         if (reInscription != null && StrUtil.isNotEmpty(reInscription.getDataB64()) && StrUtil.isNotEmpty(reInscription.getContentType())) {
             transactionBuilder.addOrdOutput(destinationAddress, Base64.decode(reInscription.getDataB64()), reInscription.getContentType(), metaData);
         } else {
-            transactionBuilder.addOutput(Coin.SATOSHI, destinationAddress);
+            transactionBuilder.addOutput(BsvAmount.SATOSHI, destinationAddress);
         }
 
         return postTxBuild(changeAddress, feePerKb, bapBase, remoteSignType, this.doBsmSign, this.doInputSign, transactionBuilder);
@@ -144,33 +141,33 @@ public class RemoteOrdTransactionTemplate {
 
     public Transaction sendOrdinal(
             BapBaseCore bapBase,
-            UTXO ordinalUtxo,
-            UTXO paymentUtxo,
-            Address destinationAddress,
-            Address changeAddress,
+            BsvUtxo ordinalUtxo,
+            BsvUtxo paymentUtxo,
+            AddressEnhance destinationAddress,
+            AddressEnhance changeAddress,
             long feePerKb,
             OrdScriptBuilder.Inscription reInscription,
             OrdScriptBuilder.ORDMap metaData,
-            KeyBag keyBag) {
-        return sendOrdinal(bapBase, ordinalUtxo, paymentUtxo, destinationAddress, changeAddress, feePerKb, reInscription, metaData, keyBag, new OrdinalsTransactionSigner(), null);
+            SigningKeyProvider keyProvider) {
+        return sendOrdinal(bapBase, ordinalUtxo, paymentUtxo, destinationAddress, changeAddress, feePerKb, reInscription, metaData, keyProvider, null);
 
     }
 
     public Transaction sendOrdinal(
             BapBaseCore bapBase,
-            UTXO ordinalUtxo,
-            UTXO paymentUtxo,
-            Address destinationAddress,
-            Address changeAddress,
+            BsvUtxo ordinalUtxo,
+            BsvUtxo paymentUtxo,
+            AddressEnhance destinationAddress,
+            AddressEnhance changeAddress,
             long feePerKb,
             OrdScriptBuilder.Inscription reInscription,
             OrdScriptBuilder.ORDMap metaData,
-            KeyBag keyBag,
-            TransactionSigner transactionSigner,
+            SigningKeyProvider keyProvider,
+            RemoteTransactionSigner transactionSigner,
             RemoteSignType remoteSignType) {
         preTxBuild(transactionSigner, remoteSignType);
 
-        OrdTransactionBuilder transactionBuilder = new OrdTransactionBuilder(bapBase, keyBag, transactionSigner);
+        OrdTransactionBuilder transactionBuilder = new OrdTransactionBuilder(bapBase, keyProvider);
         transactionBuilder
                 .addOrdInput(ordinalUtxo);
         transactionBuilder.addInput(paymentUtxo);
@@ -178,28 +175,28 @@ public class RemoteOrdTransactionTemplate {
         if (reInscription != null && StrUtil.isNotEmpty(reInscription.getDataB64()) && StrUtil.isNotEmpty(reInscription.getContentType())) {
             transactionBuilder.addOrdOutput(destinationAddress, Base64.decode(reInscription.getDataB64()), reInscription.getContentType(), metaData);
         } else {
-            transactionBuilder.addOutput(Coin.SATOSHI, destinationAddress);
+            transactionBuilder.addOutput(BsvAmount.SATOSHI, destinationAddress);
         }
-        transactionBuilder.withFeeKb(Coin.valueOf(feePerKb))
+        transactionBuilder.withFeeKb(BsvAmount.valueOf(feePerKb))
                 .changeAddress(changeAddress);
 
-        transactionBuilder.signTx(keyBag, SigHash.Flags.SINGLE, true, true);
+        transactionBuilder.signTx(keyProvider, com.metanet4j.bsv.primitives.TransactionSignature.SIGHASH_SINGLE, true, true);
         return transactionBuilder.build();
     }
 
     @Deprecated
     public Transaction sendUtxos(
             BapBase bapBase,
-            List<UTXO> utxos,
-            Address destinationAddress,
+            List<BsvUtxo> utxos,
+            AddressEnhance destinationAddress,
             long feePerByte,
-            KeyBag keyBag) throws Exception {
-        OrdTransactionBuilder transactionBuilder = new OrdTransactionBuilder(bapBase, keyBag, new OrdinalsTransactionSigner());
+            SigningKeyProvider keyProvider) throws Exception {
+        OrdTransactionBuilder transactionBuilder = new OrdTransactionBuilder(bapBase, keyProvider);
         transactionBuilder.addInputs(utxos);
-        transactionBuilder.withFeeKb(Coin.valueOf(feePerByte));
+        transactionBuilder.withFeeKb(BsvAmount.valueOf(feePerByte));
         transactionBuilder.changeAddress(destinationAddress);
 
-        transactionBuilder.signTx(keyBag, SigHash.Flags.ALL, true, true);
+        transactionBuilder.signTx(keyProvider, com.metanet4j.bsv.primitives.TransactionSignature.SIGHASH_ALL, true, true);
         return transactionBuilder.build();
     }
 
@@ -208,7 +205,7 @@ public class RemoteOrdTransactionTemplate {
      * bap + 1sat ordinal
      * content-type:application/bap
      *
-     * @param payAddressLiteList
+     * @param payAddressEnhanceList
      * @param utxoProvider
      * @param destinationAddress
      * @param changeAddress
@@ -216,10 +213,10 @@ public class RemoteOrdTransactionTemplate {
      * @param bapBase
      * @return
      */
-    public Transaction createBapOrdinal(List<AddressLite> payAddressLiteList,
-                                        UTXOProvider utxoProvider,
-                                        Address destinationAddress,
-                                        Address changeAddress,
+    public Transaction createBapOrdinal(List<AddressEnhance> payAddressEnhanceList,
+                                        UTXOProvider<AddressEnhance, BsvUtxo> utxoProvider,
+                                        AddressEnhance destinationAddress,
+                                        AddressEnhance changeAddress,
                                         long feePerKb,
                                         RemoteBapBase bapBase,
                                         RemoteTransactionSigner transactionSigner,
@@ -227,7 +224,7 @@ public class RemoteOrdTransactionTemplate {
         preTxBuild(transactionSigner, remoteSignType);
         RemoteOrdTransactionBuilder transactionBuilder = new RemoteOrdTransactionBuilder(bapBase, transactionSigner);
         transactionBuilder
-                .addInputs(utxoProvider.listUxtos(payAddressLiteList));
+                .addInputs(utxoProvider.listUxtos(payAddressEnhanceList));
         //should first output
         transactionBuilder.addOrdOutput(destinationAddress, bapBase.getIdentityKey().getBytes(StandardCharsets.UTF_8), "application/bap", null);
         BapDataLockBuilder bapDataLockBuilder = new BapDataLockBuilder(bapBase, true, remoteSignType);
@@ -236,25 +233,25 @@ public class RemoteOrdTransactionTemplate {
                 this.doBsmSign, this.doInputSign, transactionBuilder).build();
     }
 
-    public Transaction createPostOrdinal(List<AddressLite> payAddressLiteList,
-                                         UTXOProvider utxoProvider,
-                                         Address destinationAddress,
-                                         Address changeAddress,
+    public Transaction createPostOrdinal(List<AddressEnhance> payAddressEnhanceList,
+                                         UTXOProvider<AddressEnhance, BsvUtxo> utxoProvider,
+                                         AddressEnhance destinationAddress,
+                                         AddressEnhance changeAddress,
                                          long feePerKb,
                                          OrdScriptBuilder.Inscription inscription,
                                          RemoteBapBase remoteBapBase,
                                          RemoteSignType remoteSignType) {
 
 
-        return createPostOrdinal(payAddressLiteList, utxoProvider, destinationAddress, changeAddress, feePerKb, inscription, remoteBapBase, new RemoteTransactionSigner(), remoteSignType);
+        return createPostOrdinal(payAddressEnhanceList, utxoProvider, destinationAddress, changeAddress, feePerKb, inscription, remoteBapBase, new RemoteTransactionSigner(), remoteSignType);
 
     }
 
 
-    public Transaction createPostOrdinal(List<AddressLite> payAddressLiteList,
-                                         UTXOProvider utxoProvider,
-                                         Address destinationAddress,
-                                         Address changeAddress,
+    public Transaction createPostOrdinal(List<AddressEnhance> payAddressEnhanceList,
+                                         UTXOProvider<AddressEnhance, BsvUtxo> utxoProvider,
+                                         AddressEnhance destinationAddress,
+                                         AddressEnhance changeAddress,
                                          long feePerKb,
                                          OrdScriptBuilder.Inscription inscription,
                                          RemoteBapBase bapBase,
@@ -264,21 +261,21 @@ public class RemoteOrdTransactionTemplate {
         OrdScriptBuilder.ORDMap ordMap = new OrdScriptBuilder.ORDMap();
         ordMap.put("app", bapBase.getAppName());
         ordMap.put("type", "post");
-        return createOrdinal(payAddressLiteList, utxoProvider, destinationAddress, changeAddress, feePerKb, inscription, ordMap, bapBase, transactionSigner, remoteSignType).build();
+        return createOrdinal(payAddressEnhanceList, utxoProvider, destinationAddress, changeAddress, feePerKb, inscription, ordMap, bapBase, transactionSigner, remoteSignType).build();
 
     }
 
-    private void preTxBuild(TransactionSigner transactionSigner, RemoteSignType remoteSignType) {
+    private void preTxBuild(RemoteTransactionSigner transactionSigner, RemoteSignType remoteSignType) {
         if (remoteSignType != null) {
             Assert.isInstanceOf(RemoteTransactionSigner.class, transactionSigner);
         }
     }
 
-    private RemoteOrdTransactionBuilder postTxBuild(Address changeAddress, long feePerKb, BapBaseCore bapBase, RemoteSignType remoteSignType, boolean doBsmSign, boolean doInputSign, RemoteOrdTransactionBuilder transactionBuilder) {
+    private RemoteOrdTransactionBuilder postTxBuild(AddressEnhance changeAddress, long feePerKb, BapBaseCore bapBase, RemoteSignType remoteSignType, boolean doBsmSign, boolean doInputSign, RemoteOrdTransactionBuilder transactionBuilder) {
         if (doBsmSign) {
             transactionBuilder.addSigmaSign(bapBase, remoteSignType);
         }
-        transactionBuilder.withFeeKb(Coin.valueOf(feePerKb))
+        transactionBuilder.withFeeKb(BsvAmount.valueOf(feePerKb))
                 .changeAddress(changeAddress);
 
         if (doBsmSign) {
