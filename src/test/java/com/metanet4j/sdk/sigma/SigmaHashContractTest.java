@@ -9,19 +9,19 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import cn.hutool.core.codec.Base64;
-import io.bitcoinsv.bitcoinjsv.core.Coin;
-import io.bitcoinsv.bitcoinjsv.core.Sha256Hash;
-import io.bitcoinsv.bitcoinjsv.msg.protocol.Transaction;
-import io.bitcoinsv.bitcoinjsv.msg.protocol.TransactionInput;
-import io.bitcoinsv.bitcoinjsv.params.Net;
-import io.bitcoinsv.bitcoinjsv.script.Script;
-import io.bitcoinsv.bitcoinjsv.script.ScriptBuilder;
-import io.bitcoinsv.bitcoinjsv.script.ScriptOpCodes;
+import com.metanet4j.base.bsv.BsvAmount;
+import com.metanet4j.base.bsv.BsvHashBytes;
+import com.metanet4j.bsv.transaction.Transaction;
+import com.metanet4j.bsv.transaction.TransactionInput;
+import com.metanet4j.bsv.transaction.TransactionOutput;
+import com.metanet4j.bsv.script.OP;
+import com.metanet4j.bsv.script.Script;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Arrays;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class SigmaHashContractTest {
@@ -30,13 +30,13 @@ class SigmaHashContractTest {
     void hashesOutpointAndUnsignedOutputScript() throws Exception {
         byte[] prevHash = new byte[32];
         prevHash[0] = 42;
-        Script script = new ScriptBuilder().data("payload".getBytes(StandardCharsets.US_ASCII)).build();
+        Script script = new Script().writeBin(toBoxed("payload".getBytes(StandardCharsets.US_ASCII)));
         Transaction tx = transaction(prevHash, 7, script);
         Sigma sigma = new Sigma(null, tx);
 
         byte[] expectedInput = sha256(ByteBuffer.allocate(36).order(ByteOrder.LITTLE_ENDIAN)
                 .put(prevHash).putInt(7).array());
-        byte[] expectedData = sha256(script.getProgram());
+        byte[] expectedData = sha256(script.toUint8Array());
         byte[] combined = ByteBuffer.allocate(64).put(expectedInput).put(expectedData).array();
         assertArrayEquals(expectedInput, sigma.getInputHash().getBytes());
         assertArrayEquals(expectedData, sigma.getDataHash().getBytes());
@@ -44,7 +44,7 @@ class SigmaHashContractTest {
         assertNull(sigma.getSig());
         assertEquals(0, sigma.getSigInstanceCount());
         assertEquals(-1, sigma.getSigInstancePosition());
-        assertSame(tx.getOutput(0), sigma.getTargetTxOut());
+        assertSame(tx.outputs.get(0), sigma.getTargetTxOut());
         assertSame(tx, sigma.getTransaction());
         assertThrows(IllegalArgumentException.class, sigma::verify);
 
@@ -71,16 +71,16 @@ class SigmaHashContractTest {
     void parsesSigmaPushesAndHashesOnlyPriorData() throws Exception {
         String address = "1cMh228HTCiwS8ZsaakH8A8wze1JR5ZsP";
         byte[] signature = {1, 2, 3};
-        Script before = new ScriptBuilder().data("payload".getBytes(StandardCharsets.US_ASCII)).build();
-        Script signed = new ScriptBuilder()
-                .data("payload".getBytes(StandardCharsets.US_ASCII))
-                .op(ScriptOpCodes.OP_RETURN)
-                .data("SIGMA".getBytes(StandardCharsets.US_ASCII))
-                .data("BSM".getBytes(StandardCharsets.US_ASCII))
-                .data(address.getBytes(StandardCharsets.US_ASCII))
-                .data(signature)
-                .data("0".getBytes(StandardCharsets.US_ASCII))
-                .build();
+        Script before = new Script().writeBin(toBoxed("payload".getBytes(StandardCharsets.US_ASCII)));
+        Script signed = new Script()
+                .writeBin(toBoxed("payload".getBytes(StandardCharsets.US_ASCII)))
+                .writeOpCode(OP.OP_RETURN)
+                .writeBin(toBoxed("SIGMA".getBytes(StandardCharsets.US_ASCII)))
+                .writeBin(toBoxed("BSM".getBytes(StandardCharsets.US_ASCII)))
+                .writeBin(toBoxed(address.getBytes(StandardCharsets.US_ASCII)))
+                .writeBin(toBoxed(signature))
+                .writeBin(toBoxed("0".getBytes(StandardCharsets.US_ASCII)))
+                ;
         Transaction tx = transaction(new byte[32], 0, signed);
         Sigma sigma = new Sigma(null, tx);
 
@@ -90,29 +90,40 @@ class SigmaHashContractTest {
         assertEquals(0, sigma.getSig().getVin());
         assertEquals(1, sigma.getSigInstanceCount());
         assertEquals(2, sigma.getSigInstancePosition());
-        assertArrayEquals(sha256(before.getProgram()), sigma.getDataHash().getBytes());
+        assertArrayEquals(sha256(before.toUint8Array()), sigma.getDataHash().getBytes());
         assertFalse(sigma.verify());
     }
 
     @Test
     void missingInputUsesTheDocumentedDummyHash() {
-        Transaction tx = new Transaction(Net.MAINNET);
-        tx.addOutput(Coin.valueOf(100), new ScriptBuilder()
-                .data("payload".getBytes(StandardCharsets.US_ASCII)).build());
+        Transaction tx = new Transaction();
+        tx.outputs.add(new TransactionOutput(
+                new Script().writeBin(toBoxed("payload".getBytes(StandardCharsets.US_ASCII))), 100d));
         Sigma sigma = new Sigma(null, tx);
-        assertEquals(Sha256Hash.of(new byte[32]), sigma.getInputHash());
+        assertEquals(BsvHashBytes.ZERO_HASH, sigma.getInputHash());
         sigma.setRefVin(-2);
-        assertEquals(Sha256Hash.of(new byte[32]), sigma.getInputHash());
+        assertEquals(BsvHashBytes.ZERO_HASH, sigma.getInputHash());
         sigma.setRefVin(0);
-        tx.setInputs(Arrays.asList((TransactionInput) null));
-        assertEquals(Sha256Hash.of(new byte[32]), sigma.getInputHash());
+        tx.inputs.add(null);
+        assertEquals(BsvHashBytes.ZERO_HASH, sigma.getInputHash());
     }
 
     private static Transaction transaction(byte[] prevHash, long index, Script outputScript) {
-        Transaction tx = new Transaction(Net.MAINNET);
-        tx.addInput(Sha256Hash.wrap(prevHash), index, new ScriptBuilder().build());
-        tx.addOutput(Coin.valueOf(100), outputScript);
+        Transaction tx = new Transaction();
+        TransactionInput input = new TransactionInput(new BsvHashBytes(prevHash).toString(),
+                (int) index, new Script());
+        input.sequence = 0xffff_ffffL;
+        tx.inputs.add(input);
+        tx.outputs.add(new TransactionOutput(outputScript, 100d));
         return tx;
+    }
+
+    private static List<Integer> toBoxed(byte[] data) {
+        List<Integer> out = new java.util.ArrayList<>(data.length);
+        for (byte b : data) {
+            out.add(b & 0xFF);
+        }
+        return out;
     }
 
     private static byte[] sha256(byte[] bytes) throws Exception {
