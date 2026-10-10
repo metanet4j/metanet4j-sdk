@@ -168,7 +168,16 @@ public class TransactionBuilder {
      * <p>口径由 {@code TransactionBuilderContractTest} 反向确认（见 migration-rules §12）。
      */
     protected long getUnLockScriptSize(TransactionInput transactionInput, Script script) {
-        return ScriptExtend.getNumberOfBytesRequiredToSpend(script, -1, null);
+        // 能取到私钥时按实际公钥长度计费；取不到时保守按 65 字节（由 ScriptExtend 处理 pubKeyLen<=0）
+        byte[] pubKeyHash = pubKeyHashOf(script);
+        int pubKeyLen = -1;
+        if (keyProvider != null && pubKeyHash.length > 0) {
+            com.metanet4j.sdk.PrivateKey key = keyProvider.findKeyFromPubHash(pubKeyHash);
+            if (key != null) {
+                pubKeyLen = key.getPubKey().length;
+            }
+        }
+        return ScriptExtend.getNumberOfBytesRequiredToSpend(script, pubKeyLen, null);
     }
 
     public BsvAmount getFee() {

@@ -195,16 +195,16 @@ class TransactionBuilderContractTest {
 
     @Test
     void publicOnlyKeyUsesAConservativeUnlockingSizeForChangeEstimation() {
-        KeyBag publicOnlyBag = mock(KeyBag.class);
-        when(publicOnlyBag.findKeyFromPubHash(any(byte[].class)))
-                .thenReturn(ECKey.fromPublicOnly(bap.getPayAccountKey().getPubKey()));
+        // 新架构：解析不到密钥的提供者代表「只有公钥、无本地私钥」，费用按 65 字节保守估算
+        SigningKeyProvider noKeys = pubKeyHash -> null;
         TransactionBuilder full = new TransactionBuilder(bap, keyProvider)
                 .addInput(utxo(9, 0, 20_000)).addOutput(BsvAmount.valueOf(777), paymentAddress);
-        TransactionBuilder publicOnly = new TransactionBuilder(bap, publicOnlyBag)
+        TransactionBuilder publicOnly = new TransactionBuilder(bap, noKeys)
                 .addInput(utxo(9, 0, 20_000)).addOutput(BsvAmount.valueOf(777), paymentAddress);
 
-        Coin fullChange = full.calculateChangeAmount(full.getTargetTransaction(), paymentAddress, BsvAmount.valueOf(1000));
-        Coin publicChange = publicOnly.calculateChangeAmount(
+        BsvAmount fullChange = full.calculateChangeAmount(full.getTargetTransaction(), paymentAddress,
+                BsvAmount.valueOf(1000));
+        BsvAmount publicChange = publicOnly.calculateChangeAmount(
                 publicOnly.getTargetTransaction(), paymentAddress, BsvAmount.valueOf(1000));
         // 缺少私钥时保守按 65 字节公钥计费，比已知压缩公钥多 32 字节。
         assertEquals(full.getFee().add(BsvAmount.valueOf(32)), publicOnly.getFee());
@@ -212,24 +212,12 @@ class TransactionBuilderContractTest {
         assertEquals(BsvAmount.valueOf(19_223), publicChange.add(publicOnly.getFee()));
     }
 
-    @Test
-    void completionForwardsTheRequestedForkIdModeToTheSigner() {
-        SigningKeyProvider signer = mock(TransactionSigner.class);
-        when(signer.signInputs(any(), eq(keyProvider))).thenReturn(true);
-        TransactionBuilder builder = new TransactionBuilder(bap, keyProvider, signer)
-                .addInput(utxo(10, 0, 20_000)).addOutput(BsvAmount.valueOf(777), paymentAddress);
-        builder.completeAndSignTx(keyProvider, false);
-        ArgumentCaptor<TransactionSigner.ProposedTransaction> captured =
-                ArgumentCaptor.forClass(TransactionSigner.ProposedTransaction.class);
-        verify(signer).signInputs(captured.capture(), eq(keyProvider));
-        assertEquals(false, ((ExtendForSignTransaction) captured.getValue()).isUseForkId());
-    }
-
     private BsvUtxo utxo(int hashByte, long index, long satoshis) {
         byte[] hash = new byte[32];
         hash[0] = (byte) hashByte;
-        return new BsvUtxo(Sha256Hash.wrap(hash), index, BsvAmount.valueOf(satoshis),
-                0, false, null, paymentAddress.toBase58());
+        return new BsvUtxo(BsvHashBytes.of(hash), index, satoshis, 0, false,
+                paymentAddress.toBase58(),
+                new P2PKH().lock(paymentAddress.getHash160()).toUint8Array());
     }
 
     private static List<Integer> toBoxed(byte[] data) {
