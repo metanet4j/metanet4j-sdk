@@ -20,7 +20,6 @@ import com.metanet4j.sdk.context.PreSignHashContext;
 import com.metanet4j.sdk.exception.SignErrorException;
 import com.metanet4j.sdk.ordinals.OrdScriptBuilder;
 import com.metanet4j.sdk.signers.ExtendForSignTransaction;
-import com.metanet4j.sdk.signers.TransactionExtend;
 import com.metanet4j.sdk.transcation.LockingScriptBuilder;
 import io.bitcoinsv.bitcoinjsv.core.Address;
 import io.bitcoinsv.bitcoinjsv.core.Coin;
