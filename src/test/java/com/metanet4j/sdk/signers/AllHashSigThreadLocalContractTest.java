@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.metanet4j.sdk.context.PreSignHashContext;
-import io.bitcoinsv.bitcoinjsv.core.Sha256Hash;
+import com.metanet4j.base.bsv.BsvHashBytes;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
@@ -16,8 +16,8 @@ class AllHashSigThreadLocalContractTest {
     @Test
     void findsMatchingSigningContextAndRejectsUnknownHash() {
         AllHashSigThreadLocal store = new AllHashSigThreadLocal();
-        Sha256Hash firstHash = Sha256Hash.of(new byte[] {1});
-        Sha256Hash secondHash = Sha256Hash.of(new byte[] {2});
+        BsvHashBytes firstHash = BsvHashBytes.of(new byte[] {1});
+        BsvHashBytes secondHash = BsvHashBytes.of(new byte[] {2});
         PreSignHashContext first = new PreSignHashContext();
         first.setPreSignHash(firstHash);
         PreSignHashContext second = new PreSignHashContext();
@@ -29,7 +29,7 @@ class AllHashSigThreadLocalContractTest {
         assertSame(second, store.getSignedHashContext(secondHash));
         assertSame(first, store.getSignedHashContext(firstHash));
         RuntimeException missing = assertThrows(RuntimeException.class,
-                () -> store.getSignedHashContext(Sha256Hash.of(new byte[] {3})));
+                () -> store.getSignedHashContext(BsvHashBytes.of(new byte[] {3})));
         assertTrue(missing.getMessage().contains("get preSignHashContext is null"));
         store.remove();
     }
@@ -37,7 +37,7 @@ class AllHashSigThreadLocalContractTest {
     @Test
     void keepsSigningContextsSeparateAcrossThreads() throws InterruptedException {
         AllHashSigThreadLocal store = new AllHashSigThreadLocal();
-        Sha256Hash hash = Sha256Hash.of(new byte[] {4});
+        BsvHashBytes hash = BsvHashBytes.of(new byte[] {4});
         PreSignHashContext context = new PreSignHashContext();
         context.setPreSignHash(hash);
         store.get().add(context);
