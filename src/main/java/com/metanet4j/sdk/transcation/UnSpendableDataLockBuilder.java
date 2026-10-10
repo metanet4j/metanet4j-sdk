@@ -14,7 +14,7 @@ import com.metanet4j.sdk.context.PreSignHashContext;
 import com.metanet4j.sdk.remote.PreSignHashUtils;
 import com.metanet4j.sdk.remote.RemoteSignType;
 import com.metanet4j.sdk.utils.UtilsExtend;
-import io.bitcoinsv.bitcoinjsv.core.Sha256Hash;
+import com.metanet4j.base.bsv.BsvHashBytes;
 import io.bitcoinsv.bitcoinjsv.script.Script;
 import io.bitcoinsv.bitcoinjsv.script.ScriptBuilder;
 import io.bitcoinsv.bitcoinjsv.script.ScriptChunk;
@@ -83,7 +83,7 @@ public abstract class UnSpendableDataLockBuilder<T extends UnSpendableDataLockBu
         outputStream.writeBytes(HexUtil.decodeHex("7c"));
 
         byte[] data = UtilsExtend.formatMessageForSigning(outputStream.toByteArray());
-        Sha256Hash hash = Sha256Hash.twiceOf(data);
+        BsvHashBytes hash = BsvHashBytes.twiceOf(data);
         PreSignHashContext unspendableDataSig = getSig(hash);
         Assert.isTrue(this.bapBase.getSignAddress(this.remoteSignType).equals(unspendableDataSig.getSignAddress()),
                 "remote signature address does not match the requested BAP address");
@@ -165,7 +165,7 @@ public abstract class UnSpendableDataLockBuilder<T extends UnSpendableDataLockBu
         outputStream.writeBytes(HexUtil.decodeHex("7c"));
 
         byte[] data = UtilsExtend.formatMessageForSigning(outputStream.toByteArray());
-        Sha256Hash hash = Sha256Hash.twiceOf(data);
+        BsvHashBytes hash = BsvHashBytes.twiceOf(data);
 
         PreSignHashContext preSignHashContext = new PreSignHashContext();
         preSignHashContext.setPreSignHash(hash);
@@ -218,7 +218,7 @@ public abstract class UnSpendableDataLockBuilder<T extends UnSpendableDataLockBu
      * @param hash
      * @return
      */
-    public PreSignHashContext getSig(Sha256Hash hash) {
+    public PreSignHashContext getSig(BsvHashBytes hash) {
         return PreSignHashUtils.getSignedHashContext(hash);
     }
 
