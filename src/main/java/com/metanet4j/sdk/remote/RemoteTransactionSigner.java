@@ -73,8 +73,14 @@ public class RemoteTransactionSigner {
             txIn.unlockingScriptTemplate = new P2PKH().unlock(key.getKey(), "all", anyoneCanPay,
                     satoshisOf(sourceOutput));
             // toChecksigFormat 是子类 TransactionSignature 的能力：签名器产出即该类型
-            List<Integer> checksig = signature instanceof com.metanet4j.bsv.primitives.TransactionSignature ts
-                    ? ts.toChecksigFormat() : signature.toDER();
+            List<Integer> checksig = new java.util.ArrayList<>();
+            if (signature instanceof com.metanet4j.bsv.primitives.TransactionSignature ts) {
+                checksig.addAll(ts.toChecksigFormat());
+            } else {
+                for (Double b : signature.toDER()) {
+                    checksig.add(b.intValue());
+                }
+            }
             txIn.unlockingScript = new Script().writeBin(checksig)
                     .writeBin(toBoxed(key.getPubKey()));
         }

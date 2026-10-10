@@ -70,7 +70,7 @@ public abstract class UnSpendableDataLockBuilder<T extends UnSpendableDataLockBu
         for (ByteBuffer buffer : dataList) {
             builder.data(buffer.array());
         }
-        return builder.build();
+        return Script.fromBinary(builder.build().getProgram());
 
     }
 

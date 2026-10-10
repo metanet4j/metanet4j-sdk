@@ -69,7 +69,9 @@ public class RemoteOrdTransactionTemplate {
     ) {
         preTxBuild(transactionSigner, remoteSignType);
 
-        RemoteOrdTransactionBuilder transactionBuilder = new RemoteOrdTransactionBuilder(bapBase, transactionSigner);
+        // 远程流程不本地签名，密钥由 RemoteTransactionSigner 回填
+        RemoteOrdTransactionBuilder transactionBuilder = new RemoteOrdTransactionBuilder(bapBase,
+                resolveKeyProvider(transactionSigner, bapBase));
         transactionBuilder
                 .addInputs(utxoProvider.listUxtos(payAddressEnhanceList));
         transactionBuilder.addOrdOutput(destinationAddress, Base64.decode(inscription.getDataB64()), inscription.getContentType(), metaData, RemoteSignType.CURRENT);
@@ -125,7 +127,9 @@ public class RemoteOrdTransactionTemplate {
     ) {
         preTxBuild(transactionSigner, remoteSignType);
 
-        RemoteOrdTransactionBuilder transactionBuilder = new RemoteOrdTransactionBuilder(bapBase, transactionSigner);
+        // 远程流程不本地签名，密钥由 RemoteTransactionSigner 回填
+        RemoteOrdTransactionBuilder transactionBuilder = new RemoteOrdTransactionBuilder(bapBase,
+                resolveKeyProvider(transactionSigner, bapBase));
         transactionBuilder.addOrdInput(ordinalUtxo);
         transactionBuilder.addInput(paymentUtxo);
 
@@ -149,7 +153,7 @@ public class RemoteOrdTransactionTemplate {
             OrdScriptBuilder.Inscription reInscription,
             OrdScriptBuilder.ORDMap metaData,
             SigningKeyProvider keyProvider) {
-        return sendOrdinal(bapBase, ordinalUtxo, paymentUtxo, destinationAddress, changeAddress, feePerKb, reInscription, metaData, keyProvider, null);
+        return sendOrdinal(bapBase, ordinalUtxo, paymentUtxo, destinationAddress, changeAddress, feePerKb, reInscription, metaData, keyProvider, null, null);
 
     }
 
@@ -222,7 +226,9 @@ public class RemoteOrdTransactionTemplate {
                                         RemoteTransactionSigner transactionSigner,
                                         RemoteSignType remoteSignType) {
         preTxBuild(transactionSigner, remoteSignType);
-        RemoteOrdTransactionBuilder transactionBuilder = new RemoteOrdTransactionBuilder(bapBase, transactionSigner);
+        // 远程流程不本地签名，密钥由 RemoteTransactionSigner 回填
+        RemoteOrdTransactionBuilder transactionBuilder = new RemoteOrdTransactionBuilder(bapBase,
+                resolveKeyProvider(transactionSigner, bapBase));
         transactionBuilder
                 .addInputs(utxoProvider.listUxtos(payAddressEnhanceList));
         //should first output
@@ -263,6 +269,12 @@ public class RemoteOrdTransactionTemplate {
         ordMap.put("type", "post");
         return createOrdinal(payAddressEnhanceList, utxoProvider, destinationAddress, changeAddress, feePerKb, inscription, ordMap, bapBase, transactionSigner, remoteSignType).build();
 
+    }
+
+    /** 远程流程的密钥提供者：本地无密钥时返回 {@code null}（由 RemoteTransactionSigner 回填签名）。 */
+    private SigningKeyProvider resolveKeyProvider(RemoteTransactionSigner transactionSigner,
+                                                  BapBaseCore bapBase) {
+        return bapBase instanceof SigningKeyProvider provider ? provider : null;
     }
 
     private void preTxBuild(RemoteTransactionSigner transactionSigner, RemoteSignType remoteSignType) {
