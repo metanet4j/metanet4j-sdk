@@ -21,20 +21,14 @@ import com.metanet4j.sdk.exception.SignErrorException;
 import com.metanet4j.sdk.ordinals.OrdScriptBuilder;
 import com.metanet4j.sdk.signers.ExtendForSignTransaction;
 import com.metanet4j.sdk.transcation.LockingScriptBuilder;
-import io.bitcoinsv.bitcoinjsv.core.Address;
-import io.bitcoinsv.bitcoinjsv.core.Coin;
-import io.bitcoinsv.bitcoinjsv.core.ECKey;
-import io.bitcoinsv.bitcoinjsv.core.Sha256Hash;
-import io.bitcoinsv.bitcoinjsv.core.UTXO;
-import io.bitcoinsv.bitcoinjsv.msg.protocol.Transaction;
-import io.bitcoinsv.bitcoinjsv.params.Net;
-import io.bitcoinsv.bitcoinjsv.script.Script;
-import io.bitcoinsv.bitcoinjsv.script.ScriptBuilder;
-import io.bitcoinsv.bitcoinjsv.script.ScriptOpCodes;
+import com.metanet4j.sdk.address.AddressEnhance;
+import com.metanet4j.base.bsv.BsvAmount;
+import com.metanet4j.base.bsv.BsvUtxo;
+import com.metanet4j.bsv.transaction.Transaction;
+import com.metanet4j.bsv.script.Script;
+import com.metanet4j.sdk.PrivateKey;
 import io.bitcoinsv.bitcoinjsv.script.ScriptUtils_legacy;
 import io.bitcoinsv.bitcoinjsv.script.ScriptVerifyFlag;
-import io.bitcoinsv.bitcoinjsv.script.SigHash;
-import io.bitcoinsv.bitcoinjsv.signers.TransactionSigner;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -47,8 +41,8 @@ class RemoteTransactionContractTest {
     private final RemoteBapBase remoteBap = new RemoteBapBase(bap.getRootAddress(),
             bap.getPreviouAddress(), bap.getCurrentAddress(), bap.getPayAccountAddress(),
             bap.getOrdAddress(), bap.getAppName());
-    private final Address paymentAddress = new Address(bap.getPayAccountAddress());
-    private final ECKey paymentKey = ECKey.fromPrivate(bap.getPayAccountKey().getPrivKeyBytes());
+    private final AddressEnhance paymentAddress = new AddressEnhance(bap.getPayAccountAddress());
+    private final PrivateKey paymentKey = bap.getPayAccountKey();
 
     @AfterEach
     void clearSignedHashes() {
@@ -60,7 +54,7 @@ class RemoteTransactionContractTest {
         RemoteTransactionBuilder builder = new RemoteTransactionBuilder(remoteBap,
                 new RemoteTransactionSigner());
         builder.addInput(paymentUtxo(1))
-                .addOutput(Coin.valueOf(777), paymentAddress)
+                .addOutput(BsvAmount.valueOf(777), paymentAddress)
                 .changeAddress(paymentAddress);
 
         List<PreSignHashContext> requests = builder.getTxInputSignHash(false, remoteBap);
@@ -72,10 +66,10 @@ class RemoteTransactionContractTest {
         sign(request, paymentKey);
 
         Transaction signed = builder.completeAndSignTx(null, true);
-        assertTrue(signed.getInput(0).getScriptBytes().length > 0);
-        ScriptUtils_legacy.correctlySpends(signed.getInput(0).getScriptSig(), signed, 0,
-                signed.getInput(0).getConnectedOutput().getScriptPubKey(),
-                signed.getInput(0).getConnectedOutput().getValue(), ScriptVerifyFlag.GENESIS_SET);
+        assertTrue(signed.inputs.get(0).getScriptBytes().length > 0);
+        ScriptUtils_legacy.correctlySpends(signed.inputs.get(0).getScriptSig(), signed, 0,
+                signed.inputs.get(0).getConnectedOutput().getScriptPubKey(),
+                signed.inputs.get(0).getConnectedOutput().getValue(), ScriptVerifyFlag.GENESIS_SET);
     }
 
     @Test
@@ -86,9 +80,9 @@ class RemoteTransactionContractTest {
         Script inscription = OrdScriptBuilder.buildInscription(bap.getOrdAddress(),
                 "prior".getBytes(StandardCharsets.US_ASCII), "text/plain", null);
         Transaction funding = new Transaction(Net.MAINNET);
-        funding.addOutput(Coin.SATOSHI, inscription);
-        builder.addInput(funding.getOutput(0));
-        builder.addOutput(Coin.valueOf(777), paymentAddress);
+        funding.addOutput(BsvAmount.SATOSHI, inscription);
+        builder.addInput(funding.outputs.get(0));
+        builder.addOutput(BsvAmount.valueOf(777), paymentAddress);
 
         List<PreSignHashContext> requests = builder.getTxInputSignHash(false, remoteBap);
 
@@ -114,7 +108,7 @@ class RemoteTransactionContractTest {
         when(data.isHaveSign()).thenReturn(true);
         builder.addDataOutput(data);
         assertEquals(1, builder.getAllBsmSignHash(true, false, remoteBap).size());
-        assertArrayEquals(script.getProgram(), builder.getTargetTransaction().getOutput(0).getScriptBytes());
+        assertArrayEquals(script.toUint8Array(), builder.getTargetTransaction().outputs.get(0).getScriptBytes());
 
         byte[] hash = new byte[32];
         hash[0] = 3;
@@ -126,7 +120,7 @@ class RemoteTransactionContractTest {
     void signsTheRequestedSingleAnyoneCanPayHash() {
         RemoteTransactionBuilder builder = new RemoteTransactionBuilder(remoteBap,
                 new RemoteTransactionSigner());
-        builder.addInput(paymentUtxo(4)).addOutput(Coin.valueOf(777), paymentAddress);
+        builder.addInput(paymentUtxo(4)).addOutput(BsvAmount.valueOf(777), paymentAddress);
         PreSignHashContext request = builder.getTxInputSignHash(
                 SigHash.Flags.SINGLE, true, remoteBap).get(0);
         sign(request, paymentKey);
@@ -135,10 +129,10 @@ class RemoteTransactionContractTest {
                 SigHash.Flags.SINGLE, true, true);
 
         assertTrue(new RemoteTransactionSigner().signInputs(proposed, null));
-        ScriptUtils_legacy.correctlySpends(proposed.partialTx.getInput(0).getScriptSig(),
+        ScriptUtils_legacy.correctlySpends(proposed.partialTx.inputs.get(0).getScriptSig(),
                 proposed.partialTx, 0,
-                proposed.partialTx.getInput(0).getConnectedOutput().getScriptPubKey(),
-                proposed.partialTx.getInput(0).getConnectedOutput().getValue(),
+                proposed.partialTx.inputs.get(0).getConnectedOutput().getScriptPubKey(),
+                proposed.partialTx.inputs.get(0).getConnectedOutput().getValue(),
                 ScriptVerifyFlag.GENESIS_SET);
     }
 
@@ -175,9 +169,9 @@ class RemoteTransactionContractTest {
         builder.addOrdOutput(bap.getOrdAddress(), content, "text/plain", null,
                 RemoteSignType.CURRENT);
 
-        assertEquals(Coin.SATOSHI, builder.build().getOutput(0).getValue());
+        assertEquals(BsvAmount.SATOSHI, builder.build().outputs.get(0).getValue());
         assertArrayEquals(OrdScriptBuilder.buildInscription(bap.getOrdAddress(), content,
-                "text/plain", null).getProgram(), builder.build().getOutput(0).getScriptBytes());
+                "text/plain", null).toUint8Array(), builder.build().outputs.get(0).getScriptBytes());
         assertEquals(1, builder.getAllBsmSignHash(true, false, remoteBap).size());
         assertEquals(RemoteSignType.CURRENT,
                 builder.getAllBsmSignHash(true, false, remoteBap).get(0).getRemoteSignType());
@@ -189,12 +183,12 @@ class RemoteTransactionContractTest {
         byte[] hash = new byte[32];
         hash[0] = 8;
         tx.addInput(Sha256Hash.wrap(hash), 0, new ScriptBuilder().build());
-        tx.addOutput(Coin.valueOf(777), paymentAddress);
+        tx.addOutput(BsvAmount.valueOf(777), paymentAddress);
         ExtendForSignTransaction proposed = new ExtendForSignTransaction(
                 TransactionExtend.toTransactionExtend(tx), SigHash.Flags.ALL, true, false);
 
         assertTrue(new RemoteTransactionSigner().signInputs(proposed, null));
-        assertEquals(0, proposed.partialTx.getInput(0).getScriptBytes().length);
+        assertEquals(0, proposed.partialTx.inputs.get(0).getScriptBytes().length);
     }
 
     @Test
@@ -208,8 +202,8 @@ class RemoteTransactionContractTest {
                 "text/plain", null));
 
         assertArrayEquals(OrdScriptBuilder.buildInscription(bap.getOrdAddress(), content,
-                        "text/plain", null).getProgram(),
-                builder.build().getOutput(0).getScriptBytes());
+                        "text/plain", null).toUint8Array(),
+                builder.build().outputs.get(0).getScriptBytes());
         assertEquals(RemoteSignType.CURRENT,
                 builder.getAllBsmSignHash(true, false, remoteBap).get(0).getRemoteSignType());
     }
@@ -224,16 +218,24 @@ class RemoteTransactionContractTest {
         assertArrayEquals(new byte[0], signer.serialize());
     }
 
-    private UTXO paymentUtxo(int firstHashByte) {
+    private BsvUtxo paymentUtxo(int firstHashByte) {
         byte[] hash = new byte[32];
         hash[0] = (byte) firstHashByte;
-        return new UTXO(Sha256Hash.wrap(hash), 0, Coin.valueOf(20_000),
+        return new BsvUtxo(Sha256Hash.wrap(hash), 0, BsvAmount.valueOf(20_000),
                 0, false, null, paymentAddress.toBase58());
     }
 
-    private void sign(PreSignHashContext request, ECKey key) {
-        request.setSigB64(Base64.encode(key.sign(request.getPreSignHash()).encodeToDER()));
-        request.setPublicKey(PublicKey.fromBytes(key.getPubKey()));
+    private void sign(PreSignHashContext request, PrivateKey key) {
+        request.setSigB64(Base64.encode(toBytes(key.sign(request.getPreSignHash()).toDER())));
+        request.setPublicKey(key.getPublicKey());
         PreSignHashUtils.setPreSignHashContext(request);
+    }
+
+    private static byte[] toBytes(java.util.List<?> values) {
+        byte[] bytes = new byte[values.size()];
+        for (int i = 0; i < bytes.length; i++) {
+            bytes[i] = (byte) ((Number) values.get(i)).intValue();
+        }
+        return bytes;
     }
 }
