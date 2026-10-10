@@ -1,10 +1,11 @@
 package com.metanet4j.sdk.bap;
 
+import com.metanet4j.sdk.PrivateKey;
+
 import cn.hutool.core.util.HexUtil;
 import com.metanet4j.sdk.PublicKey;
 import com.metanet4j.sdk.address.AddressEnhance;
 import io.bitcoinsv.bitcoinjsv.core.ECKey;
-import io.bitcoinsv.bitcoinjsv.core.ECKeyLite;
 import io.bitcoinsv.bitcoinjsv.core.Utils;
 import io.bitcoinsv.bitcoinjsv.temp.KeyBag;
 import io.bitcoinsv.bitcoinjsv.temp.RedeemData;
@@ -16,17 +17,17 @@ import org.jspecify.annotations.Nullable;
  */
 public class SpecifyBapBase extends BapBaseAbstract {
 
-    private ECKeyLite rootPrivateKey;
-    private ECKeyLite signPrivateKey;
-    private ECKeyLite previousPrivateKey;
+    private PrivateKey rootPrivateKey;
+    private PrivateKey signPrivateKey;
+    private PrivateKey previousPrivateKey;
 
-    private ECKeyLite encryptPrivateKey;
-    private ECKeyLite payAccountKey;
-    private ECKeyLite ordPrivateKey;
+    private PrivateKey encryptPrivateKey;
+    private PrivateKey payAccountKey;
+    private PrivateKey ordPrivateKey;
     private PublicKey friendPublicKey;
 
 
-    public SpecifyBapBase(ECKeyLite signPrivateKey, ECKeyLite rootPrivateKey, String identityKey, String appName) {
+    public SpecifyBapBase(PrivateKey signPrivateKey, PrivateKey rootPrivateKey, String identityKey, String appName) {
         this.identityKey = identityKey;
         this.appName = appName;
         this.signPrivateKey = signPrivateKey;
@@ -34,60 +35,60 @@ public class SpecifyBapBase extends BapBaseAbstract {
 
     }
 
-    public SpecifyBapBase(ECKeyLite signPrivateKey, ECKeyLite rootPrivateKey, String identityKey, String appName, ECKeyLite previousPrivateKey) {
+    public SpecifyBapBase(PrivateKey signPrivateKey, PrivateKey rootPrivateKey, String identityKey, String appName, PrivateKey previousPrivateKey) {
         this(signPrivateKey, rootPrivateKey, identityKey, appName);
         this.previousPrivateKey = previousPrivateKey;
     }
 
-    public SpecifyBapBase(ECKeyLite signPrivateKey, ECKeyLite encryptPrivateKey, ECKeyLite rootPrivateKey, String identityKey, String appName) {
+    public SpecifyBapBase(PrivateKey signPrivateKey, PrivateKey encryptPrivateKey, PrivateKey rootPrivateKey, String identityKey, String appName) {
         this(signPrivateKey, rootPrivateKey, identityKey, appName);
         this.encryptPrivateKey = encryptPrivateKey;
     }
 
-    public SpecifyBapBase(ECKeyLite signPrivateKey, ECKeyLite payAccountKey, ECKeyLite encryptPrivateKey, ECKeyLite rootPrivateKey, String identityKey, String appName) {
+    public SpecifyBapBase(PrivateKey signPrivateKey, PrivateKey payAccountKey, PrivateKey encryptPrivateKey, PrivateKey rootPrivateKey, String identityKey, String appName) {
         this(signPrivateKey, encryptPrivateKey, rootPrivateKey, identityKey, appName);
         this.payAccountKey = payAccountKey;
     }
 
-    public SpecifyBapBase(ECKeyLite signPrivateKey, ECKeyLite payAccountKey, ECKeyLite encryptPrivateKey, ECKeyLite rootPrivateKey, String identityKey, ECKeyLite ordPrivateKey, String appName) {
+    public SpecifyBapBase(PrivateKey signPrivateKey, PrivateKey payAccountKey, PrivateKey encryptPrivateKey, PrivateKey rootPrivateKey, String identityKey, PrivateKey ordPrivateKey, String appName) {
         this(signPrivateKey, payAccountKey, encryptPrivateKey, rootPrivateKey, identityKey, appName);
         this.ordPrivateKey = ordPrivateKey;
     }
 
-    public SpecifyBapBase(ECKeyLite signPrivateKey, ECKeyLite payAccountKey, ECKeyLite encryptPrivateKey, ECKeyLite rootPrivateKey, String identityKey, ECKeyLite ordPrivateKey, PublicKey friendPublicKey,
+    public SpecifyBapBase(PrivateKey signPrivateKey, PrivateKey payAccountKey, PrivateKey encryptPrivateKey, PrivateKey rootPrivateKey, String identityKey, PrivateKey ordPrivateKey, PublicKey friendPublicKey,
                           String appName) {
         this(signPrivateKey, payAccountKey, encryptPrivateKey, rootPrivateKey, identityKey, ordPrivateKey, appName);
         this.friendPublicKey = friendPublicKey;
     }
 
     @Override
-    public ECKeyLite getRootPrivateKey() {
+    public PrivateKey getRootPrivateKey() {
         return this.rootPrivateKey;
     }
 
     @Override
-    public ECKeyLite getPreviousPrivateKey() {
+    public PrivateKey getPreviousPrivateKey() {
         return this.previousPrivateKey;
     }
 
     @Override
-    public ECKeyLite getCurrentPrivateKey() {
+    public PrivateKey getCurrentPrivateKey() {
         return this.signPrivateKey;
     }
 
     @Override
-    public ECKeyLite getEncryptKey() {
+    public PrivateKey getEncryptKey() {
 
         return this.encryptPrivateKey;
     }
 
     @Override
-    public ECKeyLite getPayAccountKey() {
+    public PrivateKey getPayAccountKey() {
         return this.payAccountKey;
     }
 
     @Override
-    public ECKeyLite getOrdPrivateKey() {
+    public PrivateKey getOrdPrivateKey() {
         return this.ordPrivateKey;
     }
 

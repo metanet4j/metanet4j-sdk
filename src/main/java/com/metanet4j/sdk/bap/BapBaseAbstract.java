@@ -1,7 +1,8 @@
 package com.metanet4j.sdk.bap;
 
+import com.metanet4j.sdk.PrivateKey;
+
 import com.metanet4j.sdk.PublicKey;
-import io.bitcoinsv.bitcoinjsv.core.ECKeyLite;
 
 public abstract class BapBaseAbstract implements BapBaseCore {
 
@@ -10,32 +11,32 @@ public abstract class BapBaseAbstract implements BapBaseCore {
 
 
     @Override
-    public ECKeyLite getRootPrivateKey() {
+    public PrivateKey getRootPrivateKey() {
         return null;
     }
 
     @Override
-    public ECKeyLite getCurrentPrivateKey() {
+    public PrivateKey getCurrentPrivateKey() {
         return null;
     }
 
     @Override
-    public ECKeyLite getPreviousPrivateKey() {
+    public PrivateKey getPreviousPrivateKey() {
         return null;
     }
 
     @Override
-    public ECKeyLite getEncryptKey() {
+    public PrivateKey getEncryptKey() {
         return null;
     }
 
     @Override
-    public ECKeyLite getOrdPrivateKey() {
+    public PrivateKey getOrdPrivateKey() {
         return null;
     }
 
     @Override
-    public ECKeyLite getPayAccountKey() {
+    public PrivateKey getPayAccountKey() {
         return null;
     }
 

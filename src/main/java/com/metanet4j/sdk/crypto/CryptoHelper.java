@@ -5,6 +5,7 @@ import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.util.HexUtil;
 import cn.hutool.core.util.RandomUtil;
 import com.google.common.collect.Lists;
+import com.metanet4j.base.bsv.BsvNetwork;
 import com.metanet4j.sdk.PrivateKey;
 import com.metanet4j.sdk.PublicKey;
 import com.metanet4j.sdk.address.AddressEnhance;
@@ -59,13 +60,13 @@ public final class CryptoHelper {
         return generateRootCryptoBase(generateWordList(),"",MainNetParams.get());
     }
 
-    public static CryptoBase generateChlidCryptoBase(DeterministicKey parentDeterministicKey,ChildNumber childNumber,NetworkParameters parameters) throws InvalidKeyException {
+    public static CryptoBase generateChlidCryptoBase(DeterministicKey parentDeterministicKey,ChildNumber childNumber,BsvNetwork parameters) throws InvalidKeyException {
         DeterministicKey deterministicKey = HDKeyDerivation.deriveChildKey(parentDeterministicKey,childNumber);
         return getCryptoBase(parameters, deterministicKey);
     }
 
     public static CryptoBase generateChlidCryptoBase(DeterministicKey parentDeterministicKey,ChildNumber childNumber) throws InvalidKeyException {
-        return generateChlidCryptoBase(parentDeterministicKey,childNumber, MainNetParams.get());
+        return generateChlidCryptoBase(parentDeterministicKey,childNumber, BsvNetwork.MAINNET);
     }
 
     private static List<String> generateWordList() {
@@ -82,7 +83,7 @@ public final class CryptoHelper {
         return wordsList;
     }
 
-    private static CryptoBase getCryptoBase(NetworkParameters parameters, DeterministicKey deterministicKey) throws InvalidKeyException {
+    private static CryptoBase getCryptoBase(BsvNetwork parameters, DeterministicKey deterministicKey) throws InvalidKeyException {
         CryptoBase cryptoBase = new CryptoBase();
         PrivateKey privateKey = PrivateKey.fromWIF(deterministicKey.getPrivateKeyAsWiF(parameters));
         PublicKey publicKey = PublicKey.fromHex(deterministicKey.getPublicKeyAsHex());

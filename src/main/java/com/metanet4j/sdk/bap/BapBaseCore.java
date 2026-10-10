@@ -5,9 +5,7 @@ import com.metanet4j.sdk.PublicKey;
 import com.metanet4j.sdk.address.AddressEnhance;
 import com.metanet4j.sdk.crypto.Ecies;
 import com.metanet4j.sdk.remote.RemoteSignType;
-import io.bitcoinsv.bitcoinjsv.core.Address;
-import io.bitcoinsv.bitcoinjsv.core.ECKeyLite;
-import io.bitcoinsv.bitcoinjsv.params.MainNetParams;
+import com.metanet4j.sdk.PrivateKey;
 
 import java.nio.charset.Charset;
 
@@ -18,42 +16,42 @@ public interface BapBaseCore {
      *
      * @return
      */
-    ECKeyLite getRootPrivateKey();
+    PrivateKey getRootPrivateKey();
 
     /**
      * Get the current private key for signing.
      *
      * @return
      */
-    ECKeyLite getCurrentPrivateKey();
+    PrivateKey getCurrentPrivateKey();
 
     /**
      * Get the previous private key for signing, often used for signing the "new ID" operation in the BAP protocol.
      *
      * @return
      */
-    ECKeyLite getPreviousPrivateKey();
+    PrivateKey getPreviousPrivateKey();
 
     /**
      * Get the encryption private key for encryption
      *
      * @return
      */
-    ECKeyLite getEncryptKey();
+    PrivateKey getEncryptKey();
 
     /**
      * Get the ordinals private key for sending ordinals UTXO.
      *
      * @return
      */
-    ECKeyLite getOrdPrivateKey();
+    PrivateKey getOrdPrivateKey();
 
     /**
      * Get the payment account private key for making payments
      *
      * @return
      */
-    ECKeyLite getPayAccountKey();
+    PrivateKey getPayAccountKey();
 
     /**
      * Get the public key of a friend for adding as a friend.
@@ -84,8 +82,8 @@ public interface BapBaseCore {
         return AddressEnhance.fromECkeyLite(getPayAccountKey());
     }
 
-    default Address getOrdAddress() {
-        return new Address(MainNetParams.get(), getOrdPrivateKey().getPubKeyHash());
+    default AddressEnhance getOrdAddress() {
+        return AddressEnhance.fromECkeyLite(getOrdPrivateKey());
     }
 
     default String getSignAddress(RemoteSignType remoteSignType) {
@@ -100,7 +98,7 @@ public interface BapBaseCore {
 
     default byte[] encrypt(byte[] bytes) {
         try {
-            return Ecies.encrypt(bytes, ECKeyLite.fromPublicOnly(getEncryptKey().getPubKey()), null);
+            return Ecies.encrypt(bytes, getEncryptKey().getKey().toPublicKey(), null);
         } catch (Exception e) {
             throw new IllegalStateException("BAP 字节加密失败", e);
         }
@@ -108,7 +106,7 @@ public interface BapBaseCore {
 
     default String encrypt(String plainText) {
         try {
-            return Ecies.encrypt(plainText, ECKeyLite.fromPublicOnly(getEncryptKey().getPubKey()), null);
+            return Ecies.encrypt(plainText, getEncryptKey().getKey().toPublicKey(), null);
         } catch (Exception e) {
             throw new IllegalStateException("BAP 文本加密失败", e);
         }
@@ -117,8 +115,7 @@ public interface BapBaseCore {
     default String decrypt(String encryptedPlainText) {
         try {
             return new String(Ecies.decrypt(Base64.decode(encryptedPlainText),
-                    ECKeyLite.fromPrivate(getEncryptKey().getPrivKeyBytes()),
-                    null), Charset.forName("UTF-8"));
+                    getEncryptKey().getKey(), null), Charset.forName("UTF-8"));
         } catch (Exception e) {
             throw new IllegalStateException("BAP 文本解密失败", e);
         }

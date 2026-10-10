@@ -106,7 +106,7 @@ public class BapBase extends MasterKeyBapBase {
         DeterministicKey privateFriendKey = dh.deriveChild(childNumbers.subList(0, size - 1), false, true,
                 childNumbers.get(size - 1));
         System.out.println(privateFriendKey.serializePrivB58(MainNetParams.get()));
-        PrivateKey privateKey = new PrivateKey(ECKeyLite.fromPrivate(privateFriendKey.getPrivKey()));
+        PrivateKey privateKey = PrivateKey.of(privateFriendKey.getPrivKey());
         return privateKey.getPublicKey();
     }
 
@@ -269,7 +269,8 @@ public class BapBase extends MasterKeyBapBase {
             DeterministicKey encryptionKey = getEncryptDeterministicKey(
                     HDUtils.parsePath(this.bapBaseConfig.getDefaultEncryptPath()));
             return Ecies.encrypt(this.identityKey,
-                    ECKeyLite.fromPublicOnly(encryptionKey.getPubKey()), null);
+                    com.metanet4j.bsv.primitives.PublicKey.fromDER(
+                            box(encryptionKey.getPubKey().getEncoded(true))), null);
         } catch (Exception e) {
             throw new IllegalStateException("BAP 身份加密失败", e);
         }
@@ -285,7 +286,7 @@ public class BapBase extends MasterKeyBapBase {
     public String decryptSelf(String self) {
         try {
             return new String(Ecies.decrypt(Base64.decode(self),
-                    ECKeyLite.fromPrivate(getEncryptDeterministicKey(HDUtils.parsePath(this.bapBaseConfig.getDefaultEncryptPath())).getPrivKeyBytes()),
+                    PrivateKey.of(getEncryptDeterministicKey(HDUtils.parsePath(this.bapBaseConfig.getDefaultEncryptPath())).getPrivKeyBytes()).getKey(),
                     null), Charset.forName("UTF-8"));
         } catch (Exception e) {
             throw new IllegalStateException("BAP 身份解密失败", e);
@@ -318,45 +319,45 @@ public class BapBase extends MasterKeyBapBase {
     }
 
     @Override
-    public ECKeyLite getRootPrivateKey() {
-        return ECKeyLite.fromPrivate(this.rootPrivateKey.getPrivKey());
+    public PrivateKey getRootPrivateKey() {
+        return PrivateKey.of(this.rootPrivateKey.getPrivKey());
     }
 
     @Override
-    public ECKeyLite getCurrentPrivateKey() {
+    public PrivateKey getCurrentPrivateKey() {
 
-        return ECKeyLite.fromPrivate(this.currentPrivateKey.getPrivKey());
+        return PrivateKey.of(this.currentPrivateKey.getPrivKey());
     }
 
-    public ECKeyLite getPreviousPrivateKey() {
-        return ECKeyLite.fromPrivate(this.previousPrivateKey.getPrivKey());
+    public PrivateKey getPreviousPrivateKey() {
+        return PrivateKey.of(this.previousPrivateKey.getPrivKey());
     }
 
 
     @Override
-    public ECKeyLite getOrdPrivateKey() {
-        return ECKeyLite.fromPrivate(getKeyBasePath(HDUtils.parsePath(this.bapBaseConfig.getDefaultOrdPath())).getPrivKey());
+    public PrivateKey getOrdPrivateKey() {
+        return PrivateKey.of(getKeyBasePath(HDUtils.parsePath(this.bapBaseConfig.getDefaultOrdPath())).getPrivKey());
     }
 
     @Override
-    public ECKeyLite getEncryptKey() {
-        return ECKeyLite.fromPrivate(getKeyBaseRoot(HDUtils.parsePath(this.bapBaseConfig.getDefaultEncryptPath())).getPrivKeyBytes());
+    public PrivateKey getEncryptKey() {
+        return PrivateKey.of(getKeyBaseRoot(HDUtils.parsePath(this.bapBaseConfig.getDefaultEncryptPath())).getPrivKeyBytes());
     }
 
     @Override
-    public ECKeyLite getPayAccountKey() {
-        return ECKeyLite.fromPrivate(getKeyBasePath(HDUtils.parsePath(this.bapBaseConfig.getDefaultPayAccountPath())).getPrivKeyBytes());
+    public PrivateKey getPayAccountKey() {
+        return PrivateKey.of(getKeyBasePath(HDUtils.parsePath(this.bapBaseConfig.getDefaultPayAccountPath())).getPrivKeyBytes());
     }
 
 
     @Override
     public String getRootAddress() {
-        return new AddressLite(MainNetParams.get(), this.getRootPrivateKey().getPubKeyHash()).toBase58();
+        return AddressEnhance.fromECkeyLite(this.getRootPrivateKey()).toBase58();
     }
 
     @Override
     public AddressEnhance getCurrentAddress() {
-        return new AddressEnhance(MainNetParams.get(), this.getCurrentPrivateKey().getPubKeyHash());
+        return AddressEnhance.fromECkeyLite(this.getCurrentPrivateKey());
     }
 
     public AddressEnhance getPreviouAddress() {
@@ -365,13 +366,13 @@ public class BapBase extends MasterKeyBapBase {
     }
 
     @Override
-    public Address getOrdAddress() {
-        return new Address(MainNetParams.get(), this.getOrdPrivateKey().getPubKeyHash());
+    public AddressEnhance getOrdAddress() {
+        return AddressEnhance.fromECkeyLite(this.getOrdPrivateKey());
     }
 
     @Override
     public AddressEnhance getPayAccountAddress() {
-        return new AddressEnhance(MainNetParams.get(), this.getPayAccountKey().getPubKeyHash());
+        return AddressEnhance.fromECkeyLite(this.getPayAccountKey());
     }
 
 
@@ -445,13 +446,13 @@ public class BapBase extends MasterKeyBapBase {
             if (AddressEnhance.fromPubKeyHash(pubkeyHash).toBase58()
                     .equals(AddressEnhance.fromPubKeyHash(this.bapBase.getPayAccountKey().getPubKeyHash()).toBase58())) {
 
-                return ECKey.fromPrivate(this.bapBase.getPayAccountKey().getPrivKeyBytes());
+                return this.bapBase.getPayAccountKey().getKey();
             }
             //find ordKey
             if (AddressEnhance.fromPubKeyHash(pubkeyHash).toBase58()
                     .equals(AddressEnhance.fromPubKeyHash(this.bapBase.getOrdPrivateKey().getPubKeyHash()).toBase58())) {
 
-                return ECKey.fromPrivate(this.bapBase.getOrdPrivateKey().getPrivKeyBytes());
+                return this.bapBase.getOrdPrivateKey().getKey();
             }
             throw new RuntimeException("not find ecKey by pubkeyHash:" + HexUtil.encodeHexStr(pubkeyHash) + ",address is :" + AddressEnhance.fromPubKeyHash(pubkeyHash).toBase58());
         }
@@ -470,4 +471,12 @@ public class BapBase extends MasterKeyBapBase {
     }
 
 
+
+    private static java.util.List<Double> box(byte[] data) {
+        Double[] values = new Double[data.length];
+        for (int i = 0; i < data.length; i++) {
+            values[i] = (double) (data[i] & 0xFF);
+        }
+        return java.util.List.of(values);
+    }
 }

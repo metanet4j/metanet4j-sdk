@@ -1,5 +1,7 @@
 package com.metanet4j.sdk.bap;
 
+import com.metanet4j.sdk.PrivateKey;
+
 import com.metanet4j.sdk.crypto.MasterPrivateKey;
 import io.bitcoinsv.bitcoinjsv.crypto.ChildNumber;
 

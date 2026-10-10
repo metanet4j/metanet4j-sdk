@@ -128,8 +128,7 @@ public abstract class UnSpendableDataLockBuilder<T extends UnSpendableDataLockBu
             Assert.notNull(bapBase.getPreviousPrivateKey(),
                     "the SignType is PREVIOUS,so sign previous privateKey not allow null when signOpReturnWithAIP");
             signatureBuffers.add(ByteBuffer.wrap(bapBase.getPreviouAddress().toBase58().getBytes(Charsets.UTF_8)));
-            String sig = new EcKeyLiteExtend(bapBase.getPreviousPrivateKey().getPrivKey(),
-                    bapBase.getPreviousPrivateKey().getPubKeyPoint()).signMessage(outputStream.toByteArray());
+            String sig = EcKeyLiteExtend.fromPrivateKey(bapBase.getPreviousPrivateKey().getKey()).signMessage(outputStream.toByteArray());
             signatureBuffers.add(ByteBuffer.wrap(Base64.decode(sig.getBytes(Charsets.UTF_8))));
 
         } else if (signType == SignType.CURRENT) {
@@ -138,8 +137,7 @@ public abstract class UnSpendableDataLockBuilder<T extends UnSpendableDataLockBu
             Assert.notNull(bapBase.getCurrentPrivateKey(),
                     "the SignType is CURRENT,so sign current privateKey not allow null when signOpReturnWithAIP");
             signatureBuffers.add(ByteBuffer.wrap(bapBase.getCurrentAddress().toBase58().getBytes(Charsets.UTF_8)));
-            String sig = new EcKeyLiteExtend(bapBase.getCurrentPrivateKey().getPrivKey(),
-                    bapBase.getCurrentPrivateKey().getPubKeyPoint()).signMessage(outputStream.toByteArray());
+            String sig = EcKeyLiteExtend.fromPrivateKey(bapBase.getCurrentPrivateKey().getKey()).signMessage(outputStream.toByteArray());
             signatureBuffers.add(ByteBuffer.wrap(Base64.decode(sig.getBytes(Charsets.UTF_8))));
         } else if (signType == SignType.ROOT) {
             Assert.notNull(bapBase.getRootAddress(),
@@ -147,8 +145,7 @@ public abstract class UnSpendableDataLockBuilder<T extends UnSpendableDataLockBu
             Assert.notNull(bapBase.getRootPrivateKey(),
                     "the SignType is ROOT,so sign root privateKey not allow null when signOpReturnWithAIP");
             signatureBuffers.add(ByteBuffer.wrap(bapBase.getRootAddress().getBytes(Charsets.UTF_8)));
-            String sig = new EcKeyLiteExtend(bapBase.getRootPrivateKey().getPrivKey(),
-                    bapBase.getRootPrivateKey().getPubKeyPoint()).signMessage(outputStream.toByteArray());
+            String sig = EcKeyLiteExtend.fromPrivateKey(bapBase.getRootPrivateKey().getKey()).signMessage(outputStream.toByteArray());
             signatureBuffers.add(ByteBuffer.wrap(Base64.decode(sig.getBytes(Charsets.UTF_8))));
         } else {
             throw new IllegalArgumentException("local signing requires ROOT, PREVIOUS or CURRENT");
