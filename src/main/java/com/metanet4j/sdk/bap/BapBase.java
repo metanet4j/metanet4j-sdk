@@ -270,7 +270,7 @@ public class BapBase extends MasterKeyBapBase {
                     HDUtils.parsePath(this.bapBaseConfig.getDefaultEncryptPath()));
             return Ecies.encrypt(this.identityKey,
                     com.metanet4j.bsv.primitives.PublicKey.fromDER(
-                            box(encryptionKey.getPubKey().getEncoded(true))), null);
+                            encryptionKey.getPubKey().getEncoded(true)), null);
         } catch (Exception e) {
             throw new IllegalStateException("BAP 身份加密失败", e);
         }
@@ -444,15 +444,15 @@ public class BapBase extends MasterKeyBapBase {
             }
             //find payAccountKey
             if (AddressEnhance.fromPubKeyHash(pubkeyHash).toBase58()
-                    .equals(AddressEnhance.fromPubKeyHash(this.bapBase.getPayAccountKey().getPubKeyHash()).toBase58())) {
+                    .equals(AddressEnhance.fromPublicKey(this.bapBase.getPayAccountKey().getPublicKey()).toBase58())) {
 
-                return this.bapBase.getPayAccountKey().getKey();
+                return this.bapBase.getPayAccountKey();
             }
             //find ordKey
             if (AddressEnhance.fromPubKeyHash(pubkeyHash).toBase58()
-                    .equals(AddressEnhance.fromPubKeyHash(this.bapBase.getOrdPrivateKey().getPubKeyHash()).toBase58())) {
+                    .equals(AddressEnhance.fromPublicKey(this.bapBase.getOrdPrivateKey().getPublicKey()).toBase58())) {
 
-                return this.bapBase.getOrdPrivateKey().getKey();
+                return this.bapBase.getOrdPrivateKey();
             }
             throw new RuntimeException("not find ecKey by pubkeyHash:" + HexUtil.encodeHexStr(pubkeyHash) + ",address is :" + AddressEnhance.fromPubKeyHash(pubkeyHash).toBase58());
         }

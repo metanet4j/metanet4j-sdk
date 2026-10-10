@@ -112,15 +112,15 @@ public class SpecifyBapBase extends BapBaseAbstract {
 
             //find payAccountKey
             if (AddressEnhance.fromPubKeyHash(pubkeyHash).toBase58()
-                    .equals(AddressEnhance.fromPubKeyHash(this.specifyBapBase.getPayAccountKey().getPubKeyHash()).toBase58())) {
+                    .equals(AddressEnhance.fromPublicKey(this.specifyBapBase.getPayAccountKey().getPublicKey()).toBase58())) {
 
-                return ECKey.fromPrivate(this.specifyBapBase.getPayAccountKey().getPrivKey());
+                return this.specifyBapBase.getPayAccountKey();
             }
             //find ordKey
             if (AddressEnhance.fromPubKeyHash(pubkeyHash).toBase58()
-                    .equals(AddressEnhance.fromPubKeyHash(this.specifyBapBase.getOrdPrivateKey().getPubKeyHash()).toBase58())) {
+                    .equals(AddressEnhance.fromPublicKey(this.specifyBapBase.getOrdPrivateKey().getPublicKey()).toBase58())) {
 
-                return ECKey.fromPrivate(this.specifyBapBase.getOrdPrivateKey().getPrivKey());
+                return this.specifyBapBase.getOrdPrivateKey();
             }
             throw new RuntimeException("not find ecKey by pubkeyHash:" + HexUtil.encodeHexStr(pubkeyHash) + ",address is :" + AddressEnhance.fromPubKeyHash(pubkeyHash).toBase58());
 

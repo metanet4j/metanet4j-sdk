@@ -180,7 +180,8 @@ public class Sigma implements PreSignHash {
                 signPrivateKey = EcKeyLiteExtend.fromPrivate(bapBaseCore.getOrdPrivateKey().getPrivKey());
             }
             String s = signPrivateKey.signMessage(getMessageHash().getBytes());
-            return sigM(s, AddressEnhance.fromPrivateKey(new PrivateKey(signPrivateKey)).toBase58());
+            return sigM(s, AddressEnhance.fromPublicKey(
+                    com.metanet4j.bsv.primitives.PublicKey.fromDER(box(signPrivateKey.getPubKey()))).toBase58());
         }
     }
 

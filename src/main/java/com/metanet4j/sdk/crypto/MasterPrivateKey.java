@@ -1,81 +1,91 @@
 package com.metanet4j.sdk.crypto;
 
 import cn.hutool.core.collection.CollectionUtil;
-import cn.hutool.core.util.HexUtil;
 import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
-import io.bitcoinsv.bitcoinjsv.core.Utils;
-import io.bitcoinsv.bitcoinjsv.crypto.DeterministicKey;
-import io.bitcoinsv.bitcoinjsv.crypto.HDKeyDerivation;
-import io.bitcoinsv.bitcoinjsv.crypto.MnemonicCode;
-import io.bitcoinsv.bitcoinjsv.params.MainNetParams;
-import io.bitcoinsv.bitcoinjsv.params.NetworkParameters;
+import com.metanet4j.bsv.compat.Bip39WordlistEn;
+import com.metanet4j.bsv.compat.HD;
+import com.metanet4j.bsv.compat.Mnemonic;
+import com.metanet4j.bsv.primitives.PrivateKey;
+import com.metanet4j.bsv.primitives.Utils;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/**
+ * BIP39 助记词 + BIP32 主私钥包装。
+ *
+ * <p>旧实现基于 bitcoinj 的 {@code DeterministicKey}／{@code HDKeyDerivation}／{@code MnemonicCode}；
+ * 现改用新 SDK（com.metanet4j.bsv）的 {@code compat.HD} 与 {@code compat.Mnemonic}。
+ * 助记词 → seed → 主密钥的推导链、xprv／xpub 序列化与单词表语义保持不变（V03 行为验收）。
+ */
 public class MasterPrivateKey {
 
-    private  DeterministicKey masterDeterministicKey;
+    private final HD masterDeterministicKey;
 
-    public MasterPrivateKey(DeterministicKey masterDeterministicKey) {
+    public MasterPrivateKey(HD masterDeterministicKey) {
         this.masterDeterministicKey = masterDeterministicKey;
     }
 
+    /** 解析 xprv。 */
     public static MasterPrivateKey fromXprv(String xprv) {
-        DeterministicKey masterPrivateKey = DeterministicKey.deserializeB58(xprv, MainNetParams.get());
-        return new MasterPrivateKey(masterPrivateKey);
+        return new MasterPrivateKey(HD.fromString(xprv));
     }
 
-
-    public DeterministicKey getMasterDeterministicKey() {
+    /** 底层 BIP32 节点（新 SDK 的 {@code compat.HD}）。 */
+    public HD getMasterDeterministicKey() {
         return masterDeterministicKey;
     }
 
-    public  String toXprv(){
-      return   masterDeterministicKey.serializePrivB58(MainNetParams.get());
+    /** 底层主私钥。 */
+    public PrivateKey getMasterPrivateKey() {
+        return masterDeterministicKey.privKey;
     }
 
-    public  String toXpub(){
-        return  masterDeterministicKey.serializePubB58(MainNetParams.get());
+    /** 序列化为 xprv。 */
+    public String toXprv() {
+        return masterDeterministicKey.toString();
     }
 
-
+    /** 序列化为 xpub。 */
+    public String toXpub() {
+        return masterDeterministicKey.toPublic().toString();
+    }
 
     public static MasterPrivateKey fromSeed() {
-
-        return fromSeed(generateWordList(),"",MainNetParams.get());
+        return fromSeed(generateWordList(), "");
     }
 
     public static MasterPrivateKey fromSeed(String seed) {
-        return fromSeed(StrUtil.split(seed," "),"",MainNetParams.get());
+        return fromSeed(StrUtil.split(seed, " "), "");
     }
 
-    public static MasterPrivateKey fromSeed(List<String> wordList, String salt)  {
-        return fromSeed(wordList,salt, MainNetParams.get());
-    }
-
-    public static MasterPrivateKey fromSeed(List<String> wordList, String salt, NetworkParameters parameters){
+    public static MasterPrivateKey fromSeed(List<String> wordList, String salt) {
         if (CollectionUtil.isEmpty(wordList)) {
             wordList = generateWordList();
         }
-        DeterministicKey masterPrivateKey = HDKeyDerivation
-                .createMasterPrivateKey((Utils.HEX.decode(HexUtil.encodeHexStr(MnemonicCode.toSeed(wordList, salt)))));
-        return new MasterPrivateKey(masterPrivateKey);
-
+        List<Integer> seed = Mnemonic.fromString(String.join(Bip39WordlistEn.SPACE, wordList))
+                .toSeed(salt);
+        return new MasterPrivateKey(HD.fromSeed(seed));
     }
 
     public static List<String> generateLongWordList() {
-       return generateWordList(24);
+        return generateWordList(24);
     }
 
     public static List<String> generateWordList() {
-      return   generateWordList(12);
+        return generateWordList(12);
     }
 
+    /**
+     * 从 BIP39 英文单词表随机抽取指定数量的不重复单词。
+     *
+     * @throws IllegalArgumentException 数量越界（小于 0 或超过单词表容量）
+     */
     public static List<String> generateWordList(int len) {
-        List<String> dictionary = MnemonicCode.INSTANCE.getWordList();
+        List<String> dictionary = Bip39WordlistEn.VALUE;
         if (len < 0 || len > dictionary.size()) {
             throw new IllegalArgumentException("word count out of range: " + len);
         }
@@ -86,4 +96,13 @@ public class MasterPrivateKey {
         return indexSet.stream().map(dictionary::get).collect(Collectors.toList());
     }
 
+    /** 单词表副本（供调用方校验助记词合法性）。 */
+    public static List<String> wordList() {
+        return new ArrayList<>(Bip39WordlistEn.VALUE);
+    }
+
+    /** 主私钥 hex，便于与既有断言比较。 */
+    public String toPrivKeyHex() {
+        return Utils.toHex(masterDeterministicKey.privKey.toArray("be", 32));
+    }
 }
