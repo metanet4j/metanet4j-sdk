@@ -15,7 +15,7 @@ import com.metanet4j.sdk.bap.BapBase;
 import com.metanet4j.sdk.context.PreSignHashContext;
 import com.metanet4j.sdk.remote.PreSignHashUtils;
 import com.metanet4j.sdk.remote.RemoteSignType;
-import io.bitcoinsv.bitcoinjsv.script.ScriptChunk;
+import com.metanet4j.bsv.script.ScriptChunk;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -36,11 +36,11 @@ class UnSpendableDataLockBuilderContractTest {
     @Test
     void remoteRequestIsStableAndTheSameBuilderAcceptsItsSignature() {
         BapDataLockBuilder builder = new BapDataLockBuilder(bap, true, null).buildRoot();
-        byte[] unsignedScript = builder.getLockingScript().getProgram();
+        byte[] unsignedScript = builder.getLockingScript().toUint8Array();
 
         PreSignHashContext request = builder.getPreSignHashContext();
         assertEquals(request.getPreSignHash(), builder.getPreSignHashContext().getPreSignHash());
-        assertArrayEquals(unsignedScript, builder.getLockingScript().getProgram());
+        assertArrayEquals(unsignedScript, builder.getLockingScript().toUint8Array());
         assertFalse(builder.isHaveSign());
         assertEquals(RemoteSignType.ROOT, request.getRemoteSignType());
         assertEquals(bap.getRootAddress(), request.getSignAddress());
@@ -67,7 +67,7 @@ class UnSpendableDataLockBuilderContractTest {
             };
             builder.sign();
             assertArrayEquals(new byte[] {0, (byte) 0x80, (byte) 0xff, 0x7c},
-                    builder.getLockingScript().getChunks().get(2).data());
+                    com.metanet4j.sdk.utils.ScriptHelper.getPushData(builder.getLockingScript().getChunks().get(2)));
             assertValidAip(builder, address, new byte[] {0x6a, 0, (byte) 0x80, (byte) 0xff, 0x7c, 0x7c});
         }
     }
@@ -87,11 +87,11 @@ class UnSpendableDataLockBuilderContractTest {
     @Test
     void missingRemoteSignatureLeavesTheBuilderUnsignedAndRetryable() {
         BapDataLockBuilder builder = new BapDataLockBuilder(bap, true, null).buildAlias("profile");
-        byte[] unsignedScript = builder.getLockingScript().getProgram();
+        byte[] unsignedScript = builder.getLockingScript().toUint8Array();
         PreSignHashContext request = builder.getPreSignHashContext();
         assertThrows(RuntimeException.class, builder::sign);
         assertFalse(builder.isHaveSign());
-        assertArrayEquals(unsignedScript, builder.getLockingScript().getProgram());
+        assertArrayEquals(unsignedScript, builder.getLockingScript().toUint8Array());
         request.setSigB64(EcKeyLiteExtend.fromPrivate(bap.getCurrentPrivateKey().getPrivKey())
                 .signHash(request.getPreSignHash()));
         PreSignHashUtils.setPreSignHashContext(request);
@@ -106,7 +106,7 @@ class UnSpendableDataLockBuilderContractTest {
     @Test
     void remoteSignatureMustComeFromTheRequestedBapAddress() {
         BapDataLockBuilder builder = new BapDataLockBuilder(bap, true, RemoteSignType.CURRENT).buildAlias("profile");
-        byte[] unsigned = builder.getLockingScript().getProgram();
+        byte[] unsigned = builder.getLockingScript().toUint8Array();
         PreSignHashContext request = builder.getPreSignHashContext();
         request.setSignAddress(bap.getRootAddress());
         request.setSigB64(EcKeyLiteExtend.fromPrivate(bap.getRootPrivateKey().getPrivKey())
@@ -114,7 +114,7 @@ class UnSpendableDataLockBuilderContractTest {
         PreSignHashUtils.setPreSignHashContext(request);
         assertThrows(IllegalArgumentException.class, builder::sign);
         assertFalse(builder.isHaveSign());
-        assertArrayEquals(unsigned, builder.getLockingScript().getProgram());
+        assertArrayEquals(unsigned, builder.getLockingScript().toUint8Array());
 
         PreSignHashUtils.clear();
         request.setSignAddress(bap.getCurrentAddress().toBase58());
@@ -130,7 +130,7 @@ class UnSpendableDataLockBuilderContractTest {
     @Test
     void malformedRemoteSignaturesDoNotChangeTheUnsignedScript() {
         BapDataLockBuilder builder = new BapDataLockBuilder(bap, true, RemoteSignType.ROOT).buildRoot();
-        byte[] unsigned = builder.getLockingScript().getProgram();
+        byte[] unsigned = builder.getLockingScript().toUint8Array();
         PreSignHashContext request = builder.getPreSignHashContext();
         for (String invalid : List.of("AA==", "???")) {
             PreSignHashUtils.clear();
@@ -138,7 +138,7 @@ class UnSpendableDataLockBuilderContractTest {
             PreSignHashUtils.setPreSignHashContext(request);
             assertThrows(RuntimeException.class, builder::sign);
             assertFalse(builder.isHaveSign());
-            assertArrayEquals(unsigned, builder.getLockingScript().getProgram());
+            assertArrayEquals(unsigned, builder.getLockingScript().toUint8Array());
         }
     }
 
@@ -147,7 +147,7 @@ class UnSpendableDataLockBuilderContractTest {
         BapDataLockBuilder defaultBuilder = new BapDataLockBuilder(binaryPayload(), bap).sign();
         BapDataLockBuilder nullTypeBuilder = new BapDataLockBuilder(binaryPayload(), bap, (SignType) null).sign();
         assertEquals(8, nullTypeBuilder.getLockingScript().getChunks().size());
-        assertArrayEquals(defaultBuilder.getLockingScript().getProgram(), nullTypeBuilder.getLockingScript().getProgram());
+        assertArrayEquals(defaultBuilder.getLockingScript().toUint8Array(), nullTypeBuilder.getLockingScript().toUint8Array());
         assertValidAip(nullTypeBuilder, bap.getCurrentAddress().toBase58(),
                 new byte[] {0x6a, 0, (byte) 0x80, (byte) 0xff, 0x7c, 0x7c});
     }
@@ -155,10 +155,10 @@ class UnSpendableDataLockBuilderContractTest {
     @Test
     void remoteEnumCannotSilentlyProduceAnIncompleteLocalSignature() {
         BapDataLockBuilder builder = new BapDataLockBuilder(binaryPayload(), bap, SignType.REMOTE);
-        byte[] unsigned = builder.getLockingScript().getProgram();
+        byte[] unsigned = builder.getLockingScript().toUint8Array();
         assertThrows(IllegalArgumentException.class, builder::sign);
         assertFalse(builder.isHaveSign());
-        assertArrayEquals(unsigned, builder.getLockingScript().getProgram());
+        assertArrayEquals(unsigned, builder.getLockingScript().toUint8Array());
     }
 
     @Test
@@ -207,7 +207,8 @@ class UnSpendableDataLockBuilderContractTest {
         assertEquals("15PciHG22SNLQJXMoSUaWVi7WSqc7hCfva", text(chunks.get(start + 1)));
         assertEquals("BITCOIN_ECDSA", text(chunks.get(start + 2)));
         assertEquals(address, text(chunks.get(start + 3)));
-        String signature = Base64.getEncoder().encodeToString(chunks.get(start + 4).data());
+        String signature = Base64.getEncoder().encodeToString(
+                com.metanet4j.sdk.utils.ScriptHelper.getPushData(chunks.get(start + 4)));
         assertTrue(AipHelper.verifySign(address, signature, message));
         byte[] changed = message.clone();
         changed[1] ^= 1;
@@ -215,6 +216,7 @@ class UnSpendableDataLockBuilderContractTest {
     }
 
     private static String text(ScriptChunk chunk) {
-        return new String(chunk.data(), StandardCharsets.UTF_8);
+        byte[] data = com.metanet4j.sdk.utils.ScriptHelper.getPushData(chunk);
+        return data == null ? "" : new String(data, StandardCharsets.UTF_8);
     }
 }
