@@ -5,8 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.metanet4j.sdk.TestData;
 import com.metanet4j.sdk.remote.RemoteSignType;
-import io.bitcoinsv.bitcoinjsv.crypto.ChildNumber;
-import io.bitcoinsv.bitcoinjsv.crypto.HDUtils;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
@@ -62,10 +60,10 @@ class BapVariantContractTest {
         assertEquals("M/44H/236H/1H/0/0", panda.getDefaultOrdPath());
         assertEquals("yours wallet", panda.getAppName());
 
-        List<ChildNumber> path = HDUtils.parsePath(panda.getDefaultRootPath());
+        BapPath path = BapPath.parse(panda.getDefaultRootPath());
         PandaBapBase pandaIdentity = new PandaBapBase(TestData.masterPrivateKey, path, path, panda);
-        assertEquals(HDUtils.formatPath(path), pandaIdentity.rootPath);
-        assertEquals(HDUtils.formatPath(path), pandaIdentity.currentPath);
+        assertEquals(path.toString(), pandaIdentity.rootPath);
+        assertEquals(path.toString(), pandaIdentity.currentPath);
         assertEquals(panda, pandaIdentity.bapBaseConfig);
         assertEquals("yours wallet", pandaIdentity.getAppName());
     }

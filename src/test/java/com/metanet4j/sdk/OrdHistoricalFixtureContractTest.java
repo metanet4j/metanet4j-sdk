@@ -9,8 +9,7 @@ import cn.hutool.core.util.HexUtil;
 import com.alibaba.fastjson.JSONArray;
 import com.metanet4j.sdk.bap.BapBase;
 import com.metanet4j.sdk.sigma.Sigma;
-import io.bitcoinsv.bitcoinjsv.msg.protocol.Transaction;
-import io.bitcoinsv.bitcoinjsv.params.Net;
+import com.metanet4j.bsv.transaction.Transaction;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -74,7 +73,7 @@ class OrdHistoricalFixtureContractTest {
         assertEquals("BSM", output(tx.txo(), 0).get("s28"));
         assertEquals("12cxrp1b47DgxtxisBCzuL24QHdkrAKf8Y", output(tx.txo(), 0).get("s29"));
 
-        Transaction transaction = new Transaction(Net.MAINNET, HexUtil.decodeHex(hex));
+        Transaction transaction = Transaction.fromBinary(HexUtil.decodeHex(hex));
         assertTrue(new Sigma(BapBase.fromOnlyMasterPrivateKey(TestData.masterPrivateKey), transaction).verify());
     }
 
