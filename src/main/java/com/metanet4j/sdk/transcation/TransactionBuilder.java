@@ -7,6 +7,7 @@ import com.metanet4j.bsv.script.OP;
 import com.metanet4j.bsv.script.Script;
 import com.metanet4j.bsv.script.ScriptChunk;
 import com.metanet4j.bsv.script.templates.P2PKH;
+import com.metanet4j.bsv.primitives.TransactionSignature;
 import com.metanet4j.bsv.primitives.Writer;
 import com.metanet4j.bsv.transaction.Transaction;
 import com.metanet4j.bsv.transaction.TransactionInput;
@@ -186,7 +187,18 @@ public class TransactionBuilder {
      */
     public Transaction completeAndSignTx(SigningKeyProvider provider, boolean useForkId)
             throws SignErrorException {
-        prepareInputsForSigning(targetTransaction, provider);
+        return completeAndSignTx(provider, TransactionSignature.SIGHASH_ALL, false);
+    }
+
+    /**
+     * 完成并签名，并指定签名的范围。
+     *
+     * @param hashFlags   SIGHASH 基础类型（{@code TransactionSignature.SIGHASH_ALL／NONE／SINGLE}）
+     * @param anyoneCanPay 是否 ANYONECANPAY
+     */
+    public Transaction completeAndSignTx(SigningKeyProvider provider, int hashFlags,
+                                         boolean anyoneCanPay) throws SignErrorException {
+        prepareInputsForSigning(targetTransaction, provider, hashFlags, anyoneCanPay);
         try {
             targetTransaction.sign().toCompletableFuture().join();
         } catch (RuntimeException e) {
@@ -195,11 +207,23 @@ public class TransactionBuilder {
         return targetTransaction;
     }
 
-    /** 为每个输入注入解锁模板（取代旧 {@code setEmptyInputScript}）。 */
+    /** 为每个输入注入解锁模板（取代旧 {@code setEmptyInputScript}），签名范围按 {@code ALL}。 */
     protected void prepareInputsForSigning(Transaction transaction, SigningKeyProvider provider) {
+        prepareInputsForSigning(transaction, provider, TransactionSignature.SIGHASH_ALL, false);
+    }
+
+    /**
+     * 为每个输入注入解锁模板（取代旧 {@code setEmptyInputScript}）。
+     *
+     * <p>签名范围必须传进解锁模板，否则 SIGHASH 选择会被静默丢弃（旧流程由
+     * {@code TransactionSigner} 携带，新流程只能在此处传递）。
+     */
+    protected void prepareInputsForSigning(Transaction transaction, SigningKeyProvider provider,
+                                           int hashFlags, boolean anyoneCanPay) {
         if (provider == null) {
             throw new IllegalArgumentException("签名密钥提供者不能为空");
         }
+        String signOutputs = signOutputsOf(hashFlags);
         for (int i = 0; i < transaction.inputs.size(); i++) {
             TransactionInput input = transaction.inputs.get(i);
             byte[] pubKeyHash = pubKeyHashOf(lockingScriptOf(input));
@@ -210,9 +234,19 @@ public class TransactionBuilder {
             if (key == null) {
                 throw new SignErrorException("交易输入 " + i + " 找不到可签名密钥");
             }
-            input.unlockingScriptTemplate = new P2PKH().unlock(key.getKey(), "all", false,
-                    satoshisOf(input));
+            input.unlockingScriptTemplate = new P2PKH().unlock(key.getKey(), signOutputs,
+                    anyoneCanPay, satoshisOf(input));
         }
+    }
+
+    /** SIGHASH 基础类型映射为解锁模板的 {@code signOutputs} 取值。 */
+    private static String signOutputsOf(int hashFlags) {
+        int base = hashFlags & 31;
+        return switch (base) {
+            case TransactionSignature.SIGHASH_NONE -> "none";
+            case TransactionSignature.SIGHASH_SINGLE -> "single";
+            default -> "all";
+        };
     }
 
     public static String broadcast(String raw, Broadcaster broadcaster) {

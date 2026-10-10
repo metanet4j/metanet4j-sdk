@@ -68,12 +68,12 @@ public class OrdTransactionBuilder extends TransactionBuilder {
         return signTx(keyProvider, TransactionSignature.SIGHASH_ALL, useForkId, false);
     }
 
-    /** 注入解锁模板并签名。 */
+    /** 注入解锁模板并签名；{@code hashFlags}／{@code anyoneCanPay} 会贯通到签名范围。 */
     public OrdTransactionBuilder signTx(SigningKeyProvider keyProvider, int hashFlags,
                                         boolean useForkId, boolean anyoneCanPay)
             throws SignErrorException {
         setEmptyInputScriptHaveOrdinals(this.getTargetTransaction(), keyProvider);
-        completeAndSignTx(keyProvider, useForkId);
+        completeAndSignTx(keyProvider, hashFlags, anyoneCanPay);
         return this;
     }
 
