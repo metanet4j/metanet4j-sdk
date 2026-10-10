@@ -11,10 +11,8 @@ import com.metanet4j.sdk.exception.SignErrorException;
 import com.metanet4j.sdk.ordinals.OrdScriptBuilder;
 import com.metanet4j.sdk.remote.*;
 import com.metanet4j.sdk.utxo.impl.bitails.BitailsUtxoProvider;
-import io.bitcoinsv.bitcoinjsv.core.Coin;
-import io.bitcoinsv.bitcoinjsv.ecc.ECDSASignature;
-import io.bitcoinsv.bitcoinjsv.msg.protocol.Transaction;
-import io.bitcoinsv.bitcoinjsv.script.SigHash;
+import com.metanet4j.base.bsv.BsvAmount;
+import com.metanet4j.bsv.transaction.Transaction;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -88,7 +86,7 @@ public class RemoteSignBitcoinschemaTransactionTest extends TransactionContextTe
         signRemoteAllPreSignHash(ordTransactionBuilder2.getTxInputSignHash(true, bapBase));
 
         ordTransactionTemplate.setDoInputSign(true);
-        ordTransactionBuilder2.signTx(null, SigHash.Flags.ALL, true, true);
+        ordTransactionBuilder2.signTx(keyProvider, com.metanet4j.bsv.primitives.TransactionSignature.SIGHASH_ALL, true, true);
 
         Transaction transaction = ordTransactionBuilder2.build();
         correctlySpends(transaction);
@@ -121,13 +119,13 @@ public class RemoteSignBitcoinschemaTransactionTest extends TransactionContextTe
             switch (remoteSignType) {
                 case ROOT:
                     String s = EcKeyLiteExtend.fromPrivate(bapBase.getRootPrivateKey().getPrivKey()).signHash(preSignHashContext.getPreSignHash());
-                    preSignHashContext.setPublicKey(PublicKey.fromHex(bapBase.getRootPrivateKey().getPublicKeyAsHex()));
+                    preSignHashContext.setPublicKey(bapBase.getRootPrivateKey().getPublicKey());
                     preSignHashContext.setSigB64(s);
                     break;
                 case PREVIOUS:
                     String s1 = EcKeyLiteExtend.fromPrivate(bapBase.getPreviousPrivateKey().getPrivKey()).signHash(preSignHashContext.getPreSignHash());
                     preSignHashContext.setSigB64(s1);
-                    preSignHashContext.setPublicKey(PublicKey.fromHex(bapBase.getPreviousPrivateKey().getPublicKeyAsHex()));
+                    preSignHashContext.setPublicKey(bapBase.getPreviousPrivateKey().getPublicKey());
                     break;
                 case CURRENT:
                     String s2 = EcKeyLiteExtend.fromPrivate(bapBase.getCurrentPrivateKey().getPrivKey()).signHash(preSignHashContext.getPreSignHash());
@@ -156,7 +154,7 @@ public class RemoteSignBitcoinschemaTransactionTest extends TransactionContextTe
 
     private void buildRemoteSignTxThenBroadcast(UnSpendableDataLockBuilder dataLockBuilder) throws SignErrorException {
         RemoteTransactionBuilder transactionBuilder = buildDataTx(dataLockBuilder);
-        Transaction transaction = transactionBuilder.completeAndSignTx(transactionBuilder.getKeyBag(), true);
+        Transaction transaction = transactionBuilder.completeAndSignTx(transactionBuilder.getKeyProvider(), true);
         correctlySpends(transaction);
         broadcast(transaction);
         parseTx(transaction);
@@ -184,10 +182,10 @@ public class RemoteSignBitcoinschemaTransactionTest extends TransactionContextTe
     private RemoteTransactionBuilder buildDataTx(UnSpendableDataLockBuilder dataLockBuilder) {
         RemoteTransactionBuilder transactionBuilder = new RemoteTransactionBuilder(this.remoteBapBase, new RemoteTransactionSigner());
         transactionBuilder
-                .addInputs(Lists.newArrayList(paymentAddress),
+                .addInputs(java.util.List.<com.metanet4j.sdk.address.AddressEnhance>of(paymentAddress),
                         new BitailsUtxoProvider())
                 .addDataOutput(dataLockBuilder)
-                .withFeeKb(Coin.valueOf(feePerKb))
+                .withFeeKb(BsvAmount.valueOf(feePerKb))
                 .changeAddress(changeAddress);
         return transactionBuilder;
     }
