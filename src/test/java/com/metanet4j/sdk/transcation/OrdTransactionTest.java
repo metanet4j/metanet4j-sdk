@@ -10,12 +10,9 @@ import com.metanet4j.sdk.ordinals.OrdTransactionTemplate;
 import com.metanet4j.sdk.sigma.Sigma;
 import com.metanet4j.sdk.utxo.impl.bitails.BitailsUtxoProvider;
 import com.metanet4j.sdk.utxo.impl.gorillapool.OrdinalsOriginGorillaUtxoProvider;
-import io.bitcoinsv.bitcoinjsv.core.Address;
-import io.bitcoinsv.bitcoinjsv.core.UTXO;
-import io.bitcoinsv.bitcoinjsv.msg.protocol.Transaction;
-import io.bitcoinsv.bitcoinjsv.params.MainNetParams;
-import io.bitcoinsv.bitcoinjsv.params.Net;
-import io.bitcoinsv.bitcoinjsv.script.SigHash;
+import com.metanet4j.bsv.transaction.Transaction;
+import com.metanet4j.base.bsv.BsvUtxo;
+import com.metanet4j.sdk.address.AddressEnhance;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -46,7 +43,7 @@ public class OrdTransactionTest extends TransactionContextTest {
                         .dataB64(Base64.encode("test send oridinals 1110-1 from metanet-sdk".getBytes())).build(),
                 ordMap,
                 bapBase,
-                keyBag
+                keyProvider
         ).build();
 
         parseTx(transaction);
@@ -66,7 +63,7 @@ public class OrdTransactionTest extends TransactionContextTest {
                 changeAddress,
                 feePerKb,
                 bapBase,
-                keyBag
+                keyProvider
         );
 
         parseTx(transaction);
@@ -83,10 +80,10 @@ public class OrdTransactionTest extends TransactionContextTest {
     public void testSendOrdinalByCreateUtxo() {
         String origin = "58a97bf6af7c1fa3325af5ccc717309d25df5bb8f3c611b145881e977a1eb8d4_0";
 
-        List<UTXO> originUtxoList = new OrdinalsOriginGorillaUtxoProvider().listUxtos(Lists.newArrayList(origin));
-        List<UTXO> paymentUtxoList = new BitailsUtxoProvider().listUxtos(Lists.newArrayList(paymentAddress));
+        List<BsvUtxo> originUtxoList = new OrdinalsOriginGorillaUtxoProvider().listUxtos(Lists.newArrayList(origin));
+        List<BsvUtxo> paymentUtxoList = new BitailsUtxoProvider().listUxtos(Lists.newArrayList(paymentAddress));
         Transaction transaction = new OrdTransactionTemplate().sendOrdinal(this.bapBase, originUtxoList.get(0), paymentUtxoList.get(0)
-                , ordAddress, changeAddress, 50L, null, null, keyBag);
+                , ordAddress, changeAddress, 50L, null, null, keyProvider);
         parseTx(transaction);
         correctlySpends(transaction);
         String txId = broadcast(transaction);
@@ -96,11 +93,11 @@ public class OrdTransactionTest extends TransactionContextTest {
     @Test
     public void testSendOrdinalBySendUtxo() {
         String origin = "c51f95b21c4b0f6373f8ada9db85da469a86d5c564cc1c64183d964b78cdeadb_0";
-        Address pandaAddress = Address.fromBase58(MainNetParams.get(), "1PHhmDqXuwrX2kpA8DApVaMC98LrgNo9uF");
-        List<UTXO> originUtxoList = new OrdinalsOriginGorillaUtxoProvider().listUxtos(Lists.newArrayList(origin));
-        List<UTXO> paymentUtxoList = new BitailsUtxoProvider().listUxtos(Lists.newArrayList(paymentAddress));
+        AddressEnhance pandaAddress = AddressEnhance.fromBase58("1PHhmDqXuwrX2kpA8DApVaMC98LrgNo9uF");
+        List<BsvUtxo> originUtxoList = new OrdinalsOriginGorillaUtxoProvider().listUxtos(Lists.newArrayList(origin));
+        List<BsvUtxo> paymentUtxoList = new BitailsUtxoProvider().listUxtos(Lists.newArrayList(paymentAddress));
         Transaction transaction = new OrdTransactionTemplate().sendOrdinal(this.bapBase, originUtxoList.get(0), paymentUtxoList.get(0)
-                , pandaAddress, changeAddress, 50L, null, null, keyBag);
+                , pandaAddress, changeAddress, 50L, null, null, keyProvider);
         parseTx(transaction);
         correctlySpends(transaction);
         String txId = broadcast(transaction);
