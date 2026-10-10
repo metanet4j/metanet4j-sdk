@@ -35,7 +35,7 @@ public final class RedeemDataExtend {
 
     /** 压缩公钥字节；无私钥时返回 {@code null}。 */
     public byte[] getPubKeyBytes() {
-        return key == null ? null : toBytes(key.getPubKey());
+        return key == null ? null : key.getPubKey();
     }
 
     /** 私钥的 hex，便于断言。 */
@@ -43,11 +43,4 @@ public final class RedeemDataExtend {
         return key == null ? null : key.getKey().toHex();
     }
 
-    private static byte[] toBytes(java.util.List<?> values) {
-        byte[] bytes = new byte[values.size()];
-        for (int i = 0; i < bytes.length; i++) {
-            bytes[i] = (byte) ((Number) values.get(i)).intValue();
-        }
-        return bytes;
-    }
 }
