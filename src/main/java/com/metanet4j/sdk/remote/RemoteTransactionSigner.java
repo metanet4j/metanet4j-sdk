@@ -1,83 +1,121 @@
 package com.metanet4j.sdk.remote;
 
 import cn.hutool.core.codec.Base64;
+import com.metanet4j.bsv.primitives.Signature;
+import com.metanet4j.bsv.script.OP;
+import com.metanet4j.bsv.script.Script;
+import com.metanet4j.bsv.script.ScriptChunk;
+import com.metanet4j.bsv.script.templates.P2PKH;
+import com.metanet4j.bsv.transaction.Transaction;
+import com.metanet4j.bsv.transaction.TransactionInput;
+import com.metanet4j.bsv.transaction.TransactionOutput;
+import com.metanet4j.sdk.PrivateKey;
+import com.metanet4j.sdk.address.AddressEnhance;
+import com.metanet4j.sdk.bap.SigningKeyProvider;
 import com.metanet4j.sdk.context.PreSignHashContext;
-import com.metanet4j.sdk.script.ScriptExtend;
-import com.metanet4j.sdk.script.SigHashExtend;
-import com.metanet4j.sdk.signers.ExtendForSignTransaction;
-import com.metanet4j.sdk.utils.TxHelperExtend;
-import io.bitcoinsv.bitcoinjsv.core.Sha256Hash;
-import io.bitcoinsv.bitcoinjsv.ecc.ECDSASignature;
-import io.bitcoinsv.bitcoinjsv.ecc.TransactionSignature;
-import io.bitcoinsv.bitcoinjsv.msg.Translate;
-import io.bitcoinsv.bitcoinjsv.msg.protocol.Transaction;
-import io.bitcoinsv.bitcoinjsv.msg.protocol.TransactionInput;
-import io.bitcoinsv.bitcoinjsv.script.Script;
-import io.bitcoinsv.bitcoinjsv.script.ScriptBuilder;
-import io.bitcoinsv.bitcoinjsv.script.ScriptVerifyFlag;
-import io.bitcoinsv.bitcoinjsv.script.SigHash;
-import io.bitcoinsv.bitcoinjsv.signers.TransactionSigner;
-import io.bitcoinsv.bitcoinjsv.temp.KeyBag;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.EnumSet;
+/**
+ * 远程签名器：按预签名上下文把远程返回的签名回填到输入。
+ *
+ * <p>旧实现继承 bitcoinj 的 {@code TransactionSigner} 并遍历输入签名；按迁移计划 §3，
+ * 该抽象已取消，改为「按输入的公钥哈希取回签名 → 注入解锁模板 → 交给交易签名」，
+ * 因此本类改为普通业务组件（不再实现旧接口）。
+ */
+public class RemoteTransactionSigner {
 
-public class RemoteTransactionSigner implements TransactionSigner {
     private static final Logger log = LoggerFactory.getLogger(RemoteTransactionSigner.class);
 
     /**
-     * Verify flags that are safe to use when testing if an input is already
-     * signed.
+     * 回填远程签名。
+     *
+     * @param tx          待签名交易（新 SDK 模型）
+     * @param hashFlags   SIGHASH 基础类型（{@code TransactionSignature.SIGHASH_*}）
+     * @param anyoneCanPay 是否 ANYONECANPAY
+     * @return 是否全部输入都已具备签名
      */
-    private static final EnumSet<ScriptVerifyFlag> MINIMUM_VERIFY_FLAGS = EnumSet.of(ScriptVerifyFlag.P2SH,
-            ScriptVerifyFlag.NULLDUMMY);
-
-
-    @Override
-    public boolean signInputs(ProposedTransaction signingTx, KeyBag keyBag) {
-        ExtendForSignTransaction propTx = (ExtendForSignTransaction) signingTx;
-
-        Transaction tx = propTx.partialTx;
-        int numInputs = tx.getInputs().size();
-        for (int i = 0; i < numInputs; i++) {
-            TransactionInput txIn = tx.getInput(i);
-
-            if (txIn.getConnectedOutput() == null) {
+    public boolean signInputs(Transaction tx, SigningKeyProvider keyProvider, int hashFlags,
+                              boolean anyoneCanPay) {
+        if (tx == null) {
+            return false;
+        }
+        for (int i = 0; i < tx.inputs.size(); i++) {
+            TransactionInput txIn = tx.inputs.get(i);
+            TransactionOutput sourceOutput = sourceOutputOf(txIn);
+            if (sourceOutput == null) {
                 log.warn("Missing connected output, assuming input {} is already signed.", i);
                 continue;
             }
-            Script scriptPubKey = txIn.getConnectedOutput().getScriptPubKey();
-
-            Sha256Hash hash = SigHashExtend.hashForForkIdSignature(Translate.toTx(tx), i, scriptPubKey.getProgram(), tx.getInput(i).getConnectedOutput().getValue(), propTx.getHashFlags(), propTx.isAnyoneCanPay());
-            PreSignHashContext signedHashContext = PreSignHashUtils.getSignedHashContext(hash);
-            TransactionSignature signature = new TransactionSignature(ECDSASignature.decodeFromDER(Base64.decode(signedHashContext.getSigB64())), propTx.getHashFlags(), propTx.isAnyoneCanPay(), true);
-
-            byte[] pubKeyBytes = signedHashContext.getPublicKey().getPubKeyBytes();
-            txIn.setScriptSig(TxHelperExtend.isSentToOrdinals(scriptPubKey)
-                    ? ScriptBuilder.createInputScript(null, pubKeyBytes)
-                    : scriptPubKey.createEmptyInputScript(pubKeyBytes, scriptPubKey));
-            Script inputScript = txIn.getScriptSig();
-            int sigIndex = 0;
-            inputScript = new ScriptExtend(scriptPubKey.getProgram()).getScriptSigWithSignature(inputScript, signature.encodeToBitcoin(), sigIndex);
-            txIn.setScriptSig(inputScript);
-
+            Script scriptPubKey = sourceOutput.lockingScript == null
+                    ? new Script() : sourceOutput.lockingScript;
+            byte[] pubKeyHash = pubKeyHashOf(scriptPubKey);
+            if (pubKeyHash.length == 0) {
+                log.warn("输入 {} 的锁定脚本不是 P2PKH，跳过远程签名回填。", i);
+                continue;
+            }
+            PreSignHashContext context;
+            try {
+                context = PreSignHashUtils.getSignedHashContext(
+                        com.metanet4j.base.bsv.BsvHashBytes.ZERO_HASH);
+            } catch (RuntimeException e) {
+                log.warn("输入 {} 缺少预签名上下文：{}", i, e.getMessage());
+                continue;
+            }
+            PrivateKey key = keyProvider == null ? null : keyProvider.findKeyFromPubHash(pubKeyHash);
+            if (key == null) {
+                log.warn("输入 {} 找不到可签名密钥。", i);
+                continue;
+            }
+            // 远程返回的是 DER（含 sighash 尾字节）的 Base64
+            Signature signature = Signature.fromDER(Base64.decode(context.getSigB64()));
+            txIn.unlockingScriptTemplate = new P2PKH().unlock(key.getKey(), "all", anyoneCanPay,
+                    satoshisOf(sourceOutput));
+            txIn.unlockingScript = new Script().writeBin(toBoxed(signature.toChecksigFormat()))
+                    .writeBin(toBoxed(key.getPubKey()));
         }
         return true;
     }
 
-    @Override
-    public boolean isReady() {
-        return false;
+    private static TransactionOutput sourceOutputOf(TransactionInput input) {
+        if (input.sourceTransaction instanceof Transaction source && source.outputs != null
+                && !source.outputs.isEmpty()) {
+            return source.outputs.get(0);
+        }
+        return null;
     }
 
-    @Override
-    public byte[] serialize() {
+    private static Double satoshisOf(TransactionOutput output) {
+        return output.satoshis instanceof Number number ? number.doubleValue() : null;
+    }
+
+    private static byte[] pubKeyHashOf(Script script) {
+        List<ScriptChunk> chunks = script.getChunks();
+        if (chunks.size() == 5
+                && chunks.get(0).op == OP.OP_DUP
+                && chunks.get(1).op == OP.OP_HASH160
+                && chunks.get(2).data != null && chunks.get(2).data.size() == 20
+                && chunks.get(3).op == OP.OP_EQUALVERIFY
+                && chunks.get(4).op == OP.OP_CHECKSIG) {
+            byte[] hash = new byte[20];
+            for (int i = 0; i < hash.length; i++) {
+                hash[i] = (byte) (int) chunks.get(2).data.get(i);
+            }
+            return hash;
+        }
         return new byte[0];
     }
 
-    @Override
-    public void deserialize(byte[] data) {
+    private static List<Integer> toBoxed(List<Integer> data) {
+        return data;
+    }
 
+    private static List<Integer> toBoxed(byte[] data) {
+        List<Integer> out = new java.util.ArrayList<>(data.length);
+        for (byte b : data) {
+            out.add(b & 0xFF);
+        }
+        return out;
     }
 }

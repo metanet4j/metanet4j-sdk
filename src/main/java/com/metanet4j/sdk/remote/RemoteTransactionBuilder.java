@@ -1,39 +1,51 @@
 package com.metanet4j.sdk.remote;
 
 import com.google.common.collect.Lists;
+import com.metanet4j.base.bsv.BsvAmount;
+import com.metanet4j.base.bsv.BsvHashBytes;
+import com.metanet4j.bsv.script.OP;
+import com.metanet4j.bsv.script.Script;
+import com.metanet4j.bsv.script.ScriptChunk;
+import com.metanet4j.bsv.transaction.Transaction;
+import com.metanet4j.bsv.transaction.TransactionInput;
+import com.metanet4j.bsv.transaction.TransactionOutput;
 import com.metanet4j.sdk.bap.BapBaseCore;
 import com.metanet4j.sdk.bap.RemoteBapBase;
+import com.metanet4j.sdk.bap.SigningKeyProvider;
 import com.metanet4j.sdk.context.PreSignHashContext;
 import com.metanet4j.sdk.script.SigHashExtend;
 import com.metanet4j.sdk.sigma.Sigma;
 import com.metanet4j.sdk.transcation.LockingScriptBuilder;
 import com.metanet4j.sdk.transcation.TransactionBuilder;
 import com.metanet4j.sdk.utils.TxHelperExtend;
-import io.bitcoinsv.bitcoinjsv.core.Sha256Hash;
-import io.bitcoinsv.bitcoinjsv.msg.Translate;
-import io.bitcoinsv.bitcoinjsv.msg.protocol.Transaction;
-import io.bitcoinsv.bitcoinjsv.msg.protocol.TransactionInput;
-import io.bitcoinsv.bitcoinjsv.script.Script;
-import io.bitcoinsv.bitcoinjsv.script.SigHash;
-import io.bitcoinsv.bitcoinjsv.script.interpreter.ScriptExecutionException;
-import io.bitcoinsv.bitcoinjsv.signers.TransactionSigner;
-import io.bitcoinsv.bitcoinjsv.temp.KeyBag;
-import lombok.extern.slf4j.Slf4j;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
 
+/**
+ * 远程签名交易构建：只生成各输入的预签名哈希与签名地址，不落地私钥。
+ *
+ * <p>旧实现依赖 bitcoinj 交易模型、{@code KeyBag} 与 {@code TransactionSigner}；
+ * 按迁移计划 §3 改为新 SDK 交易模型 + {@link SigningKeyProvider} 显式密钥，
+ * 金额用 {@link BsvAmount}，预签名哈希用 {@link BsvHashBytes}。
+ */
 @Slf4j
 public class RemoteTransactionBuilder extends TransactionBuilder implements TransactionAllPreSignHash {
 
     public List<PreSignHashContext> bsmSignHashContexts;
 
-    public RemoteTransactionBuilder(RemoteBapBase bapBaseCore, TransactionSigner transactionSigner) {
-        super(bapBaseCore, null, transactionSigner);
+    private final RemoteTransactionSigner remoteTransactionSigner = new RemoteTransactionSigner();
+
+    public RemoteTransactionBuilder(RemoteBapBase bapBaseCore, SigningKeyProvider keyProvider) {
+        super(bapBaseCore, null, keyProvider);
         this.bsmSignHashContexts = new ArrayList<>();
     }
 
+    /** 远程签名器（回填远程返回的签名）。 */
+    public RemoteTransactionSigner getRemoteTransactionSigner() {
+        return remoteTransactionSigner;
+    }
 
     @Override
     public TransactionBuilder addDataOutput(LockingScriptBuilder lockingScriptBuilder) {
@@ -43,7 +55,6 @@ public class RemoteTransactionBuilder extends TransactionBuilder implements Tran
         return super.addDataOutput(lockingScriptBuilder);
     }
 
-
     public TransactionBuilder addSigmaSign(BapBaseCore bapBase, RemoteSignType remoteSignType) {
         Sigma sigma = new Sigma(bapBase, targetTransaction, true, remoteSignType);
         targetTransaction = sigma.sign().getSignedTx();
@@ -51,35 +62,45 @@ public class RemoteTransactionBuilder extends TransactionBuilder implements Tran
         return this;
     }
 
+    /** 远程流程不在本地清空输入脚本（由预签名哈希替代）。 */
     @Override
-    protected void setEmptyInputScript(Transaction outputTransaction, KeyBag bag) throws ScriptExecutionException {
-
+    protected void prepareInputsForSigning(Transaction transaction, SigningKeyProvider provider) {
+        // no-op：远程签名由 RemoteTransactionSigner 回填
     }
 
     @Override
-    public List<PreSignHashContext> getAllBsmSignHash(boolean useForkId, boolean anyoneCanPay, BapBaseCore bapBase) {
+    public List<PreSignHashContext> getAllBsmSignHash(boolean useForkId, boolean anyoneCanPay,
+                                                      BapBaseCore bapBase) {
         return this.bsmSignHashContexts;
     }
 
     public List<PreSignHashContext> getTxInputSignHash(boolean anyoneCanPay, BapBaseCore bapBase) {
-        return getTxInputSignHash(SigHash.Flags.ALL, anyoneCanPay, bapBase);
+        return getTxInputSignHash(com.metanet4j.bsv.primitives.TransactionSignature.SIGHASH_ALL,
+                anyoneCanPay, bapBase);
     }
 
-    public List<PreSignHashContext> getTxInputSignHash(SigHash.Flags flags, boolean anyoneCanPay, BapBaseCore bapBase) {
+    /**
+     * 逐输入计算预签名哈希与签名地址。
+     *
+     * @param hashFlags SIGHASH 基础类型（{@code TransactionSignature.SIGHASH_*}）
+     */
+    public List<PreSignHashContext> getTxInputSignHash(int hashFlags, boolean anyoneCanPay,
+                                                       BapBaseCore bapBase) {
         List<PreSignHashContext> preSignHashContexts = Lists.newArrayList();
-
-        int numInputs = this.targetTransaction.getInputs().size();
+        int numInputs = this.targetTransaction.inputs.size();
         for (int i = 0; i < numInputs; i++) {
             PreSignHashContext preSignHashContext = new PreSignHashContext();
-            TransactionInput txIn = this.targetTransaction.getInput(i);
-            if (txIn.getConnectedOutput() == null) {
+            TransactionInput txIn = this.targetTransaction.inputs.get(i);
+            TransactionOutput sourceOutput = sourceOutputOf(txIn);
+            if (sourceOutput == null) {
                 log.warn("Missing connected output, assuming input {} is already signed.", i);
                 continue;
             }
-            Script scriptPubKey = txIn.getConnectedOutput().getScriptPubKey();
-
-
-            Sha256Hash hash = SigHashExtend.hashForForkIdSignature(Translate.toTx(this.targetTransaction), i, scriptPubKey.getProgram(), this.targetTransaction.getInput(i).getConnectedOutput().getValue(), flags, anyoneCanPay);
+            Script scriptPubKey = sourceOutput.lockingScript == null
+                    ? new Script() : sourceOutput.lockingScript;
+            BsvHashBytes hash = SigHashExtend.hashForForkIdSignature(this.targetTransaction, i,
+                    scriptPubKey.toUint8Array(), BsvAmount.fromSdkValue(sourceOutput.satoshis),
+                    hashFlags, anyoneCanPay);
             preSignHashContext.setPreSignHash(hash);
 
             if (TxHelperExtend.isSentToOrdinals(scriptPubKey)) {
@@ -91,11 +112,9 @@ public class RemoteTransactionBuilder extends TransactionBuilder implements Tran
             }
             preSignHashContexts.add(preSignHashContext);
         }
-
         return preSignHashContexts.stream().map(o -> {
             o.setFee(this.getFee());
             return o;
-
         }).collect(Collectors.toList());
     }
 
@@ -104,5 +123,11 @@ public class RemoteTransactionBuilder extends TransactionBuilder implements Tran
         return 76 + 33 + 10;
     }
 
-
+    private static TransactionOutput sourceOutputOf(TransactionInput input) {
+        if (input.sourceTransaction instanceof Transaction source && source.outputs != null
+                && !source.outputs.isEmpty()) {
+            return source.outputs.get(0);
+        }
+        return null;
+    }
 }
