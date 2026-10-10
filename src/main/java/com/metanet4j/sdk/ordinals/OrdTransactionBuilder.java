@@ -6,7 +6,6 @@ import com.metanet4j.sdk.input.TransactionInputEnhance;
 import com.metanet4j.sdk.input.TransactionOutPointEnhance;
 import com.metanet4j.sdk.output.TransactionOutputEnhance;
 import com.metanet4j.sdk.signers.ExtendForSignTransaction;
-import com.metanet4j.sdk.signers.TransactionExtend;
 import com.metanet4j.sdk.transcation.TransactionBuilder;
 import com.metanet4j.sdk.utils.RedeemDataExtend;
 import com.metanet4j.sdk.utils.TxHelperExtend;
@@ -69,14 +68,14 @@ public class OrdTransactionBuilder extends TransactionBuilder {
 
 
     public OrdTransactionBuilder signTx(KeyBag keyBag, boolean useForkId) throws SignErrorException {
-        return signTx(keyBag, SigHash.Flags.ALL, useForkId, false);
+        return signTx(keyBag, TransactionSignature.SIGHASH_ALL, useForkId, false);
     }
 
 
     public OrdTransactionBuilder signTx(KeyBag keyBag, SigHash.Flags hashFlags, boolean useForkId, boolean anyoneCanPay) throws SignErrorException {
 
         setEmptyInputScriptHaveOrdinals(this.getTargetTransaction(), keyBag);
-        final ExtendForSignTransaction extendForSignTransaction = new ExtendForSignTransaction(TransactionExtend.toTransactionExtend(this.getTargetTransaction()), hashFlags, useForkId, anyoneCanPay);
+        final ExtendForSignTransaction extendForSignTransaction = new ExtendForSignTransaction(this.getTargetTransaction(), hashFlags, useForkId, anyoneCanPay);
         if (!this.getTransactionSigner().signInputs(extendForSignTransaction, keyBag)) {
             throw new SignErrorException();
         }

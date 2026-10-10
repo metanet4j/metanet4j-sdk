@@ -10,7 +10,6 @@ import com.metanet4j.sdk.ordinals.OrdScriptBuilder;
 import com.metanet4j.sdk.output.TransactionOutputEnhance;
 import com.metanet4j.sdk.sigma.Sigma;
 import com.metanet4j.sdk.signers.ExtendForSignTransaction;
-import com.metanet4j.sdk.signers.TransactionExtend;
 import io.bitcoinsv.bitcoinjsv.core.Address;
 import io.bitcoinsv.bitcoinjsv.core.Coin;
 import io.bitcoinsv.bitcoinjsv.core.UTXO;
@@ -60,12 +59,12 @@ public class RemoteOrdTransactionBuilder extends RemoteTransactionBuilder {
 
 
     public RemoteOrdTransactionBuilder signTx(KeyBag keyBag, boolean useForkId) throws SignErrorException {
-        return signTx(keyBag, SigHash.Flags.ALL, useForkId, false);
+        return signTx(keyBag, TransactionSignature.SIGHASH_ALL, useForkId, false);
     }
 
 
     public RemoteOrdTransactionBuilder signTx(KeyBag keyBag, SigHash.Flags hashFlags, boolean useForkId, boolean anyoneCanPay) throws SignErrorException {
-        final ExtendForSignTransaction extendForSignTransaction = new ExtendForSignTransaction(TransactionExtend.toTransactionExtend(this.getTargetTransaction()), hashFlags, useForkId, anyoneCanPay);
+        final ExtendForSignTransaction extendForSignTransaction = new ExtendForSignTransaction(this.getTargetTransaction(), hashFlags, useForkId, anyoneCanPay);
         if (!this.getTransactionSigner().signInputs(extendForSignTransaction, keyBag)) {
             throw new SignErrorException();
         }

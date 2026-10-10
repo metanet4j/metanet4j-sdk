@@ -11,7 +11,6 @@ import com.metanet4j.sdk.remote.RemoteTransactionSigner;
 import com.metanet4j.sdk.script.ScriptExtend;
 import com.metanet4j.sdk.sigma.Sigma;
 import com.metanet4j.sdk.signers.ExtendForSignTransaction;
-import com.metanet4j.sdk.signers.TransactionExtend;
 import com.metanet4j.sdk.utils.RedeemDataExtend;
 import com.metanet4j.sdk.utils.TxHelperExtend;
 import com.metanet4j.sdk.utxo.UTXOProvider;
@@ -219,7 +218,7 @@ public class TransactionBuilder {
 
     public Transaction completeAndSignTx(KeyBag keyBag, boolean useForkId) throws SignErrorException {
         setEmptyInputScript(targetTransaction, keyBag);
-        final ExtendForSignTransaction proposedTransaction = new ExtendForSignTransaction(TransactionExtend.toTransactionExtend(this.getTargetTransaction()), SigHash.Flags.ALL, useForkId, false);
+        final ExtendForSignTransaction proposedTransaction = new ExtendForSignTransaction(this.getTargetTransaction(), TransactionSignature.SIGHASH_ALL, useForkId, false);
         boolean b = transactionSigner.signInputs(proposedTransaction, keyBag);
         if (b) {
             return proposedTransaction.partialTx;
