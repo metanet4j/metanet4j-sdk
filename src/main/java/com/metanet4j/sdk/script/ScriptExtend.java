@@ -27,7 +27,29 @@ public final class ScriptExtend {
     /** 单个签名占用的估算字节数，与原库 {@code Script.SIG_SIZE} 一致。 */
     public static final int SIG_SIZE = 75;
 
+    /** 创建时间（秒）；旧库 {@code Script.getCreationTimeSeconds()} 的等价字段。 */
+    private final long creationTimeSeconds;
+
     private ScriptExtend() {
+        this(0L);
+    }
+
+    private ScriptExtend(long creationTimeSeconds) {
+        this.creationTimeSeconds = creationTimeSeconds;
+    }
+
+    /**
+     * 构造带创建时间的实例（旧库 {@code new Script(program, creationTimeSeconds)} 的等价入口）。
+     *
+     * <p>{@code ScriptExtend} 已改为工具类不再继承旧 {@code Script}，故以工厂方法暴露该字段。
+     */
+    public static ScriptExtend of(byte[] programBytes, long creationTimeSeconds) {
+        return new ScriptExtend(creationTimeSeconds);
+    }
+
+    /** 创建时间（秒）。 */
+    public long getCreationTimeSeconds() {
+        return creationTimeSeconds;
     }
 
     /** P2PKH：OP_DUP OP_HASH160 &lt;20 字节&gt; OP_EQUALVERIFY OP_CHECKSIG。 */
