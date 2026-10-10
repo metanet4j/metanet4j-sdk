@@ -23,9 +23,9 @@ public class WordsvBapBaseTest {
         BapBase aliceBapBase = BapBase.fromOnlyMasterPrivateKey(WordsvTestData.aliceMasterPrivateKey);
 
         try {
-            String encrypt = Ecies.encrypt(WordsvTestData.aliceXprv, serverBapBase.getEncryptKey(), null);
+            String encrypt = Ecies.encrypt(WordsvTestData.aliceXprv, serverBapBase.getEncryptKey().getPublicKey().getPublicKey(), null);
             System.out.println(encrypt);
-            byte[] decrypt = Ecies.decrypt(Base64.decode(encrypt), serverBapBase.getEncryptKey(), null);
+            byte[] decrypt = Ecies.decrypt(Base64.decode(encrypt), serverBapBase.getEncryptKey().getKey(), null);
             String s = new String(decrypt, Charset.forName("UTF-8"));
             System.out.println(s);
             System.out.println(serverBapBase.decrypt(encrypt));
