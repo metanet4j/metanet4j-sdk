@@ -130,17 +130,19 @@ public class RemoteSignBitcoinschemaTransactionTest extends TransactionContextTe
                 case CURRENT:
                     String s2 = EcKeyLiteExtend.fromPrivate(bapBase.getCurrentPrivateKey().getPrivKey()).signHash(preSignHashContext.getPreSignHash());
                     preSignHashContext.setSigB64(s2);
-                    preSignHashContext.setPublicKey(PublicKey.fromHex(bapBase.getCurrentPrivateKey().getPublicKeyAsHex()));
+                    preSignHashContext.setPublicKey(bapBase.getCurrentPrivateKey().getPublicKey());
                     break;
                 case ORD:
-                    ECDSASignature signature = bapBase.getOrdPrivateKey().sign(preSignHashContext.getPreSignHash());
-                    preSignHashContext.setSigB64(Base64.encode(signature.encodeToDER()));
-                    preSignHashContext.setPublicKey(PublicKey.fromHex(bapBase.getOrdPrivateKey().getPublicKeyAsHex()));
+                    com.metanet4j.bsv.primitives.Signature signature =
+                            bapBase.getOrdPrivateKey().sign(preSignHashContext.getPreSignHash());
+                    preSignHashContext.setSigB64(Base64.encode(toBytes(signature.toDER())));
+                    preSignHashContext.setPublicKey(bapBase.getOrdPrivateKey().getPublicKey());
                     break;
                 case PAYMENT:
-                    ECDSASignature signature1 = bapBase.getPayAccountKey().sign(preSignHashContext.getPreSignHash());
-                    preSignHashContext.setSigB64(Base64.encode(signature1.encodeToDER()));
-                    preSignHashContext.setPublicKey(PublicKey.fromHex(bapBase.getPayAccountKey().getPublicKeyAsHex()));
+                    com.metanet4j.bsv.primitives.Signature signature1 =
+                            bapBase.getPayAccountKey().sign(preSignHashContext.getPreSignHash());
+                    preSignHashContext.setSigB64(Base64.encode(toBytes(signature1.toDER())));
+                    preSignHashContext.setPublicKey(bapBase.getPayAccountKey().getPublicKey());
                     break;
 
             }
@@ -180,7 +182,7 @@ public class RemoteSignBitcoinschemaTransactionTest extends TransactionContextTe
     }
 
     private RemoteTransactionBuilder buildDataTx(UnSpendableDataLockBuilder dataLockBuilder) {
-        RemoteTransactionBuilder transactionBuilder = new RemoteTransactionBuilder(this.remoteBapBase, new RemoteTransactionSigner());
+        RemoteTransactionBuilder transactionBuilder = new RemoteTransactionBuilder(this.remoteBapBase, keyProvider);
         transactionBuilder
                 .addInputs(java.util.List.<com.metanet4j.sdk.address.AddressEnhance>of(paymentAddress),
                         new BitailsUtxoProvider())
@@ -188,5 +190,13 @@ public class RemoteSignBitcoinschemaTransactionTest extends TransactionContextTe
                 .withFeeKb(BsvAmount.valueOf(feePerKb))
                 .changeAddress(changeAddress);
         return transactionBuilder;
+    }
+
+    private static byte[] toBytes(java.util.List<?> values) {
+        byte[] bytes = new byte[values.size()];
+        for (int i = 0; i < bytes.length; i++) {
+            bytes[i] = (byte) ((Number) values.get(i)).intValue();
+        }
+        return bytes;
     }
 }
