@@ -42,7 +42,7 @@ class PreSignHashContextContractTest {
         context.setPreSignHash(BsvHashBytes.fromDisplayHex("2".repeat(64)));
         context.setRemoteSignType(RemoteSignType.PAYMENT);
         context.setFee(BsvAmount.valueOf(42));
-        context.setPublicKey(PublicKey.fromBytes(ECKeyLite.fromPrivate(BigInteger.TWO).getPubKey()));
+        context.setPublicKey(com.metanet4j.sdk.PrivateKey.of(BigInteger.TWO).getPublicKey());
 
         LinkedHashMap<String, Object> map = context.toMap();
         map.put("fee", Integer.valueOf(42));
