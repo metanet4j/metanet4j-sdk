@@ -3,10 +3,8 @@ package com.metanet4j.sdk.sigma;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
-import io.bitcoinsv.bitcoinjsv.msg.protocol.Transaction;
-import io.bitcoinsv.bitcoinjsv.params.Net;
-import io.bitcoinsv.bitcoinjsv.script.Script;
-import io.bitcoinsv.bitcoinjsv.script.ScriptBuilder;
+import com.metanet4j.bsv.transaction.Transaction;
+import com.metanet4j.bsv.script.Script;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
 
@@ -27,8 +25,8 @@ class SigmaProtocolModelTest {
         assertEquals("other", mutable.getAddress());
         assertEquals("signature", mutable.getSignature());
 
-        Script script = new ScriptBuilder().data("SIGMA".getBytes(StandardCharsets.US_ASCII)).build();
-        Transaction transaction = new Transaction(Net.MAINNET);
+        Script script = new Script().writeBin(toBoxed("SIGMA".getBytes(StandardCharsets.US_ASCII)));
+        Transaction transaction = new Transaction();
         SignResponse response = new SignResponse("address", "base64-signature", "BSM", 2, 3,
                 script, transaction);
         assertEquals(sig.getAddress(), response.getAddress());
@@ -36,5 +34,13 @@ class SigmaProtocolModelTest {
         assertSame(script, response.getSigmaScript());
         assertSame(transaction, response.getSignedTx());
         assertSame(Algorithm.BSM, Algorithm.valueOf("BSM"));
+    }
+
+    private static java.util.List<Integer> toBoxed(byte[] data) {
+        java.util.List<Integer> out = new java.util.ArrayList<>(data.length);
+        for (byte b : data) {
+            out.add(b & 0xFF);
+        }
+        return out;
     }
 }

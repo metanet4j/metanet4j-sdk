@@ -243,7 +243,7 @@ public class BitcoinschemaTransactionTest extends TransactionContextTest {
     @Test
     public void testEckeyLiteExtend() {
         String s1 = bapBase.getOrdAddress().toBase58();
-        String s2 = new Address(MainNetParams.get(), EcKeyLiteExtend.fromPrivate(bapBase.getOrdPrivateKey().getPrivKey()).getPubKeyHash()).toBase58();
+        String s2 = AddressEnhance.fromPrivateKey(bapBase.getOrdPrivateKey()).toBase58();
         Assertions.assertEquals(s1, s2);
     }
 
