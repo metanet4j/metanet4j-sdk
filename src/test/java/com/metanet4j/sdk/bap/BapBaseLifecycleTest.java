@@ -7,12 +7,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.metanet4j.sdk.TestData;
 import com.metanet4j.sdk.crypto.MasterPrivateKey;
+import com.metanet4j.bsv.compat.HD;
+import com.metanet4j.sdk.bap.BapPath;
 import com.metanet4j.sdk.crypto.Ecies;
-import io.bitcoinsv.bitcoinjsv.core.ECKeyLite;
-import io.bitcoinsv.bitcoinjsv.crypto.ChildNumber;
-import io.bitcoinsv.bitcoinjsv.crypto.DeterministicHierarchy;
-import io.bitcoinsv.bitcoinjsv.crypto.DeterministicKey;
-import io.bitcoinsv.bitcoinjsv.crypto.HDUtils;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -27,17 +24,17 @@ class BapBaseLifecycleTest {
         assertEquals(rootAddress, bap.getPreviouAddress().toBase58());
 
         String firstPath = bap.getCurrentPath();
-        List<ChildNumber> secondPath = bap.generateNextChildNumbers();
+        BapPath secondPath = bap.generateNextChildNumbers();
         assertEquals(firstPath, bap.getPreviousPath());
         assertEquals(firstAddress, bap.getPreviouAddress().toBase58());
         assertEquals(identity, bap.getIdentityKey());
         assertEquals(rootAddress, bap.getRootAddress());
-        assertEquals(2, secondPath.getLast().num());
+        assertEquals(2L, secondPath.lastIndex(), "第二个子路径的末位索引应为 2");
         assertNotEquals(firstAddress, bap.getCurrentAddress().toBase58());
 
         String secondAddress = bap.getCurrentAddress().toBase58();
         bap.generateNextChildNumbers();
-        assertEquals(3, bap.getCurrentNumberList().getLast().num());
+        assertEquals(3L, bap.getCurrentNumberList().lastIndex(), "轮换后当前路径的末位索引应为 3");
         assertEquals(secondAddress, bap.getPreviouAddress().toBase58());
     }
 
@@ -48,8 +45,8 @@ class BapBaseLifecycleTest {
         rotating.generateNextChildNumbers();
 
         BapBase reconstructed = new BapBase(TestData.masterPrivateKey,
-                List.copyOf(rotating.getRootChildNumberList()),
-                List.copyOf(rotating.getCurrentNumberList()), new DefaultBapBaseConfig());
+                rotating.getRootChildNumberList(), rotating.getCurrentNumberList(),
+                new DefaultBapBaseConfig());
         assertEquals(rotating.getIdentityKey(), reconstructed.getIdentityKey());
         assertEquals(rotating.getCurrentAddress(), reconstructed.getCurrentAddress());
         assertEquals(previousAddress, reconstructed.getPreviouAddress().toBase58());
@@ -93,7 +90,7 @@ class BapBaseLifecycleTest {
         BapBase fromMaster = BapBase.fromOnlyMasterPrivateKey(TestData.masterPrivateKey, config);
         BapBase fromPath = BapBase.fromRootPath(TestData.masterPrivateKey, config);
         BapBase fromNumbers = BapBase.fromRootChildNumberList(TestData.masterPrivateKey,
-                HDUtils.parsePath(config.getDefaultRootPath()), config);
+                BapPath.parse(config.getDefaultRootPath()), config);
 
         assertEquals(fromMaster.getIdentityKey(), fromPath.getIdentityKey());
         assertEquals(fromMaster.getCurrentAddress(), fromNumbers.getCurrentAddress());
@@ -110,13 +107,9 @@ class BapBaseLifecycleTest {
     @Test
     void selfDecryptUsesTheConfiguredAbsoluteEncryptionPathAndReportsBadCiphertext() throws Exception {
         BapBase bap = BapBase.fromOnlyMasterPrivateKey(TestData.masterPrivateKey);
-        List<ChildNumber> path = HDUtils.parsePath(bap.getBapBaseConfig().getDefaultEncryptPath());
-        DeterministicHierarchy hierarchy = new DeterministicHierarchy(
-                TestData.masterPrivateKey.getMasterDeterministicKey());
-        DeterministicKey key = hierarchy.deriveChild(path.subList(0, path.size() - 1),
-                false, true, path.getLast());
-        String ciphertext = Ecies.encrypt("identity export",
-                ECKeyLite.fromPublicOnly(key.getPubKey()), null);
+        BapPath path = BapPath.parse(bap.getBapBaseConfig().getDefaultEncryptPath());
+        HD key = path.derive(TestData.masterPrivateKey.getMasterDeterministicKey());
+        String ciphertext = Ecies.encrypt("identity export", key.pubKey, null);
 
         assertEquals("identity export", bap.decryptSelf(ciphertext));
         assertThrows(IllegalStateException.class, () -> bap.decryptSelf("invalid-ciphertext"));
