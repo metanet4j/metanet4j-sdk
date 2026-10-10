@@ -11,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import cn.hutool.core.codec.Base64;
 import com.metanet4j.sdk.EcKeyLiteExtend;
 import com.metanet4j.sdk.PublicKey;
+import com.metanet4j.sdk.PrivateKey;
 import com.metanet4j.sdk.TestData;
 import com.metanet4j.sdk.bap.BapBase;
 import com.metanet4j.sdk.bap.RemoteBapBase;
@@ -25,10 +26,10 @@ import io.bitcoinsv.bitcoinjsv.core.ECKeyLite;
 import io.bitcoinsv.bitcoinjsv.core.Sha256Hash;
 import com.metanet4j.base.bsv.BsvHashBytes;
 import com.metanet4j.base.bsv.BsvUtxo;
+import com.metanet4j.bsv.script.Script;
 import com.metanet4j.bsv.script.templates.P2PKH;
 import com.metanet4j.bsv.transaction.Transaction;
 import com.metanet4j.bsv.transaction.TransactionOutput;
-import io.bitcoinsv.bitcoinjsv.script.Script;
 import com.metanet4j.sdk.bap.SigningKeyProvider;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -80,7 +81,7 @@ class RemoteOrdTransactionTemplateContractTest {
                         "first".getBytes(StandardCharsets.US_ASCII), "text/plain", metadata).toUint8Array(),
                 builder.build().outputs.get(0).lockingScript.toUint8Array());
         assertEquals(inputSum(builder.build()), outputSum(builder.build()).add(builder.getFee()));
-        assertEquals(0, builder.build().inputs.get(0).unlockingScript.toUint8Array().length);
+        assertEquals(0, unlockingScriptBytes(builder.build(), 0).length);
         assertNull(builder.getSigma());
         assertEquals(RemoteSignType.CURRENT,
                 builder.getAllBsmSignHash(true, false, remoteBap).get(0).getRemoteSignType());
@@ -302,7 +303,7 @@ class RemoteOrdTransactionTemplateContractTest {
         assertEquals(1, tx.inputs.size());
         assertEquals(3, tx.outputs.size());
         assertEquals(BsvAmount.SATOSHI, BsvAmount.fromSdkValue(tx.outputs.get(0).satoshis));
-        assertEquals(0, tx.inputs.get(0).unlockingScript.toUint8Array().length);
+        assertEquals(0, unlockingScriptBytes(tx, 0).length);
         assertTrue(inputSum(tx).getValue() > outputSum(tx).getValue());
     }
 
@@ -338,7 +339,7 @@ class RemoteOrdTransactionTemplateContractTest {
     void signsBsmThenInputFromTwoLocallyPreparedRemoteContexts() {
         RemoteOrdTransactionTemplate template = new RemoteOrdTransactionTemplate(false, false);
         OrdScriptBuilder.Inscription content = inscription("staged");
-        List<AddressLite> addresses = List.of(bap.getPayAccountAddress());
+        List<AddressEnhance> addresses = List.of(bap.getPayAccountAddress());
         RemoteOrdTransactionBuilder unsigned = template.createOrdinal(addresses,
                 provider, destination, paymentAddress, 500, content, null,
                 remoteBap, RemoteSignType.CURRENT);
@@ -353,9 +354,9 @@ class RemoteOrdTransactionTemplateContractTest {
                 remoteBap, RemoteSignType.CURRENT);
         assertTrue(bsmSigned.getSigma().verify());
         PreSignHashContext payment = bsmSigned.getTxInputSignHash(false, remoteBap).get(0);
-        ECKey paymentKey = ECKey.fromPrivate(bap.getPayAccountKey().getPrivKeyBytes());
-        payment.setSigB64(Base64.encode(paymentKey.sign(payment.getPreSignHash()).encodeToDER()));
-        payment.setPublicKey(PublicKey.fromBytes(paymentKey.getPubKey()));
+        PrivateKey paymentKey = bap.getPayAccountKey();
+        payment.setSigB64(Base64.encode(toBytes(paymentKey.sign(payment.getPreSignHash()).toDER())));
+        payment.setPublicKey(paymentKey.getPublicKey());
         PreSignHashUtils.setPreSignHashContext(payment);
 
         template.setDoInputSign(true);
@@ -363,24 +364,24 @@ class RemoteOrdTransactionTemplateContractTest {
                 paymentAddress, 500, content, null, remoteBap,
                 RemoteSignType.CURRENT).build();
 
-        assertTrue(signed.inputs.get(0).unlockingScript.toUint8Array().length > 0);
+        assertTrue(unlockingScriptBytes(signed, 0).length > 0);
         assertUnlockingScriptValid(signed, 0);
     }
 
     private void signRemoteInputs(List<PreSignHashContext> pending) {
         for (PreSignHashContext context : pending) {
-            ECKeyLite key = context.getRemoteSignType() == RemoteSignType.ORD
+            PrivateKey key = context.getRemoteSignType() == RemoteSignType.ORD
                     ? bap.getOrdPrivateKey() : bap.getPayAccountKey();
-            context.setSigB64(Base64.encode(key.sign(context.getPreSignHash()).encodeToDER()));
-            context.setPublicKey(PublicKey.fromHex(key.getPublicKeyAsHex()));
+            context.setSigB64(Base64.encode(toBytes(key.sign(context.getPreSignHash()).toDER())));
+            context.setPublicKey(key.getPublicKey());
             PreSignHashUtils.setPreSignHashContext(context);
         }
     }
 
     private void assertSpendable(Transaction signed) {
         for (int i = 0; i < signed.inputs.size(); i++) {
-            assertTrue(signed.getInput(i).lockingScript.toUint8Array().length > 0);
-            assertUnlockingScriptValid(sent, i);
+            assertTrue(unlockingScriptBytes(signed, i).length > 0);
+            assertUnlockingScriptValid(signed, i);
         }
     }
 
@@ -395,7 +396,7 @@ class RemoteOrdTransactionTemplateContractTest {
         hash[0] = 3;
         Script prior = OrdScriptBuilder.buildInscription(destination,
                 "prior".getBytes(StandardCharsets.US_ASCII), "text/plain", null);
-        return new UTXO(Sha256Hash.wrap(hash), 0, BsvAmount.SATOSHI, 0, false, prior);
+        return new BsvUtxo(BsvHashBytes.of(hash), 0, 1L, 0, false, null, prior.toUint8Array());
     }
 
     private OrdScriptBuilder.Inscription inscription(String value) {
@@ -420,6 +421,14 @@ class RemoteOrdTransactionTemplateContractTest {
         assertNotNull(signature, "解锁脚本首项应为签名");
         int scope = signature[signature.length - 1] & 0xFF;
         assertTrue((scope & 0x40) != 0 || (scope & 0x1F) >= 1, "签名尾字节应含合法 SIGHASH 范围：" + scope);
+    }
+
+    private static byte[] toBytes(java.util.List<?> values) {
+        byte[] bytes = new byte[values.size()];
+        for (int i = 0; i < bytes.length; i++) {
+            bytes[i] = (byte) ((Number) values.get(i)).intValue();
+        }
+        return bytes;
     }
 
     /** 解锁脚本字节（字段为 Object：可能是 Script、byte[] 或字节列表）。 */
