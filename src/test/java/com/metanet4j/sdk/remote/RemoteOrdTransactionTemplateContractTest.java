@@ -76,7 +76,7 @@ class RemoteOrdTransactionTemplateContractTest {
         assertFalse(template.isDoInputSign());
         assertEquals(1, builder.build().inputs.size());
         assertEquals(2, builder.build().outputs.size());
-        assertEquals(BsvAmount.SATOSHI, builder.build()BsvAmount.fromSdkValue(.outputs.get(0).satoshis));
+        assertEquals(BsvAmount.SATOSHI, BsvAmount.fromSdkValue(builder.build().outputs.get(0).satoshis));
         assertArrayEquals(OrdScriptBuilder.buildInscription(destination,
                         "first".getBytes(StandardCharsets.US_ASCII), "text/plain", metadata).toUint8Array(),
                 builder.build().outputs.get(0).lockingScript.toUint8Array());
@@ -134,7 +134,7 @@ class RemoteOrdTransactionTemplateContractTest {
                 500, null, null, keyBag);
 
         assertEquals(2, sent.inputs.size());
-        assertEquals(BsvAmount.SATOSHI, sentBsvAmount.fromSdkValue(.outputs.get(0).satoshis));
+        assertEquals(BsvAmount.SATOSHI, BsvAmount.fromSdkValue(sent.outputs.get(0).satoshis));
         assertArrayEquals(ScriptBuilder.createOutputScript(destination).toUint8Array(),
                 sent.outputs.get(0).lockingScript.toUint8Array());
         assertTrue(sent.getInputSum().satoshis > sent.getOutputSum().satoshis);
@@ -176,7 +176,7 @@ class RemoteOrdTransactionTemplateContractTest {
                     500, attempt, null, keyBag);
             assertArrayEquals(ScriptBuilder.createOutputScript(destination).toUint8Array(),
                     sent.outputs.get(0).lockingScript.toUint8Array());
-            assertEquals(BsvAmount.SATOSHI, sentBsvAmount.fromSdkValue(.outputs.get(0).satoshis));
+            assertEquals(BsvAmount.SATOSHI, BsvAmount.fromSdkValue(sent.outputs.get(0).satoshis));
         }
     }
 
@@ -190,7 +190,7 @@ class RemoteOrdTransactionTemplateContractTest {
         assertEquals(2, tx.inputs.size());
         assertArrayEquals(ordinalUtxo().getScript().toUint8Array(),
                 tx.getInput(0).getConnectedOutput().lockingScript.toUint8Array());
-        assertEquals(BsvAmount.SATOSHI, txBsvAmount.fromSdkValue(.outputs.get(0).satoshis));
+        assertEquals(BsvAmount.SATOSHI, BsvAmount.fromSdkValue(tx.outputs.get(0).satoshis));
         assertArrayEquals(ScriptBuilder.createOutputScript(destination).toUint8Array(),
                 tx.outputs.get(0).lockingScript.toUint8Array());
         assertEquals(0, tx.getInput(0).lockingScript.toUint8Array().length);
@@ -221,7 +221,7 @@ class RemoteOrdTransactionTemplateContractTest {
         assertEquals(2, signed.inputs.size());
         assertArrayEquals(ScriptBuilder.createOutputScript(destination).toUint8Array(),
                 signed.outputs.get(0).lockingScript.toUint8Array());
-        assertEquals(BsvAmount.SATOSHI, signedBsvAmount.fromSdkValue(.outputs.get(0).satoshis));
+        assertEquals(BsvAmount.SATOSHI, BsvAmount.fromSdkValue(signed.outputs.get(0).satoshis));
         assertEquals(signed.getInputSum(), signed.getOutputSum().add(completed.getFee()));
         assertSpendable(signed);
     }
@@ -260,7 +260,7 @@ class RemoteOrdTransactionTemplateContractTest {
                 "second".getBytes(StandardCharsets.US_ASCII), "text/plain", metadata).toUint8Array();
         assertArrayEquals(inscriptionScript, Arrays.copyOf(signed.outputs.get(0).lockingScript.toUint8Array(),
                 inscriptionScript.length));
-        assertEquals(BsvAmount.SATOSHI, signedBsvAmount.fromSdkValue(.outputs.get(0).satoshis));
+        assertEquals(BsvAmount.SATOSHI, BsvAmount.fromSdkValue(signed.outputs.get(0).satoshis));
         assertSpendable(signed);
     }
 
@@ -278,7 +278,7 @@ class RemoteOrdTransactionTemplateContractTest {
                     .prepareSendOrdinal(remoteBap, ordinalUtxo(), paymentUtxo(), destination,
                             paymentAddress, 500, attempt, null, RemoteSignType.CURRENT);
             assertEquals(2, builder.build().inputs.size());
-            assertEquals(BsvAmount.SATOSHI, builder.build()BsvAmount.fromSdkValue(.outputs.get(0).satoshis));
+            assertEquals(BsvAmount.SATOSHI, BsvAmount.fromSdkValue(builder.build().outputs.get(0).satoshis));
             assertArrayEquals(ScriptBuilder.createOutputScript(destination).toUint8Array(),
                     builder.build().outputs.get(0).lockingScript.toUint8Array());
         }
@@ -304,7 +304,7 @@ class RemoteOrdTransactionTemplateContractTest {
 
         assertEquals(1, tx.inputs.size());
         assertEquals(3, tx.outputs.size());
-        assertEquals(BsvAmount.SATOSHI, txBsvAmount.fromSdkValue(.outputs.get(0).satoshis));
+        assertEquals(BsvAmount.SATOSHI, BsvAmount.fromSdkValue(tx.outputs.get(0).satoshis));
         assertEquals(0, tx.getInput(0).lockingScript.toUint8Array().length);
         assertTrue(tx.getInputSum().satoshis > tx.getOutputSum().satoshis);
     }
