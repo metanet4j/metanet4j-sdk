@@ -4,12 +4,10 @@ package com.metanet4j.sdk.ordinals;
 import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.StrUtil;
 import com.metanet4j.base.model.MAP;
-import io.bitcoinsv.bitcoinjsv.core.Address;
-import io.bitcoinsv.bitcoinjsv.core.ECKeyLite;
-import io.bitcoinsv.bitcoinjsv.script.Script;
-import io.bitcoinsv.bitcoinjsv.script.ScriptBuilder;
-import io.bitcoinsv.bitcoinjsv.script.ScriptChunk;
-import io.bitcoinsv.bitcoinjsv.script.ScriptOpCodes;
+import com.metanet4j.bsv.script.OP;
+import com.metanet4j.bsv.script.Script;
+import com.metanet4j.bsv.script.templates.P2PKH;
+import com.metanet4j.sdk.address.AddressEnhance;
 import lombok.Builder;
 import lombok.Data;
 
@@ -21,51 +19,62 @@ public class OrdScriptBuilder {
     public static final String MAP_PREFIX = "1PuQa7K62MiKCtssSLKy1kh56WWU7MtUR5";
 
 
+    /**
+     * 构造 Ordinals 铭文脚本：P2PKH 前缀 + OP_0 OP_IF "ord" OP_1 &lt;媒体类型&gt; OP_0 &lt;内容&gt; OP_ENDIF
+     * （有 MAP 元数据时再接 OP_RETURN 段）。
+     */
     public static Script buildInscription(
-            Address destinationAddress,
+            AddressEnhance destinationAddress,
             byte[] b64File,
             String mediaType,
             ORDMap metaData) {
 
-        ScriptBuilder inscriptionAsm = new ScriptBuilder();
-
-        List<ScriptChunk> chunks = ScriptBuilder.createOutputScript(destinationAddress).getChunks();
-        for (ScriptChunk chunk : chunks) {
-            inscriptionAsm.addChunk(chunk);
-        }
-
-        if (b64File != null && mediaType != null) {
-            inscriptionAsm.addChunk(new ScriptChunk(ScriptOpCodes.OP_FALSE, null));
-
-            inscriptionAsm.op(ScriptOpCodes.OP_IF)
-                    .data("ord".getBytes())
-                    .op(ScriptOpCodes.OP_TRUE)
-                    .data(mediaType.getBytes());
-            inscriptionAsm.addChunk(new ScriptChunk(ScriptOpCodes.OP_FALSE, null));
-
-            inscriptionAsm.data(b64File)
-                    .op(ScriptOpCodes.OP_ENDIF);
-        }
-
-        if (MapUtil.isNotEmpty(metaData) && StrUtil.isNotEmpty(metaData.get("app")) && StrUtil.isNotEmpty(metaData.get("type"))) {
-            inscriptionAsm
-                    .op(ScriptOpCodes.OP_RETURN)
-                    .data(MAP_PREFIX.getBytes())
-                    .data("SET".getBytes());
-
-            for (Map.Entry<String, String> entry : metaData.entrySet()) {
-                if (!"cmd".equals(entry.getKey())) {
-                    inscriptionAsm.data(entry.getKey().getBytes());
-                    inscriptionAsm.data(entry.getValue().getBytes());
-                }
+        Script inscriptionAsm = new Script();
+        for (var chunk : new P2PKH().lock(destinationAddress.getHash160()).getChunks()) {
+            inscriptionAsm.writeOpCode(chunk.op);
+            if (chunk.data != null) {
+                inscriptionAsm.writeBin(chunk.data);
             }
         }
 
-        return inscriptionAsm.build();
+        if (b64File != null && mediaType != null) {
+            inscriptionAsm.writeOpCode(OP.OP_0)
+                    .writeOpCode(OP.OP_IF)
+                    .writeBin(toBoxed("ord".getBytes()))
+                    .writeOpCode(OP.OP_1)
+                    .writeBin(toBoxed(mediaType.getBytes()))
+                    .writeOpCode(OP.OP_0)
+                    .writeBin(toBoxed(b64File))
+                    .writeOpCode(OP.OP_ENDIF);
+        }
+
+        if (MapUtil.isNotEmpty(metaData) && StrUtil.isNotEmpty(metaData.get("app"))
+                && StrUtil.isNotEmpty(metaData.get("type"))) {
+            inscriptionAsm.writeOpCode(OP.OP_RETURN)
+                    .writeBin(toBoxed(MAP_PREFIX.getBytes()))
+                    .writeBin(toBoxed("SET".getBytes()));
+
+            for (Map.Entry<String, String> entry : metaData.entrySet()) {
+                if (!"cmd".equals(entry.getKey())) {
+                    inscriptionAsm.writeBin(toBoxed(entry.getKey().getBytes()));
+                    inscriptionAsm.writeBin(toBoxed(entry.getValue().getBytes()));
+                }
+            }
+        }
+        return inscriptionAsm;
+    }
+
+    private static List<Integer> toBoxed(byte[] data) {
+        List<Integer> out = new java.util.ArrayList<>(data.length);
+        for (byte b : data) {
+            out.add(b & 0xFF);
+        }
+        return out;
     }
 
     public static class LocalSigner implements Signer {
-        ECKeyLite idKey;
+        /** 本地签名私钥。 */
+        com.metanet4j.bsv.primitives.PrivateKey idKey;
     }
 
     public static class RemoteSigner implements Signer {

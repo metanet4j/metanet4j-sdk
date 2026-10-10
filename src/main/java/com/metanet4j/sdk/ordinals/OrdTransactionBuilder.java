@@ -1,110 +1,96 @@
 package com.metanet4j.sdk.ordinals;
 
+import com.google.common.collect.Lists;
+import com.metanet4j.base.bsv.BsvAmount;
+import com.metanet4j.base.bsv.BsvUtxo;
+import com.metanet4j.bsv.primitives.TransactionSignature;
+import com.metanet4j.bsv.script.Script;
+import com.metanet4j.bsv.transaction.Transaction;
+import com.metanet4j.bsv.transaction.TransactionInput;
+import com.metanet4j.bsv.transaction.TransactionOutput;
+import com.metanet4j.sdk.address.AddressEnhance;
 import com.metanet4j.sdk.bap.BapBaseCore;
+import com.metanet4j.sdk.bap.SigningKeyProvider;
 import com.metanet4j.sdk.exception.SignErrorException;
-import com.metanet4j.sdk.input.TransactionInputEnhance;
-import com.metanet4j.sdk.input.TransactionOutPointEnhance;
-import com.metanet4j.sdk.output.TransactionOutputEnhance;
-import com.metanet4j.sdk.signers.ExtendForSignTransaction;
 import com.metanet4j.sdk.transcation.TransactionBuilder;
-import com.metanet4j.sdk.utils.RedeemDataExtend;
-import com.metanet4j.sdk.utils.TxHelperExtend;
-import io.bitcoinsv.bitcoinjsv.core.Address;
-import io.bitcoinsv.bitcoinjsv.core.Coin;
-import io.bitcoinsv.bitcoinjsv.core.UTXO;
-import io.bitcoinsv.bitcoinjsv.msg.protocol.Transaction;
-import io.bitcoinsv.bitcoinjsv.msg.protocol.TransactionInput;
-import io.bitcoinsv.bitcoinjsv.msg.protocol.TransactionOutPoint;
-import io.bitcoinsv.bitcoinjsv.msg.protocol.TransactionOutput;
-import io.bitcoinsv.bitcoinjsv.params.Net;
-import io.bitcoinsv.bitcoinjsv.script.Script;
-import io.bitcoinsv.bitcoinjsv.script.ScriptBuilder;
-import io.bitcoinsv.bitcoinjsv.script.SigHash;
-import io.bitcoinsv.bitcoinjsv.script.interpreter.ScriptExecutionException;
-import io.bitcoinsv.bitcoinjsv.signers.TransactionSigner;
-import io.bitcoinsv.bitcoinjsv.temp.KeyBag;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-
+/**
+ * Ordinals 交易构建：追加铭文输入／输出并签名。
+ *
+ * <p>旧实现基于 bitcoinj 交易模型、{@code KeyBag} 与 {@code TransactionSigner}；
+ * 按迁移计划 §3 改为新 SDK（com.metanet4j.bsv）交易模型 + {@link SigningKeyProvider} 显式取密钥 +
+ * 每输入注入解锁模板后调用 {@code Transaction.sign()}。
+ */
 public class OrdTransactionBuilder extends TransactionBuilder {
 
-    public OrdTransactionBuilder(BapBaseCore bapBaseCore, KeyBag keyBag) {
-        super(bapBaseCore, keyBag);
+    /** 铭文输出金额固定 1 satoshi。 */
+    private static final BsvAmount INSCRIPTION_SATOSHI = BsvAmount.SATOSHI;
+
+    public OrdTransactionBuilder(BapBaseCore bapBaseCore, SigningKeyProvider keyProvider) {
+        super(bapBaseCore, keyProvider);
     }
 
-    public OrdTransactionBuilder(BapBaseCore bapBaseCore, KeyBag keyBag, TransactionSigner transactionSigner) {
-        super(bapBaseCore, keyBag, transactionSigner);
+    public OrdTransactionBuilder(BapBaseCore bapBaseCore, Transaction targetTransaction,
+                                 SigningKeyProvider keyProvider) {
+        super(bapBaseCore, targetTransaction, keyProvider);
     }
 
-    public OrdTransactionBuilder(BapBaseCore bapBaseCore, Net net, KeyBag keyBag) {
-        super(bapBaseCore, net, keyBag);
-    }
-
-    public OrdTransactionBuilder(BapBaseCore bapBaseCore, Net net, Transaction targetTransaction, KeyBag keyBag) {
-        super(bapBaseCore, net, targetTransaction, keyBag);
-    }
-
-    public OrdTransactionBuilder(BapBaseCore bapBaseCore, Net net, Transaction targetTransaction, TransactionSigner transactionSigner, KeyBag keyBag) {
-        super(bapBaseCore, net, targetTransaction, transactionSigner, keyBag);
-    }
-
-    public OrdTransactionBuilder addOrdInput(UTXO utxo) {
-        TransactionOutputEnhance output = new TransactionOutputEnhance(super.net, null, utxo.getValue(), utxo.getScript().getProgram(), (int) utxo.getIndex());
-        TransactionOutPoint transactionOutPointEnhance = new TransactionOutPointEnhance(net, output, utxo.getHash());
-        TransactionInputEnhance transactionInputEnhance = new TransactionInputEnhance(net, this.targetTransaction,
-                transactionOutPointEnhance, utxo.getValue());
-        targetTransaction.addInput(transactionInputEnhance);
+    /**
+     * 追加 Ordinals 输入：锁定脚本取自 UTXO 脚本（无则留空），金额取整数 satoshi；
+     * 连接输出挂在 {@code sourceTransaction} 上，供前像与解锁模板使用。
+     */
+    public OrdTransactionBuilder addOrdInput(BsvUtxo utxo) {
+        Script lockingScript = utxo.getScript() == null
+                ? new Script() : Script.fromBinary(utxo.getScript());
+        TransactionOutput sourceOutput = new TransactionOutput(lockingScript, utxo.getSatoshis());
+        TransactionInput input = new TransactionInput(utxo.getHash().toString(), (int) utxo.getIndex(),
+                new Script());
+        input.sequence = 0xffff_ffffL;
+        announceSourceOutput(input, sourceOutput);
+        targetTransaction.addInput(input);
         return this;
     }
 
-
-    public OrdTransactionBuilder addOrdOutput(Address destinationAddress,
+    /** 追加铭文输出（金额 1 satoshi）。 */
+    public OrdTransactionBuilder addOrdOutput(AddressEnhance destinationAddress,
                                               byte[] b64File,
                                               String mediaType,
                                               OrdScriptBuilder.ORDMap metaData) {
-        this.getTargetTransaction().addOutput(new TransactionOutput(this.getNet(), this.getTargetTransaction(), Coin.SATOSHI, OrdScriptBuilder.buildInscription(destinationAddress, b64File, mediaType, metaData).getProgram()));
+        Script inscription = OrdScriptBuilder.buildInscription(destinationAddress, b64File, mediaType,
+                metaData);
+        this.getTargetTransaction().addOutput(new TransactionOutput(inscription,
+                INSCRIPTION_SATOSHI.toSdkValue()));
         return this;
     }
 
-
-    public OrdTransactionBuilder signTx(KeyBag keyBag, boolean useForkId) throws SignErrorException {
-        return signTx(keyBag, TransactionSignature.SIGHASH_ALL, useForkId, false);
+    public OrdTransactionBuilder signTx(SigningKeyProvider keyProvider, boolean useForkId)
+            throws SignErrorException {
+        return signTx(keyProvider, TransactionSignature.SIGHASH_ALL, useForkId, false);
     }
 
-
-    public OrdTransactionBuilder signTx(KeyBag keyBag, SigHash.Flags hashFlags, boolean useForkId, boolean anyoneCanPay) throws SignErrorException {
-
-        setEmptyInputScriptHaveOrdinals(this.getTargetTransaction(), keyBag);
-        final ExtendForSignTransaction extendForSignTransaction = new ExtendForSignTransaction(this.getTargetTransaction(), hashFlags, useForkId, anyoneCanPay);
-        if (!this.getTransactionSigner().signInputs(extendForSignTransaction, keyBag)) {
-            throw new SignErrorException();
-        }
+    /** 注入解锁模板并签名。 */
+    public OrdTransactionBuilder signTx(SigningKeyProvider keyProvider, int hashFlags,
+                                        boolean useForkId, boolean anyoneCanPay)
+            throws SignErrorException {
+        setEmptyInputScriptHaveOrdinals(this.getTargetTransaction(), keyProvider);
+        completeAndSignTx(keyProvider, useForkId);
         return this;
-
     }
 
     public Transaction build() {
         return this.getTargetTransaction();
     }
 
-    protected void setEmptyInputScriptHaveOrdinals(final Transaction outputTransaction, final KeyBag bag)
-            throws ScriptExecutionException {
-        int numInputs = outputTransaction.getInputs().size();
-        for (int i = 0; i < numInputs; i++) {
-            TransactionInput txIn = outputTransaction.getInput(i);
-            Script scriptPubKey = txIn.getConnectedOutput().getScriptPubKey();
-            RedeemDataExtend redeemData = TxHelperExtend.getConnectedRedeemDataExtend(txIn.getOutpoint(), bag);
-            checkNotNull(redeemData, "Transaction exists in wallet that we cannot redeem: %s",
-                    txIn.getOutpoint().getHash());
-            if (TxHelperExtend.isSentToOrdinals(scriptPubKey)) {
-                txIn.setScriptSig(
-                        ScriptBuilder.createInputScript(null, redeemData.keys.get(0).getPubKey()));
-            } else {
-                txIn.setScriptSig(
-                        scriptPubKey.createEmptyInputScript(redeemData.keys.get(0).getPubKey(), redeemData.redeemScript));
-            }
-
-        }
+    /** 为每个输入注入解锁模板（取代旧 {@code createEmptyInputScript}）。 */
+    protected void setEmptyInputScriptHaveOrdinals(final Transaction outputTransaction,
+                                                   final SigningKeyProvider provider) {
+        prepareInputsForSigning(outputTransaction, provider);
     }
 
+    /** 把来源输出挂到输入上（新 SDK 以 sourceTransaction 携带连接输出）。 */
+    private static void announceSourceOutput(TransactionInput input, TransactionOutput output) {
+        Transaction source = new Transaction();
+        source.outputs = Lists.newArrayList(output);
+        input.sourceTransaction = source;
+    }
 }
