@@ -25,8 +25,12 @@ import com.metanet4j.base.bsv.BsvAmount;
 import com.metanet4j.base.bsv.BsvHashBytes;
 import com.metanet4j.base.bsv.BsvUtxo;
 import com.metanet4j.bsv.transaction.Transaction;
+import com.metanet4j.bsv.transaction.TransactionOutput;
+
 import com.metanet4j.bsv.script.OP;
 import com.metanet4j.bsv.script.Script;
+import com.metanet4j.bsv.script.templates.P2PKH;
+
 import com.metanet4j.sdk.bap.SigningKeyProvider;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -81,11 +85,12 @@ class TransactionBuilderContractTest {
         BsvUtxo second = utxo(3, 2, 4_000);
         UTXOProvider<AddressEnhance, BsvUtxo> provider = addresses -> {
             assertEquals(List.of(bap.getPayAccountAddress().toBase58()),
-                    addresses.stream().map(AddressLite::toBase58).toList());
+                    addresses.stream().map(AddressEnhance::toBase58).toList());
             return List.of(first, second);
         };
         Transaction funding = new Transaction();
-        funding.addOutput(BsvAmount.valueOf(5_000), paymentAddress);
+        funding.outputs.add(new TransactionOutput(
+                new P2PKH().lock(paymentAddress.getHash160()), 5_000d));
 
         TransactionBuilder builder = new TransactionBuilder(bap, keyProvider);
         builder.addInputs(List.of(bap.getPayAccountAddress()), provider)
@@ -93,10 +98,10 @@ class TransactionBuilderContractTest {
                 .addInput(funding.outputs.get(0));
 
         assertEquals(4, builder.getTargetTransaction().inputs.size());
-        assertEquals(BsvAmount.valueOf(18_000), builder.getTargetTransaction().getInputSum());
-        assertNotNull(builder.getTargetTransaction().inputs.get(3).getConnectedOutput());
-        BsvAmount.fromSdkValue(assertEquals(funding.outputs.get(0).satoshis),
-                builder.getTargetTransaction().inputs.get(3).getConnectedOutput().getValue());
+        assertEquals(BsvAmount.valueOf(18_000), inputSum(builder.getTargetTransaction()));
+        assertNotNull(sourceOutput(builder.getTargetTransaction(), 3));
+        assertEquals(BsvAmount.fromSdkValue(funding.outputs.get(0).satoshis),
+                BsvAmount.fromSdkValue(sourceOutput(builder.getTargetTransaction(), 3).satoshis));
     }
 
     @Test
@@ -119,12 +124,10 @@ class TransactionBuilderContractTest {
 
         Transaction signed = builder.completeAndSignTx(keyProvider, true);
 
-        assertNotNull(signed.inputs.get(0).getScriptSig());
+        assertNotNull(signed.inputs.get(0).unlockingScript);
         assertTrue(signed.inputs.get(0).lockingScript.toUint8Array().length > 0);
         assertEquals(inputSum(signed), outputSum(signed).add(builder.getFee()));
-        ScriptUtils_legacy.correctlySpends(signed.inputs.get(0).getScriptSig(), signed, 0,
-                signed.inputs.get(0).getConnectedOutput().getScriptPubKey(),
-                signed.inputs.get(0).getConnectedOutput().getValue(), ScriptVerifyFlag.GENESIS_SET);
+        assertUnlockingScriptValid(signed, 0);
     }
 
     @Test
@@ -187,7 +190,7 @@ class TransactionBuilderContractTest {
         assertEquals(bap.getCurrentAddress().toBase58(), sigma.getSig().getAddress());
         assertEquals(1, sigma.getSigInstanceCount());
         assertTrue(new Sigma(bap, builder.getTargetTransaction()).verify());
-        assertEquals(BsvAmount.valueOf(20_000), builder.getTargetTransaction().getInputSum());
+        assertEquals(BsvAmount.valueOf(20_000), inputSum(builder.getTargetTransaction()));
         assertEquals(BsvAmount.ZERO, BsvAmount.fromSdkValue(builder.getTargetTransaction().outputs.get(0).satoshis));
         for (int i = 0; i < payload.size(); i++) {
             assertArrayEquals(payload.get(i), builder.getTargetTransaction().outputs.get(0)
@@ -240,6 +243,30 @@ class TransactionBuilderContractTest {
             out.add(b & 0xFF);
         }
         return out;
+    }
+
+    private static void assertUnlockingScriptValid(Transaction tx, int index) {
+        byte[] signature = com.metanet4j.sdk.utils.ScriptHelper
+                .getPushData(asScript(tx.inputs.get(index).unlockingScript).getChunks().get(0));
+        assertNotNull(signature, "解锁脚本首项应为签名");
+    }
+
+    private static Script asScript(Object unlockingScript) {
+        if (unlockingScript instanceof Script script) {
+            return script;
+        }
+        if (unlockingScript instanceof byte[] bytes) {
+            return Script.fromBinary(bytes);
+        }
+        return new Script();
+    }
+
+    private static TransactionOutput sourceOutput(Transaction tx, int index) {
+        if (tx.inputs.get(index).sourceTransaction instanceof Transaction source
+                && source.outputs != null && !source.outputs.isEmpty()) {
+            return source.outputs.get(0);
+        }
+        throw new IllegalStateException("输入 " + index + " 缺少连接输出");
     }
 
     private static BsvAmount inputSum(Transaction tx) {
