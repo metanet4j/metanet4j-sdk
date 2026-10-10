@@ -6,9 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.metanet4j.sdk.PublicKey;
 import com.metanet4j.sdk.remote.RemoteSignType;
-import io.bitcoinsv.bitcoinjsv.core.Coin;
-import io.bitcoinsv.bitcoinjsv.core.ECKeyLite;
-import io.bitcoinsv.bitcoinjsv.core.Sha256Hash;
+import com.metanet4j.base.bsv.BsvAmount;
+import com.metanet4j.base.bsv.BsvHashBytes;
 import java.math.BigInteger;
 import java.util.LinkedHashMap;
 import org.junit.jupiter.api.Test;
@@ -20,7 +19,7 @@ class PreSignHashContextContractTest {
         PreSignHashContext context = new PreSignHashContext();
         context.setSignAddress("local-address");
         context.setSigB64("AQID");
-        context.setPreSignHash(Sha256Hash.wrap("1".repeat(64)));
+        context.setPreSignHash(BsvHashBytes.fromDisplayHex("1".repeat(64)));
         context.setRemoteSignType(RemoteSignType.CURRENT);
 
         LinkedHashMap<String, Object> map = context.toMap();
@@ -40,15 +39,15 @@ class PreSignHashContextContractTest {
         PreSignHashContext context = new PreSignHashContext();
         context.setSignAddress("local-address");
         context.setSigB64("AQID");
-        context.setPreSignHash(Sha256Hash.wrap("2".repeat(64)));
+        context.setPreSignHash(BsvHashBytes.fromDisplayHex("2".repeat(64)));
         context.setRemoteSignType(RemoteSignType.PAYMENT);
-        context.setFee(Coin.valueOf(42));
+        context.setFee(BsvAmount.valueOf(42));
         context.setPublicKey(PublicKey.fromBytes(ECKeyLite.fromPrivate(BigInteger.TWO).getPubKey()));
 
         LinkedHashMap<String, Object> map = context.toMap();
         map.put("fee", Integer.valueOf(42));
         PreSignHashContext restored = new PreSignHashContext().fromMap(map);
-        assertEquals(Coin.valueOf(42), restored.getFee());
+        assertEquals(BsvAmount.valueOf(42), restored.getFee());
         assertEquals(context.getPublicKey().getPubKeyHex(), restored.getPublicKey().getPubKeyHex());
         assertEquals(context.getPreSignHash(), restored.getPreSignHash());
         assertEquals(RemoteSignType.PAYMENT, restored.getRemoteSignType());
