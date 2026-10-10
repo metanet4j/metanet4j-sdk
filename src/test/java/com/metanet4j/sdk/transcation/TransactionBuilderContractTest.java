@@ -25,6 +25,7 @@ import com.metanet4j.base.bsv.BsvAmount;
 import com.metanet4j.base.bsv.BsvHashBytes;
 import com.metanet4j.base.bsv.BsvUtxo;
 import com.metanet4j.bsv.transaction.Transaction;
+import com.metanet4j.bsv.script.OP;
 import com.metanet4j.bsv.script.Script;
 import com.metanet4j.sdk.bap.SigningKeyProvider;
 import java.nio.charset.StandardCharsets;
@@ -47,8 +48,8 @@ class TransactionBuilderContractTest {
             assertEquals(paymentAddress.toBase58(), addresses.get(0).toBase58());
             return List.of(utxo);
         };
-        Script dataScript = new Script().op(ScriptOpCodes.OP_RETURN)
-                .writeBin(toBoxed("payload".getBytes(StandardCharsets.US_ASCII))).build();
+        Script dataScript = new Script().writeOpCode(OP.OP_RETURN)
+                .writeBin(toBoxed("payload".getBytes(StandardCharsets.US_ASCII)));
         LockingScriptBuilder data = mock(LockingScriptBuilder.class);
         when(data.getLockingScript()).thenReturn(dataScript);
 
@@ -60,15 +61,15 @@ class TransactionBuilderContractTest {
                 .changeAddress(paymentAddress);
         Transaction tx = builder.getTargetTransaction();
 
-        assertEquals(1, tx.getInputs().size());
-        assertEquals(utxo.getHash(), tx.inputs.get(0).getOutpoint().getHash());
-        assertEquals(utxo.getIndex(), tx.inputs.get(0).getOutpoint().getIndex());
+        assertEquals(1, tx.inputs.size());
+        assertEquals(utxo.getHash().toString(), tx.inputs.get(0).sourceTXID);
+        assertEquals(utxo.getIndex(), tx.inputs.get(0).sourceOutputIndex);
         assertEquals(BsvAmount.valueOf(20_000), inputSum(tx));
-        assertEquals(3, tx.getOutputs().size());
-        assertEquals(BsvAmount.valueOf(777), tx.outputs.get(0).getValue());
-        assertEquals(BsvAmount.valueOf(0), tx.outputs.get(1).getValue());
-        assertArrayEquals(dataScript.getProgram(), tx.outputs.get(1).getScriptBytes());
-        assertEquals(builder.getChangeAmount(), tx.outputs.get(2).getValue());
+        assertEquals(3, tx.outputs.size());
+        assertEquals(BsvAmount.valueOf(777), BsvAmount.fromSdkValue(tx.outputs.get(0).satoshis));
+        assertEquals(BsvAmount.valueOf(0), BsvAmount.fromSdkValue(tx.outputs.get(1).satoshis));
+        assertArrayEquals(dataScript.toUint8Array(), tx.outputs.get(1).lockingScript.toUint8Array());
+        assertEquals(builder.getChangeAmount(), BsvAmount.fromSdkValue(tx.outputs.get(2).satoshis));
         assertEquals(inputSum(tx), outputSum(tx).add(builder.getFee()));
         assertTrue(builder.getFee().getValue() > 0);
         assertTrue(builder.getChangeAmount().getValue() > 0);
@@ -91,10 +92,10 @@ class TransactionBuilderContractTest {
                 .addInputs(List.of(utxo(4, 3, 6_000)))
                 .addInput(funding.outputs.get(0));
 
-        assertEquals(4, builder.getTargetTransaction().getInputs().size());
+        assertEquals(4, builder.getTargetTransaction().inputs.size());
         assertEquals(BsvAmount.valueOf(18_000), builder.getTargetTransaction().getInputSum());
         assertNotNull(builder.getTargetTransaction().inputs.get(3).getConnectedOutput());
-        assertEquals(funding.outputs.get(0).getValue(),
+        BsvAmount.fromSdkValue(assertEquals(funding.outputs.get(0).satoshis),
                 builder.getTargetTransaction().inputs.get(3).getConnectedOutput().getValue());
     }
 
@@ -119,7 +120,7 @@ class TransactionBuilderContractTest {
         Transaction signed = builder.completeAndSignTx(keyProvider, true);
 
         assertNotNull(signed.inputs.get(0).getScriptSig());
-        assertTrue(signed.inputs.get(0).getScriptBytes().length > 0);
+        assertTrue(signed.inputs.get(0).lockingScript.toUint8Array().length > 0);
         assertEquals(inputSum(signed), outputSum(signed).add(builder.getFee()));
         ScriptUtils_legacy.correctlySpends(signed.inputs.get(0).getScriptSig(), signed, 0,
                 signed.inputs.get(0).getConnectedOutput().getScriptPubKey(),
@@ -161,7 +162,7 @@ class TransactionBuilderContractTest {
         assertInstanceOf(LocalTransactionSigner.class, builder.getTransactionSigner());
         builder.addOutput(BsvAmount.valueOf(22), testAddress);
         assertEquals(BsvAmount.valueOf(33), outputSum(existing));
-        assertEquals(BsvAmount.valueOf(11), existing.outputs.get(0).getValue());
+        assertEquals(BsvAmount.valueOf(11), BsvAmount.fromSdkValue(existing.outputs.get(0).satoshis));
 
         TransactionSigner signer = mock(TransactionSigner.class);
         TransactionBuilder explicit = new TransactionBuilder(bap, Net.TESTNET3, existing, signer, keyProvider);
@@ -169,7 +170,7 @@ class TransactionBuilderContractTest {
         assertSame(signer, explicit.getTransactionSigner());
         TransactionBuilder empty = new TransactionBuilder(bap, Net.TESTNET3, keyProvider);
         assertEquals(Net.TESTNET3, empty.getNet());
-        assertEquals(0, empty.getTargetTransaction().getOutputs().size());
+        assertEquals(0, empty.getTargetTransaction().outputs.size());
     }
 
     @Test
@@ -187,7 +188,7 @@ class TransactionBuilderContractTest {
         assertEquals(1, sigma.getSigInstanceCount());
         assertTrue(new Sigma(bap, builder.getTargetTransaction()).verify());
         assertEquals(BsvAmount.valueOf(20_000), builder.getTargetTransaction().getInputSum());
-        assertEquals(BsvAmount.ZERO, builder.getTargetTransaction().outputs.get(0).getValue());
+        assertEquals(BsvAmount.ZERO, BsvAmount.fromSdkValue(builder.getTargetTransaction().outputs.get(0).satoshis));
         for (int i = 0; i < payload.size(); i++) {
             assertArrayEquals(payload.get(i), builder.getTargetTransaction().outputs.get(0)
                     .getScriptPubKey().getChunks().get(i + 2).writeBin(toBoxed()));
