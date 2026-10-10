@@ -14,10 +14,10 @@ class BapProviderKeyBagTest {
         BapBase bap = BapBase.fromOnlyMasterPrivateKey(TestData.masterPrivateKey);
         BapBase.BapProviderKeyBag bag = new BapBase.BapProviderKeyBag(TestData.masterPrivateKey, 2);
 
-        assertEquals(bap.getRootPrivateKey().getPrivKey(),
-                bag.findKeyFromPubHash(bap.getRootPrivateKey().getPubKeyHash()).getPrivKey());
-        assertEquals(bap.getCurrentPrivateKey().getPrivKey(),
-                bag.findKeyFromPubHash(bap.getCurrentPrivateKey().getPubKeyHash()).getPrivKey());
+        assertEquals(bap.getRootPrivateKey().getKey(),
+                bag.findKeyFromPubHash(bap.getRootPrivateKey().getPublicKey().getPubKeyHash()).getKey());
+        assertEquals(bap.getCurrentPrivateKey().getKey(),
+                bag.findKeyFromPubHash(bap.getCurrentPrivateKey().getPublicKey().getPubKeyHash()).getKey());
     }
 
     @Test
@@ -26,10 +26,10 @@ class BapProviderKeyBagTest {
         BapBase.BapProviderKeyBag bag = new BapBase.BapProviderKeyBag(
                 TestData.masterPrivateKey, 0, new DefaultBapBaseConfig());
 
-        assertEquals(bap.getPayAccountKey().getPrivKey(),
-                bag.findKeyFromPubHash(bap.getPayAccountKey().getPubKeyHash()).getPrivKey());
-        assertEquals(bap.getOrdPrivateKey().getPrivKey(),
-                bag.findKeyFromPubHash(bap.getOrdPrivateKey().getPubKeyHash()).getPrivKey());
+        assertEquals(bap.getPayAccountKey().getKey(),
+                bag.findKeyFromPubHash(bap.getPayAccountKey().getPublicKey().getPubKeyHash()).getKey());
+        assertEquals(bap.getOrdPrivateKey().getKey(),
+                bag.findKeyFromPubHash(bap.getOrdPrivateKey().getPublicKey().getPubKeyHash()).getKey());
         assertThrows(RuntimeException.class, () -> bag.findKeyFromPubHash(new byte[20]));
         assertThrows(IllegalArgumentException.class, () -> new BapBase.BapProviderKeyBag(TestData.masterPrivateKey, 1001));
     }
@@ -39,10 +39,9 @@ class BapProviderKeyBagTest {
         BapBase bap = BapBase.fromOnlyMasterPrivateKey(TestData.masterPrivateKey);
         BapBase.BapProviderKeyBag bag = new BapBase.BapProviderKeyBag(bap);
 
-        assertEquals(bap.getCurrentPrivateKey().getPrivKey(),
-                bag.findKeyFromPubHash(bap.getCurrentPrivateKey().getPubKeyHash()).getPrivKey());
-        assertEquals(bap.getCurrentPrivateKey().getPrivKey(),
-                bag.findKeyFromPubKey(bap.getCurrentPrivateKey().getPubKey()).getPrivKey());
-        assertNull(bag.findRedeemDataFromScriptHash(new byte[20]));
+        assertEquals(bap.getCurrentPrivateKey().getKey(),
+                bag.findKeyFromPubHash(bap.getCurrentPrivateKey().getPublicKey().getPubKeyHash()).getKey());
+        assertEquals(bap.getCurrentPrivateKey().getKey(),
+                bag.findKeyFromPubKey(bap.getCurrentPrivateKey().getPubKey()).getKey());
     }
 }

@@ -40,7 +40,7 @@ public class BapBaseTest {
         System.out.println(bapBase.getCurrentAddress());
         System.out.println(bapBase.getOrdAddress());
         System.out.println(bapBase.getPayAccountAddress());
-        System.out.println(AddressEnhance.fromPubKeyHash(bapBase.getEncryptKey().getPubKeyHash()).toBase58());
+        System.out.println(AddressEnhance.fromPubKeyHash(bapBase.getEncryptKey().getPublicKey().getPubKeyHash()).toBase58());
     }
 
 
@@ -52,14 +52,14 @@ public class BapBaseTest {
 
         System.out.println("rootAddress:" + bapBase.getRootAddress());
         System.out.println("root publicKey as hex:" + HexUtil.encodeHexStr(bapBase.getRootPrivateKey().getPubKey()));
-        System.out.println("rootPublicKeyhash as hex:" + HexUtil.encodeHexStr(bapBase.getRootPrivateKey().getPubKeyHash()));
+        System.out.println("rootPublicKeyhash as hex:" + HexUtil.encodeHexStr(bapBase.getRootPrivateKey().getPublicKey().getPubKeyHash()));
         System.out.println("---------");
         System.out.println("currentAddress:" + bapBase.getCurrentAddress().toBase58());
         System.out.println("previouAddress:" + bapBase.getPreviouAddress().toBase58());
         System.out.println();
         System.out.println("ordAddress:" + bapBase.getOrdAddress().toBase58());
         System.out.println("ord PublicKey as hex:" + HexUtil.encodeHexStr(bapBase.getOrdPrivateKey().getPubKey()));
-        System.out.println("ordPublicKeyhash as hex:" + HexUtil.encodeHexStr(bapBase.getOrdPrivateKey().getPubKeyHash()));
+        System.out.println("ordPublicKeyhash as hex:" + HexUtil.encodeHexStr(bapBase.getOrdPrivateKey().getPublicKey().getPubKeyHash()));
         System.out.println("---------");
         System.out.println("paymentPublicKey len:" + bapBase.getPayAccountKey().getPubKey().length);
         for (int i = 0; i < 5; i++) {
