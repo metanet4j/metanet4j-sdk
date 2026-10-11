@@ -218,6 +218,28 @@ class TxHelperExtendContractTest {
         assertNull(TxHelperExtend.getConnectedRedeemDataExtend(
                         null, new BapBase.BapProviderKeyBag(bap)),
                 "连接输出为空时应返回 null 而非抛错");
+        // 合法 P2PKH（第 3 段为 20 字节哈希）→ 覆盖 `length == ADDRESS_LENGTH` 为真的一侧，
+        // 使 pubKeyHashOfP2pkh 走到 return 分支
+        List<Integer> hash20 = new ArrayList<>();
+        for (int i = 0; i < 20; i++) {
+            hash20.add(11);
+        }
+        List<ScriptChunk> validP2pkh = new ArrayList<>();
+        validP2pkh.add(new ScriptChunk(OP.OP_DUP));
+        validP2pkh.add(new ScriptChunk(OP.OP_HASH160));
+        validP2pkh.add(new ScriptChunk(20, hash20));
+        validP2pkh.add(new ScriptChunk(OP.OP_EQUALVERIFY));
+        validP2pkh.add(new ScriptChunk(OP.OP_CHECKSIG));
+        // 注意：pubKeyHashList 只走**铭文**路径，对纯 P2PKH 返回空（§159 已确认的既定语义），
+        // 故此处必须经 getConnectedRedeemDataExtend 触发 pubKeyHashOfP2pkh 的为真分支——
+        // 哈希提取发生在密钥查找之前，故即便该地址不属于本密钥包也足以覆盖。
+        assertThrows(RuntimeException.class,
+                () -> TxHelperExtend.getConnectedRedeemDataExtend(
+                        new com.metanet4j.bsv.transaction.TransactionOutput(
+                                new Script(validP2pkh), 1d),
+                        new BapBase.BapProviderKeyBag(bap)),
+                "合法 P2PKH 会走到密钥查找；该地址不属于本密钥包时提供者抛错");
+
         // 5 段 P2PKH 形状但第 3 段数据长度 19 ≠ 20 → 覆盖 pubKeyHashOfP2pkh 中
         // `dataOf(...).length == ADDRESS_LENGTH` 为假的一侧
         List<Integer> hash19 = new ArrayList<>();

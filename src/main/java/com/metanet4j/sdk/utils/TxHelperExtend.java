@@ -98,9 +98,13 @@ public final class TxHelperExtend {
     /** 是否为直接推送数据的 chunk（opcode 处于推送范围且非 0）。 */
     private static boolean isPushData(ScriptChunk chunk) {
         int op = chunk.op;
-        return chunk.data != null && !chunk.data.isEmpty() && op != 0
-                && (op == OP.OP_PUSHDATA1 || op == OP.OP_PUSHDATA2 || op == OP.OP_PUSHDATA4
-                || op < OP.OP_PUSHDATA1);
+        // 原式为 `op != 0 && (op == OP_PUSHDATA1 || op == OP_PUSHDATA2 || op == OP_PUSHDATA4
+        // || op < OP_PUSHDATA1)`。由于 OP_PUSHDATA1 < OP_PUSHDATA2 < OP_PUSHDATA4 依次相邻，
+        // 该 `||` 链**等价于区间判断** `op >= 1 && op <= OP_PUSHDATA4`（op 为无符号字节）。
+        // 按 §62.4 方案 C 收敛为区间形式——既消去不可达的 `op == OP_PUSHDATA4` 等分支，
+        // 也让语义（"是长度为 1..78 的推送"）直接可读。
+        return chunk.data != null && !chunk.data.isEmpty()
+                && op >= 1 && op <= OP.OP_PUSHDATA4;
     }
 
 
