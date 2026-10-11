@@ -129,4 +129,40 @@ class BapPathTest {
         assertNotEquals(oneMore.hashCode(), base.hashCode(), "追加后的路径 hashCode 应不同");
     }
 
+
+    @Test
+    void parsesOptionalPrefixHardenedSuffixesAndValidatesBounds() {
+        // 覆盖 BapPath 的 5 处缺口：
+        // :38 `startsWith("m") || startsWith("M")` 的**假侧**、:47 三种硬化后缀、
+        // :91 `prefix` 的越界检查、:107—108 `lastHardened` 对空路径的抛错、:182 `equals` 的假侧。
+
+        // :38 假侧——**不带 m／M 前缀**的路径应与其带前缀形式等价
+        assertEquals(BapPath.parse("m/0/1"), BapPath.parse("0/1"),
+                "m 前缀应可省略");
+        assertEquals(BapPath.parse("M/0/1"), BapPath.parse("0/1"),
+                "M 前缀亦应可省略");
+
+        // :47 三种硬化后缀写法应等价
+        BapPath hardened = BapPath.parse("m/0'");
+        assertEquals(hardened, BapPath.parse("m/0h"), "h 后缀应等同于撇号后缀");
+        assertEquals(hardened, BapPath.parse("m/0H"), "H 后缀亦应等同");
+        assertTrue(hardened.lastHardened(), "带硬化后缀的末段应为硬化");
+        assertFalse(BapPath.parse("m/0").lastHardened(), "无后缀的末段不应为硬化");
+
+        // :91 prefix 的越界检查（下界与上界各一次）
+        BapPath path = BapPath.parse("m/0/1/2");
+        assertEquals(2, path.prefix(2).size(), "合法前缀应可用");
+        assertThrows(IllegalArgumentException.class, () -> path.prefix(-1), "负长度应被拒绝");
+        assertThrows(IllegalArgumentException.class, () -> path.prefix(path.size() + 1),
+                "超出段数应被拒绝");
+
+        // :107—108 空路径没有末段
+        assertThrows(IllegalStateException.class, () -> BapPath.of(List.of()).lastHardened(),
+                "空路径取末段硬化态应抛错");
+
+        // :182 equals 的假侧——与不同类型的对象比较应为 false（而非抛 ClassCastException）
+        assertNotEquals(hardened, "m/0'", "与字符串比较应返回 false");
+        assertNotEquals(hardened, null, "与 null 比较应返回 false");
+    }
+
 }
