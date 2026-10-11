@@ -127,6 +127,28 @@ class RemoteTransactionContractTest {
     }
 
     @Test
+    void skipsInputsWhoseSourceTransactionHasNullOutputs() {
+        // 覆盖 sourceOutputOf 三条件中**中间那个**（`source.outputs != null`）的假侧：
+        // §216 覆盖了第三个条件（outputs 为空）、§219 覆盖了第一个（instanceof），本轮补齐中间条件。
+        // 该情形对应"交易对象已建但 outputs 列表尚未初始化"，是解析中途的真实状态。
+        RemoteTransactionBuilder builder = new RemoteTransactionBuilder(remoteBap, keyProvider);
+
+        Transaction partiallyBuilt = new Transaction();
+        partiallyBuilt.outputs = null;      // 显式置为未初始化
+        TransactionInput inputWithNullOutputs = new TransactionInput(
+                new BsvHashBytes(new byte[32]).toString(), 0, new Script());
+        inputWithNullOutputs.sourceTransaction = partiallyBuilt;
+        builder.getTargetTransaction().inputs.add(inputWithNullOutputs);
+        builder.addInput(paymentUtxo(1));   // 对照：正常带输出的输入
+        builder.addOutput(BsvAmount.valueOf(1), paymentAddress);
+
+        List<PreSignHashContext> requests = builder.getTxInputSignHash(false, remoteBap);
+
+        assertEquals(1, requests.size(),
+                "outputs 列表为 null 的来源交易应被跳过，仅对照输入产出待签哈希");
+    }
+
+    @Test
     void skipsInputsWhoseSourceTransactionIsNotATransaction() {
         // 覆盖 sourceOutputOf 判断中**第一个条件**（`instanceof Transaction`）的假侧：
         // 新 SDK 的 `TransactionInput.sourceTransaction` 默认是哨兵 `Undefined.INSTANCE`，
