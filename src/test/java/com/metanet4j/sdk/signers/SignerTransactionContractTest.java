@@ -66,6 +66,7 @@ class SignerTransactionContractTest {
 
         assertTrue(OrdinalsTransactionSigner.signInput(tx, 0, keyProvider,
                 TransactionSignature.SIGHASH_SINGLE, true));
+        tx.sign().toCompletableFuture().join();
 
         assertEquals(TransactionSignature.SIGHASH_SINGLE | TransactionSignature.SIGHASH_ANYONECANPAY
                         | TransactionSignature.SIGHASH_FORKID,
@@ -93,6 +94,7 @@ class SignerTransactionContractTest {
 
         assertTrue(OrdinalsTransactionSigner.signInput(tx, 0, keyProvider,
                 TransactionSignature.SIGHASH_ALL, false));
+        tx.sign().toCompletableFuture().join();
 
         byte[] unlocking = ScriptHelper.getPushData(
                 asScript(tx.inputs.get(0).unlockingScript).getChunks().get(0));
