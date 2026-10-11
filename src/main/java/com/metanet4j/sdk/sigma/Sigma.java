@@ -387,18 +387,25 @@ public class Sigma implements PreSignHash {
         return List.of(values);
     }
 
-    /** 金额字段可能是 {@code Undefined}、数字或字符串。 */
-    /** {@code sourceTXID} 可能是 hex 串、字节数组或字节列表；统一取内部字节序（与旧 getHash().getBytes() 一致）。 */
+    /**
+     * 取 {@code sourceTXID} 的字节。
+     *
+     * <p><b>本方法经 §86 核查后按 §62.4 方案 C 收敛</b>：该字段在新 SDK 中是 {@code Object}，
+     * 原实现对其做了 {@code null}／{@code BsvHashBytes}／{@code byte[]}／{@code String}／{@code List}
+     * 五类 {@code instanceof} 分派。核查"谁会产生这些类型"得：
+     *
+     * <ul>
+     *   <li>该字段的<b>默认值是哨兵 {@code Undefined.INSTANCE}</b>（<b>不是 {@code null}</b>）；</li>
+     *   <li><b>本仓库生产侧的唯一赋值点</b>是 {@code SigHashExtend} 的
+     *       {@code params.sourceTXID = txidOf(...)}，而 {@code txidOf} 返回<b>显示序 hex 的 {@code String}</b>。</li>
+     * </ul>
+     *
+     * <p>故实践中只有两种可能：<b>{@code String}</b>（已解析）与 <b>{@code Undefined}</b>（从未解析）。
+     * 其余四类<b>无任何生产者</b>、其分支不可达，按 §62.4 删除；
+     * 并<b>保留抛错兜底</b>——它正对应 {@code Undefined} 这一<b>真实可达</b>状态：
+     * 未解析的输入走到这里<b>应当报错</b>，而不是静默产出错误哈希。
+     */
     private static byte[] sourceTxidBytes(Object sourceTXID) {
-        if (sourceTXID == null) {
-            return new byte[32];
-        }
-        if (sourceTXID instanceof BsvHashBytes hash) {
-            return hash.getBytes();
-        }
-        if (sourceTXID instanceof byte[] bytes) {
-            return bytes.length == 32 ? bytes : new BsvHashBytes(bytes).getBytes();
-        }
         if (sourceTXID instanceof String text) {
             // 【基线直跑取证】基线 Sigma.getInputHashByVin 用的是
             //     input.getOutpoint().getHash().getBytes()
@@ -412,14 +419,9 @@ public class Sigma implements PreSignHash {
             }
             return out;
         }
-        if (sourceTXID instanceof List<?> list) {
-            byte[] bytes = new byte[list.size()];
-            for (int i = 0; i < bytes.length; i++) {
-                bytes[i] = (byte) ((Number) list.get(i)).intValue();
-            }
-            return bytes.length == 32 ? bytes : new BsvHashBytes(bytes).getBytes();
-        }
-        throw new IllegalArgumentException("不支持的 sourceTXID 类型：" + sourceTXID.getClass().getName());
+        // 兜底：对应「字段仍是默认哨兵 Undefined」这一真实状态（见上）
+        throw new IllegalArgumentException("sourceTXID 尚未解析为显示序 hex 串，无法取字节："
+                + (sourceTXID == null ? "null" : sourceTXID.getClass().getName()));
     }
 
 
