@@ -54,9 +54,15 @@ public class UtilsExtend {
         return toHash(content.getBytes(charset));
     }
 
-    /** 单次 SHA-256 的显示序 hex（与旧库 {@code Sha256Hash.toString()} 一致）。 */
+    /**
+     * 单次 SHA-256 的 hex（与旧库 {@code Sha256Hash.toString()} 一致）。
+     *
+     * <p>注意必须取 {@code getBytes()} 而非 {@code toString()}：§108 的对照实验已证明
+     * **旧库「显示序」就是摘要原样**（{@code getBytes()}），而 {@code BsvHashBytes.toString()}
+     * 会**再反转一次**，直接用会得到整体反序的结果。
+     */
     public static String toHash(byte[] bytes) {
-        return BsvHashBytes.of(bytes).toString();
+        return cn.hutool.core.util.HexUtil.encodeHexStr(BsvHashBytes.of(bytes).getBytes());
     }
 
     /** 与旧库 {@code Utils.HEX.encode} 等价。 */
