@@ -24,6 +24,7 @@ import com.metanet4j.sdk.address.AddressEnhance;
 import com.metanet4j.base.bsv.BsvAmount;
 import com.metanet4j.base.bsv.BsvHashBytes;
 import com.metanet4j.base.bsv.BsvUtxo;
+import com.metanet4j.bsv.primitives.TransactionSignature;
 import com.metanet4j.bsv.transaction.Transaction;
 import com.metanet4j.bsv.transaction.TransactionInput;
 import com.metanet4j.bsv.transaction.TransactionOutput;
@@ -140,6 +141,40 @@ class TransactionBuilderContractTest {
                 .addOutput(BsvAmount.valueOf(777), paymentAddress);
 
         assertThrows(SignErrorException.class, () -> builder.completeAndSignTx(noKeys, true));
+    }
+
+    @Test
+    void prepareInputsRejectsNullProviderAndToleratesUnusableInputs() {
+        // 覆盖 §95 所列 TransactionBuilder 的三处（:`246—247`、`:253—254`、`:174—181`）。
+        // prepareInputsForSigning 是 protected，而本测试类与之**同包**，故可直接调用。
+        TransactionBuilder builder = new TransactionBuilder(bap, keyProvider);
+
+        // ① :246—247 提供者为 null → 明确报错（而非在后续以 NPE 的形式失败）
+        Transaction empty = new Transaction();
+        assertThrows(IllegalArgumentException.class,
+                () -> builder.prepareInputsForSigning(empty, null,
+                        TransactionSignature.SIGHASH_ALL, false),
+                "空提供者应在入口被拒绝");
+
+        // ② :253—254 锁定脚本不可识别 → 公钥哈希为空 → **跳过该输入**（不抛错、不中断整批）
+        Transaction withUnknownScript = new Transaction();
+        withUnknownScript.inputs.add(new TransactionInput(
+                new BsvHashBytes(new byte[32]).toString(), 0,
+                new com.metanet4j.bsv.script.Script()
+                        .writeOpCode(com.metanet4j.bsv.script.OP.OP_1)));
+        builder.prepareInputsForSigning(withUnknownScript, keyProvider,
+                TransactionSignature.SIGHASH_ALL, false);   // 不抛即通过
+
+        // ③ :174—181 提供者**抛错**（本项目提供者的既定表现，见 §132）→ 转为 key = null，
+        //    即"找不到密钥"不应让整批准备中断。
+        Transaction p2pkh = new Transaction();
+        p2pkh.inputs.add(new TransactionInput(new BsvHashBytes(new byte[32]).toString(), 0,
+                new P2PKH().lock(paymentAddress.toBase58())));
+        SigningKeyProvider throwing = pubkeyHash -> {
+            throw new IllegalStateException("模拟提供者找不到密钥");
+        };
+        builder.prepareInputsForSigning(p2pkh, throwing,
+                TransactionSignature.SIGHASH_ALL, false);   // 不抛即通过
     }
 
     @Test
