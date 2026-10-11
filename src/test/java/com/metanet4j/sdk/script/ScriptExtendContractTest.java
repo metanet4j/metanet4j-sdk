@@ -200,4 +200,42 @@ class ScriptExtendContractTest {
                 "非多签脚本应被拒绝，而非返回无意义的数字");
     }
 
+
+    @Test
+    void rejectsMultiSigShapedScriptsThatFailItsThreeInternalChecks() {
+        // 覆盖 §94 所列 isSentToMultiSig 的**三道内部校验**（:108—116）——
+        // 它们只判"像不像多签"，故**形状对但内容不合规**的脚本必须被判否，
+        // 否则后续按"多签"处理会得到错误的签名数或错误的位序。
+        byte[] pk33 = new byte[33];
+        pk33[0] = 0x02;
+        java.util.Arrays.fill(pk33, 1, 33, (byte) 3);
+
+        // ① 首段（应签名数）越出 OP_1..OP_16 —— 用 OP_0
+        byte[] badRequired = new byte[1 + 34 + 34 + 1 + 1];
+        int i = 0;
+        badRequired[i++] = 0x00;                                   // ← OP_0，不在 OP_1..OP_16
+        badRequired[i++] = 0x21; System.arraycopy(pk33, 0, badRequired, i, 33); i += 33;
+        badRequired[i++] = 0x21; System.arraycopy(pk33, 0, badRequired, i, 33); i += 33;
+        badRequired[i++] = 0x52; badRequired[i] = (byte) 0xae;
+        assertFalse(ScriptExtend.isSentToMultiSig(Script.fromBinary(badRequired)),
+                "应签名数不在 OP_1..OP_16 内时应判否");
+
+        // ② 倒数第二段（公钥数）越出 OP_1..OP_16
+        byte[] badTotal = badRequired.clone();
+        badTotal[0] = 0x52;                                        // 首段改回合法
+        badTotal[2 + 34 + 34] = 0x00;                              // ← 公钥数位置改 OP_0
+        assertFalse(ScriptExtend.isSentToMultiSig(Script.fromBinary(badTotal)),
+                "公钥数不在 OP_1..OP_16 内时应判否");
+
+        // ③ 内部一段不是标准公钥（用 20 字节而非 33/65）
+        byte[] h20 = new byte[20];
+        java.util.Arrays.fill(h20, (byte) 5);
+        byte[] badPubKey = new byte[1 + 1 + 20 + 1 + 1];
+        badPubKey[0] = 0x52; badPubKey[1] = 0x14;
+        System.arraycopy(h20, 0, badPubKey, 2, 20);
+        badPubKey[22] = 0x52; badPubKey[23] = (byte) 0xae;
+        assertFalse(ScriptExtend.isSentToMultiSig(Script.fromBinary(badPubKey)),
+                "内部公钥长度既非 33 也非 65 时应判否");
+    }
+
 }
