@@ -6,19 +6,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import cn.hutool.core.util.HexUtil;
 import com.alibaba.fastjson.JSONArray;
-import io.bitcoinsv.bitcoinjsv.core.Address;
-import io.bitcoinsv.bitcoinjsv.core.Coin;
-import io.bitcoinsv.bitcoinjsv.core.ECKey;
-import io.bitcoinsv.bitcoinjsv.core.Sha256Hash;
-import io.bitcoinsv.bitcoinjsv.msg.protocol.Transaction;
-import io.bitcoinsv.bitcoinjsv.params.MainNetParams;
-import io.bitcoinsv.bitcoinjsv.params.Net;
-import io.bitcoinsv.bitcoinjsv.script.Script;
-import io.bitcoinsv.bitcoinjsv.script.ScriptBuilder;
-import io.bitcoinsv.bitcoinjsv.script.ScriptChunk;
-import io.bitcoinsv.bitcoinjsv.script.ScriptOpCodes;
+import com.metanet4j.base.bsv.BsvAmount;
+import com.metanet4j.base.bsv.BsvHashBytes;
+import com.metanet4j.bsv.script.OP;
+import com.metanet4j.bsv.script.Script;
+import com.metanet4j.bsv.script.ScriptChunk;
+import com.metanet4j.bsv.script.templates.P2PKH;
+import com.metanet4j.bsv.transaction.Transaction;
+import com.metanet4j.bsv.transaction.TransactionInput;
+import com.metanet4j.bsv.transaction.TransactionOutput;
+import com.metanet4j.sdk.PrivateKey;
+import com.metanet4j.sdk.address.AddressEnhance;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -27,20 +28,21 @@ class BobTxoConversionContractTest {
 
     @Test
     void convertsP2pkhInputAndOutputToPublicAddressAndValueFields() {
-        ECKey key = ECKey.fromPrivate(BigInteger.TWO);
-        Address address = key.toAddress(MainNetParams.get());
+        PrivateKey key = PrivateKey.of(BigInteger.TWO);
+        AddressEnhance address = AddressEnhance.fromPrivateKey(key);
         byte[] previousHash = new byte[32];
         previousHash[0] = 42;
-        Transaction tx = new Transaction(Net.MAINNET);
-        tx.addInput(Sha256Hash.wrap(previousHash), 7,
-                new ScriptBuilder().data(new byte[] {48, 1}).data(key.getPubKey()).build())
-                .setSequenceNumber(11);
-        tx.addOutput(Coin.valueOf(546), address);
-        String hex = HexUtil.encodeHexStr(tx.bitcoinSerialize());
+        Transaction tx = new Transaction();
+        tx.inputs.add(new TransactionInput(new BsvHashBytes(previousHash).toString(), 7,
+                new Script().writeBin(toBoxed(new byte[] {48, 1}))
+                        .writeBin(toBoxed(key.getPubKey()))));
+        tx.inputs.get(0).sequence = 11L;
+        tx.outputs.add(new TransactionOutput(new P2PKH().lock(address.toBase58()), 546d));
+        String hex = HexUtil.encodeHexStr(toBytes(tx.toBinary()));
 
         Map<String, Object> bob = BobHelper.toBob(hex);
         Map<String, Object> txo = TxoHelper.toTxo(hex);
-        assertEquals(tx.getHashAsString(), field(bob, "tx").get("h"));
+        assertEquals(tx.id("hex"), field(bob, "tx").get("h"));
         assertEquals(field(bob, "tx"), field(txo, "tx"));
         assertEquals(1, items(bob, "in").size());
         assertEquals(1, items(txo, "out").size());
@@ -62,17 +64,17 @@ class BobTxoConversionContractTest {
 
     @Test
     void separatesOpReturnTapeAndKeepsPayloadInTxoFields() {
-        Transaction tx = new Transaction(Net.MAINNET);
-        tx.addInput(Sha256Hash.wrap(new byte[32]), 0, new ScriptBuilder().build());
-        tx.addOutput(Coin.valueOf(0), new ScriptBuilder().op(ScriptOpCodes.OP_RETURN)
-                .data("alpha".getBytes(StandardCharsets.UTF_8))
-                .data("|".getBytes(StandardCharsets.UTF_8))
-                .data("beta".getBytes(StandardCharsets.UTF_8)).build());
-        tx.addOutput(Coin.valueOf(0), new ScriptBuilder()
-                .addChunk(new ScriptChunk(ScriptOpCodes.OP_FALSE, null))
-                .op(ScriptOpCodes.OP_RETURN)
-                .data("genesis".getBytes(StandardCharsets.UTF_8)).build());
-        String hex = HexUtil.encodeHexStr(tx.bitcoinSerialize());
+        Transaction tx = new Transaction();
+        tx.inputs.add(new TransactionInput(new BsvHashBytes(new byte[32]).toString(), 0, new Script()));
+        tx.outputs.add(new TransactionOutput(new Script().writeOpCode(OP.OP_RETURN)
+                .writeBin(toBoxed("alpha".getBytes(StandardCharsets.UTF_8)))
+                .writeBin(toBoxed("|".getBytes(StandardCharsets.UTF_8)))
+                .writeBin(toBoxed("beta".getBytes(StandardCharsets.UTF_8))), 0d));
+        tx.outputs.add(new TransactionOutput(new Script()
+                .writeOpCode(OP.OP_0)
+                .writeOpCode(OP.OP_RETURN)
+                .writeBin(toBoxed("genesis".getBytes(StandardCharsets.UTF_8))), 0d));
+        String hex = HexUtil.encodeHexStr(toBytes(tx.toBinary()));
 
         Map<String, Object> bobOutput = item(BobHelper.toBob(hex), "out", 0);
         Map<String, Object> txoOutput = item(TxoHelper.toTxo(hex), "out", 0);
@@ -88,7 +90,7 @@ class BobTxoConversionContractTest {
 
         List<Map<String, Object>> tape = tape(bobOutput);
         assertEquals(3, tape.size());
-        assertEquals(ScriptOpCodes.OP_RETURN, cell(tape.get(0), 0).get("op"));
+        assertEquals(OP.OP_RETURN, cell(tape.get(0), 0).get("op"));
         assertEquals("alpha", cell(tape.get(1), 0).get("s"));
         assertEquals("YWxwaGE=", cell(tape.get(1), 0).get("b"));
         assertEquals("616c706861", cell(tape.get(1), 0).get("h"));
@@ -108,21 +110,21 @@ class BobTxoConversionContractTest {
 
     @Test
     void keepsNonP2pkhInputAndOpReturnAfterEarlierData() {
-        Transaction tx = new Transaction(Net.MAINNET);
-        tx.addInput(Sha256Hash.wrap(new byte[32]), 2,
-                new ScriptBuilder().op(ScriptOpCodes.OP_1).build());
-        tx.addOutput(Coin.valueOf(0), new ScriptBuilder()
-                .data("left".getBytes(StandardCharsets.UTF_8))
-                .data("right".getBytes(StandardCharsets.UTF_8))
-                .op(ScriptOpCodes.OP_RETURN)
-                .data("tail".getBytes(StandardCharsets.UTF_8)).build());
-        String hex = HexUtil.encodeHexStr(tx.bitcoinSerialize());
+        Transaction tx = new Transaction();
+        tx.inputs.add(new TransactionInput(new BsvHashBytes(new byte[32]).toString(), 2,
+                new Script().writeOpCode(OP.OP_1)));
+        tx.outputs.add(new TransactionOutput(new Script()
+                .writeBin(toBoxed("left".getBytes(StandardCharsets.UTF_8)))
+                .writeBin(toBoxed("right".getBytes(StandardCharsets.UTF_8)))
+                .writeOpCode(OP.OP_RETURN)
+                .writeBin(toBoxed("tail".getBytes(StandardCharsets.UTF_8))), 0d));
+        String hex = HexUtil.encodeHexStr(toBytes(tx.toBinary()));
 
         Map<String, Object> bob = BobHelper.toBob(hex);
         Map<String, Object> txo = TxoHelper.toTxo(hex);
         assertEquals(64, String.valueOf(field(item(bob, "in", 0), "e").get("a")).length());
         assertTrue(String.valueOf(field(item(txo, "in", 0), "e").get("a")).contains("1"));
-        assertEquals(ScriptOpCodes.OP_1, cell(tape(item(bob, "in", 0)).get(0), 0).get("op"));
+        assertEquals(OP.OP_1, cell(tape(item(bob, "in", 0)).get(0), 0).get("op"));
         assertEquals("left", item(txo, "out", 0).get("s0"));
         assertEquals("right", item(txo, "out", 0).get("s1"));
         assertEquals("tail", item(txo, "out", 0).get("s3"));
@@ -131,53 +133,61 @@ class BobTxoConversionContractTest {
         assertEquals(3, tape.size());
         assertEquals("left", cell(tape.get(0), 0).get("s"));
         assertEquals("right", cell(tape.get(0), 1).get("s"));
-        assertEquals(ScriptOpCodes.OP_RETURN, cell(tape.get(1), 0).get("op"));
+        assertEquals(OP.OP_RETURN, cell(tape.get(1), 0).get("op"));
         assertEquals("tail", cell(tape.get(2), 0).get("s"));
     }
 
     @Test
     void keepsFalseReturnPairTogetherAfterEarlierPayload() {
-        Transaction tx = new Transaction(Net.MAINNET);
-        tx.addInput(Sha256Hash.wrap(new byte[32]), 0, new ScriptBuilder().build());
-        tx.addOutput(Coin.valueOf(0), new ScriptBuilder()
-                .data("left".getBytes(StandardCharsets.UTF_8))
-                .data("right".getBytes(StandardCharsets.UTF_8))
-                .addChunk(new ScriptChunk(ScriptOpCodes.OP_FALSE, null))
-                .op(ScriptOpCodes.OP_RETURN)
-                .data("tail".getBytes(StandardCharsets.UTF_8)).build());
+        Transaction tx = new Transaction();
+        tx.inputs.add(new TransactionInput(new BsvHashBytes(new byte[32]).toString(), 0, new Script()));
+        tx.outputs.add(new TransactionOutput(new Script()
+                .writeBin(toBoxed("left".getBytes(StandardCharsets.UTF_8)))
+                .writeBin(toBoxed("right".getBytes(StandardCharsets.UTF_8)))
+                .writeOpCode(OP.OP_0)
+                .writeOpCode(OP.OP_RETURN)
+                .writeBin(toBoxed("tail".getBytes(StandardCharsets.UTF_8))), 0d));
 
         List<Map<String, Object>> tape = tape(item(BobHelper.toBob(
-                HexUtil.encodeHexStr(tx.bitcoinSerialize())), "out", 0));
+                HexUtil.encodeHexStr(toBytes(tx.toBinary()))), "out", 0));
         assertEquals(3, tape.size());
-        assertEquals(ScriptOpCodes.OP_FALSE, cell(tape.get(1), 0).get("op"));
-        assertEquals(ScriptOpCodes.OP_RETURN, cell(tape.get(1), 1).get("op"));
+        assertEquals(OP.OP_0, cell(tape.get(1), 0).get("op"));
+        assertEquals(OP.OP_RETURN, cell(tape.get(1), 1).get("op"));
         assertEquals("tail", cell(tape.get(2), 0).get("s"));
     }
 
     @Test
     void opcodeOnlyInputFallsBackToScriptIdentity() {
-        Script inputScript = new ScriptBuilder().op(ScriptOpCodes.OP_DUP)
-                .op(ScriptOpCodes.OP_HASH160).build();
-        Transaction tx = new Transaction(Net.MAINNET);
-        tx.addInput(Sha256Hash.wrap(new byte[32]), 0, inputScript);
-        tx.addOutput(Coin.valueOf(1), new ScriptBuilder().data(new byte[] {1}).build());
-        String hex = HexUtil.encodeHexStr(tx.bitcoinSerialize());
+        Script inputScript = new Script().writeOpCode(OP.OP_DUP)
+                .writeOpCode(OP.OP_HASH160);
+        Transaction tx = new Transaction();
+        tx.inputs.add(new TransactionInput(new BsvHashBytes(new byte[32]).toString(), 0, inputScript));
+        tx.outputs.add(new TransactionOutput(
+                new Script().writeBin(toBoxed(new byte[] {1})), 1d));
+        String hex = HexUtil.encodeHexStr(toBytes(tx.toBinary()));
 
-        assertEquals(Sha256Hash.of(inputScript.getProgram()).toString(),
+        // 旧库 Sha256Hash.toString() 输出**显示序**（§108 实测：等于 BsvHashBytes.getBytes() 的 hex），
+        // 故此处按显示序 hex 断言，而非用会反转的 BsvHashBytes.toString()。
+        assertEquals(HexUtil.encodeHexStr(
+                        com.metanet4j.base.bsv.BsvHashBytes.of(inputScript.toUint8Array()).getBytes()),
                 field(item(BobHelper.toBob(hex), "in", 0), "e").get("a"));
-        assertEquals(inputScript.toString(),
+        // 基线此处为 assertEquals(inputScript.toString(), ...)，旧库 Script.toString() 输出**可读操作码名**
+        // （如 "DUP HASH160"）。新 SDK 的 Script.toString() 是默认对象实现，故按基线语义直接写字面量
+        // ——这也正是 §109 让 TxoHelper 输出可读操作码名所对齐的形式。
+        assertEquals("DUP HASH160",
                 field(item(TxoHelper.toTxo(hex), "in", 0), "e").get("a"));
     }
 
     @Test
     void zeroPushInputIsReportedAsAnOpcode() {
-        Transaction tx = new Transaction(Net.MAINNET);
-        tx.addInput(Sha256Hash.wrap(new byte[32]), 0,
-                new ScriptBuilder().addChunk(new ScriptChunk(ScriptOpCodes.OP_FALSE, null)).build());
-        tx.addOutput(Coin.valueOf(1), new ScriptBuilder().data(new byte[] {1}).build());
+        Transaction tx = new Transaction();
+        tx.inputs.add(new TransactionInput(new BsvHashBytes(new byte[32]).toString(), 0,
+                new Script().writeOpCode(OP.OP_0)));
+        tx.outputs.add(new TransactionOutput(
+                new Script().writeBin(toBoxed(new byte[] {1})), 1d));
 
         Map<String, Object> input = item(TxoHelper.toTxo(
-                HexUtil.encodeHexStr(tx.bitcoinSerialize())), "in", 0);
+                HexUtil.encodeHexStr(toBytes(tx.toBinary()))), "in", 0);
         assertTrue(input.containsKey("o0"));
         assertTrue(String.valueOf(input.get("o0")).startsWith("OP_"));
         assertEquals(1, input.get("len"));
@@ -210,4 +220,22 @@ class BobTxoConversionContractTest {
     private static Map<String, Object> cell(Map<String, Object> tapeItem, int index) {
         return cells(tapeItem).get(index);
     }
+
+    private static List<Integer> toBoxed(byte[] data) {
+        List<Integer> out = new ArrayList<>(data.length);
+        for (byte b : data) {
+            out.add(b & 0xFF);
+        }
+        return out;
+    }
+
+
+    private static byte[] toBytes(List<Integer> values) {
+        byte[] out = new byte[values.size()];
+        for (int i = 0; i < out.length; i++) {
+            out[i] = (byte) (values.get(i) & 0xFF);
+        }
+        return out;
+    }
+
 }
