@@ -131,8 +131,9 @@ public final class TxHelperExtend {
         if (key == null) {
             return null;
         }
-        // P2SH 输入的赎回脚本由调用方按业务规则提供；此处保留 null 表示非 P2SH
-        return RedeemDataExtend.of(key, null);
+        // 把连接输出的锁定脚本作为赎回脚本一并返回：调用方据此重建输入脚本
+        // 或校验地址；P2SH 场景下即为赎回脚本本身。
+        return RedeemDataExtend.of(key, lockingScript);
     }
 
     /** P2PKH 锁定脚本的公钥哈希；非 P2PKH 返回空数组。 */

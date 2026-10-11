@@ -1,45 +1,51 @@
 package com.metanet4j.sdk.utils;
 
-import static io.bitcoinsv.bitcoinjsv.script.ScriptOpCodes.OP_NOP;
+import static com.metanet4j.bsv.script.OP.OP_NOP;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import cn.hutool.core.codec.Base64;
+import com.metanet4j.bsv.script.Script;
+import com.metanet4j.bsv.script.ScriptChunk;
+import com.metanet4j.bsv.script.templates.P2PKH;
+import com.metanet4j.bsv.transaction.Transaction;
+import com.metanet4j.bsv.transaction.TransactionOutput;
 import com.metanet4j.sdk.TestData;
+import com.metanet4j.sdk.address.AddressEnhance;
 import com.metanet4j.sdk.bap.BapBase;
 import com.metanet4j.sdk.ordinals.OrdScriptBuilder;
 import com.metanet4j.sdk.ordinals.OrdScriptBuilder.ORDMap;
-import io.bitcoinsv.bitcoinjsv.core.Address;
-import io.bitcoinsv.bitcoinjsv.core.Coin;
-import io.bitcoinsv.bitcoinjsv.core.Sha256Hash;
-import io.bitcoinsv.bitcoinjsv.msg.protocol.Transaction;
-import io.bitcoinsv.bitcoinjsv.msg.protocol.TransactionOutPoint;
-import io.bitcoinsv.bitcoinjsv.params.MainNetParams;
-import io.bitcoinsv.bitcoinjsv.params.Net;
-import io.bitcoinsv.bitcoinjsv.script.Script;
-import io.bitcoinsv.bitcoinjsv.script.ScriptBuilder;
-import io.bitcoinsv.bitcoinjsv.script.ScriptChunk;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
+/**
+ * {@link TxHelperExtend} 的 Ordinals 脚本识别与地址解析契约。
+ *
+ * <p>迁移要点：脚本与地址全用新 SDK 类型（{@code Script}/{@code AddressEnhance}）；
+ * P2PKH 前缀由 {@code new P2PKH().lock(hash160)} 生成；chunk 访问用 {@code op} 字段与
+ * {@code ScriptHelper.getPushData}；{@code getConnectedRedeemDataExtend} 的入参由旧库 outpoint 改为
+ * **连接输出**（{@code TransactionOutput}）与显式 {@code SigningKeyProvider}（计划 §3）。
+ */
 class TxHelperExtendContractTest {
 
     @Test
     void extractsDestinationFromInscriptionWithOptionalMapMetadata() {
         BapBase bap = BapBase.fromOnlyMasterPrivateKey(TestData.masterPrivateKey);
-        Address destination = bap.getOrdAddress();
+        AddressEnhance destination = bap.getOrdAddress();
         ORDMap metadata = new ORDMap();
         metadata.put("app", "test");
         metadata.put("type", "image");
         Script script = OrdScriptBuilder.buildInscription(destination,
                 "body".getBytes(StandardCharsets.UTF_8), "text/plain", metadata);
-        String encoded = Base64.encode(script.getProgram());
+        String encoded = Base64.encode(script.toUint8Array());
 
         assertTrue(TxHelperExtend.isSentToOrdinals(script));
         assertArrayEquals(destination.getHash160(), TxHelperExtend.getPubKeyHashByOrdinalScript(script));
@@ -51,54 +57,56 @@ class TxHelperExtendContractTest {
     @Test
     void rejectsOrdinaryAndIncompleteInscriptionScripts() {
         BapBase bap = BapBase.fromOnlyMasterPrivateKey(TestData.masterPrivateKey);
-        Address destination = bap.getOrdAddress();
-        Script payment = ScriptBuilder.createOutputScript(destination);
+        AddressEnhance destination = bap.getOrdAddress();
+        Script payment = new P2PKH().lock(destination.getHash160());
         Script inscription = OrdScriptBuilder.buildInscription(destination,
                 new byte[] {1}, "application/octet-stream", null);
 
         assertFalse(TxHelperExtend.isSentToOrdinals(payment));
         assertArrayEquals(new byte[0], TxHelperExtend.getPubKeyHashByOrdinalScript(payment));
-        assertFalse(TxHelperExtend.isSentToOrdinals(new ScriptBuilder().build()));
+        assertFalse(TxHelperExtend.isSentToOrdinals(new Script()));
 
         List<ScriptChunk> valid = inscription.getChunks();
         for (int invalidPosition = 0; invalidPosition < 13; invalidPosition++) {
-            ScriptBuilder changed = new ScriptBuilder();
+            List<ScriptChunk> changed = new ArrayList<>(valid.size());
             for (int i = 0; i < valid.size(); i++) {
                 if (i == invalidPosition) {
                     if (i == 2) {
-                        changed.data(new byte[19]);
+                        changed.add(new ScriptChunk(19, toBoxed(new byte[19])));
                     } else if (i == 7) {
-                        changed.data("other".getBytes(StandardCharsets.US_ASCII));
+                        changed.add(new ScriptChunk(5,
+                                toBoxed("other".getBytes(StandardCharsets.US_ASCII))));
                     } else {
-                        changed.op(OP_NOP);
+                        changed.add(new ScriptChunk(OP_NOP));
                     }
                 } else {
-                    changed.addChunk(valid.get(i));
+                    changed.add(valid.get(i));
                 }
             }
-            Script malformed = changed.build();
+            Script malformed = new Script(changed);
             assertFalse(TxHelperExtend.isSentToOrdinals(malformed), "chunk " + invalidPosition);
             assertArrayEquals(new byte[0], TxHelperExtend.getPubKeyHashByOrdinalScript(malformed));
         }
     }
 
     @Test
-    void resolvesConnectedInscriptionAndOrdinaryPaymentThroughKeyBag() {
+    void resolvesConnectedInscriptionAndOrdinaryPaymentThroughKeyProvider() {
         BapBase bap = BapBase.fromOnlyMasterPrivateKey(TestData.masterPrivateKey);
         BapBase.BapProviderKeyBag bag = new BapBase.BapProviderKeyBag(bap);
-        Address destination = bap.getOrdAddress();
+        AddressEnhance destination = bap.getOrdAddress();
         Script inscription = OrdScriptBuilder.buildInscription(destination,
                 new byte[] {1, 2}, "image/png", null);
 
-        RedeemDataExtend ordinal = TxHelperExtend.getConnectedRedeemDataExtend(outpoint(inscription), bag);
+        RedeemDataExtend ordinal = TxHelperExtend.getConnectedRedeemDataExtend(output(inscription), bag);
         assertNotNull(ordinal);
-        assertArrayEquals(inscription.getProgram(), ordinal.redeemScript.getProgram());
+        assertArrayEquals(inscription.toUint8Array(), ordinal.redeemScript.toUint8Array(),
+                "赎回脚本应回填连接输出的锁定脚本");
         assertEquals(bap.getOrdPrivateKey().getPrivKey(), ordinal.getFullKey().getPrivKey());
 
-        Script payment = ScriptBuilder.createOutputScript(destination);
-        RedeemDataExtend ordinary = TxHelperExtend.getConnectedRedeemDataExtend(outpoint(payment), bag);
+        Script payment = new P2PKH().lock(destination.getHash160());
+        RedeemDataExtend ordinary = TxHelperExtend.getConnectedRedeemDataExtend(output(payment), bag);
         assertNotNull(ordinary);
-        assertArrayEquals(payment.getProgram(), ordinary.redeemScript.getProgram());
+        assertArrayEquals(payment.toUint8Array(), ordinary.redeemScript.toUint8Array());
         assertEquals(bap.getOrdPrivateKey().getPrivKey(), ordinary.getFullKey().getPrivKey());
     }
 
@@ -106,21 +114,30 @@ class TxHelperExtendContractTest {
     void rejectsDisconnectedOutputAndUnknownInscriptionKey() {
         BapBase bap = BapBase.fromOnlyMasterPrivateKey(TestData.masterPrivateKey);
         BapBase.BapProviderKeyBag bag = new BapBase.BapProviderKeyBag(bap);
-        TransactionOutPoint disconnected = new TransactionOutPoint(Net.MAINNET, 0,
-                Sha256Hash.wrap(new byte[32]));
-        assertThrows(NullPointerException.class,
-                () -> TxHelperExtend.getConnectedRedeemDataExtend(disconnected, bag));
+
+        assertNull(TxHelperExtend.getConnectedRedeemDataExtend(null, bag),
+                "无连接输出时应返回 null 而非抛错（新签名以 TransactionOutput 表达连接输出）");
 
         byte[] unknownHash = new byte[20];
         Arrays.fill(unknownHash, (byte) 7);
-        Address unknown = new Address(MainNetParams.get(), unknownHash);
+        AddressEnhance unknown = AddressEnhance.fromPubKeyHash(unknownHash);
         Script inscription = OrdScriptBuilder.buildInscription(unknown, new byte[] {1}, "text/plain", null);
-        assertThrows(RuntimeException.class,
-                () -> TxHelperExtend.getConnectedRedeemDataExtend(outpoint(inscription), bag));
+        assertNull(TxHelperExtend.getConnectedRedeemDataExtend(output(inscription), bag),
+                "密钥提供者不认识该地址时应返回 null");
     }
 
-    private static TransactionOutPoint outpoint(Script script) {
-        Transaction funding = new Transaction(Net.MAINNET);
-        return new TransactionOutPoint(Net.MAINNET, funding.addOutput(Coin.valueOf(546), script));
+    /** 由脚本构造连接输出（新签名用 TransactionOutput 表达「连接输出」）。 */
+    private static TransactionOutput output(Script script) {
+        Transaction funding = new Transaction();
+        funding.outputs.add(new TransactionOutput(script, 546d));
+        return funding.outputs.get(0);
+    }
+
+    private static List<Integer> toBoxed(byte[] data) {
+        List<Integer> out = new ArrayList<>(data.length);
+        for (byte b : data) {
+            out.add(b & 0xFF);
+        }
+        return out;
     }
 }
