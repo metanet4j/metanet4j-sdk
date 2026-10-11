@@ -88,7 +88,8 @@ class BapPathTest {
         HD root = master.getMasterDeterministicKey();
         BapPath path = BapPath.parse("m/0'/1");
         assertEquals(root.derive("m/0'/1").toString(), path.derive(root).toString());
-        assertEquals(root.derive("m/0"), BapPath.parse("m/0").derive(root));
+        // 新 SDK 的 HD 无 equals：比对 xprv 字符串（相邻两行亦同此口径）
+        assertEquals(root.derive("m/0").toString(), BapPath.parse("m/0").derive(root).toString());
         // 空路径返回主节点自身
         assertEquals(root.toString(), BapPath.parse("m").derive(root).toString());
         // 单段硬化路径
