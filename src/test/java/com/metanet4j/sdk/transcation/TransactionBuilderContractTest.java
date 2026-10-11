@@ -173,6 +173,22 @@ class TransactionBuilderContractTest {
     }
 
     @Test
+    void probeSignerFailurePath() {
+        // **探查用例（§295）**：为覆盖 `:227—228`（`sign()` 抛错 → 转 `SignErrorException`）寻找可触发的形态。
+        // 已试过：① 缺解锁模板的输入（§93 实测 `sign()` 容忍）；② 输出为空（§92 备选 C）。
+        // 本批试"**零输入**"这一未试形态，观察 `sign()` 是否抛错。
+        TransactionBuilder builder = new TransactionBuilder(bap, keyProvider);
+        builder.addOutput(BsvAmount.valueOf(777), paymentAddress);
+
+        Transaction signed = builder.completeAndSignTx(keyProvider,
+                TransactionSignature.SIGHASH_ALL, false);
+
+        // **实测所得的契约**：零输入交易能被正常处理（`sign()` 对其**容忍**，不抛错）。
+        // 这同时是一条**负向证据**：`:227—228` 的 `catch → throw SignErrorException` 在本形态下不可达。
+        assertEquals(0, signed.inputs.size(), "零输入交易应被正常处理——sign() 对其容忍，不抛错");
+    }
+
+    @Test
     void preparingInputsToleratesASourceOutputWithoutLockingScript() {
         // 覆盖 `lockingScriptOf`（:303）的 `||` **第二腿**：`output.lockingScript == null`。
         // §267／§280 的样本里，连接输出要么不存在（第一腿为真）、要么锁定脚本非 null（两腿皆假），
