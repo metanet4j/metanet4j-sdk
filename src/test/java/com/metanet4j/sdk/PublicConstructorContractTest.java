@@ -34,6 +34,12 @@ class PublicConstructorContractTest {
 
         InvalidKeyException invalidKey = new InvalidKeyException("bad key");
         assertEquals("bad key", invalidKey.getMessage(), "InvalidKeyException 应保留消息");
+
+        // 另覆盖**双参重载**（§82 清单里未覆盖的是这一个，单参重载此前已被其他用例触达）
+        Throwable cause = new IllegalStateException("root cause");
+        InvalidKeyException withCause = new InvalidKeyException("bad key", cause);
+        assertEquals("bad key", withCause.getMessage(), "双参重载应保留消息");
+        assertSame(cause, withCause.getCause(), "双参重载应保留 cause");
     }
 
     @Test
