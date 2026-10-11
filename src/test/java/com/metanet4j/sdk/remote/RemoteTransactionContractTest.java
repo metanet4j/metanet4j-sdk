@@ -127,6 +127,27 @@ class RemoteTransactionContractTest {
     }
 
     @Test
+    void remoteSignerHonoursTheSingleOutputSignatureFlavour() {
+        // 覆盖 RemoteTransactionSigner:108 —— `signOutputsOf(hashFlags).equals("single")` 的**真侧**
+        //（即 `SIGHASH_SINGLE | SIGHASH_FORKID | …`）。§271 全程用 `SIGHASH_ALL`，**只走了 :110 那一侧**，
+        // 故 :108 从未被求值（§104 的线索）。本用例以 `SIGHASH_SINGLE` 打开该侧。
+        RemoteTransactionBuilder builder = new RemoteTransactionBuilder(remoteBap, keyProvider);
+        builder.addInput(paymentUtxo(1))
+                .addOutput(BsvAmount.valueOf(777), paymentAddress)
+                .changeAddress(paymentAddress);
+        PreSignHashContext request = builder.getTxInputSignHash(false, remoteBap).get(0);
+        sign(request, paymentKey);
+
+        Transaction signed = builder.completeAndSignTx(keyProvider,
+                TransactionSignature.SIGHASH_SINGLE, false);
+
+        // 注：前像哈希是以固定旗标注册的，换旗标后**上下文可能查不到**、该输入会被跳过——
+        // 那时本断言会失败，而失败本身即是"该路径未走通"的证据（§253 的教训：别让断言因错误的原因通过）。
+        assertTrue(unlockingScriptBytes(signed, 0).length > 0,
+                "SIGHASH_SINGLE 下也应完成解锁脚本回填（若为空，说明上下文未命中、该输入被跳过）");
+    }
+
+    @Test
     void remoteSignerWritesTheAnyoneCanPayFlagIntoTheUnlockingScript() {
         // 覆盖 RemoteTransactionSigner 的 `:108`／`:110`——`anyoneCanPay ? SIGHASH_ANYONECANPAY : 0` 的**两侧**。
         // **必须用 3 参重载**：2 参重载 `completeAndSignTx(provider, useForkId)` 把 anyoneCanPay **硬编码为 false**
