@@ -114,7 +114,7 @@ public class Sigma implements PreSignHash {
                 .writeBin(toBoxed(String.valueOf(vin).getBytes()));
 
         this.sig = new Sig(address, signature, Algorithm.BSM.toString(), vin, this.targetVout);
-        List<ScriptChunk> newScriptAsm = new ArrayList<>(this.getTargetTxOut().lockingScript.getChunks());
+        List<ScriptChunk> newScriptAsm = new ArrayList<>(chunksOf(this.getTargetTxOut().lockingScript));
         int existingCount = getSigInstanceCount();
         if (sigmaInstance > existingCount) {
             throw new IllegalArgumentException("Sigma instance is out of range: " + sigmaInstance);
@@ -202,7 +202,7 @@ public class Sigma implements PreSignHash {
         TransactionOutput output = transaction.outputs.get(targetVout);
         Script outputScript = output.lockingScript;
 
-        List<ScriptChunk> chunks = outputScript.getChunks();
+        List<ScriptChunk> chunks = chunksOf(outputScript);
 
         for (int i = 0; i < chunks.size(); i++) {
             if (!ScriptHelper.hasPushData(chunks.get(i))) {
@@ -421,4 +421,48 @@ public class Sigma implements PreSignHash {
         }
         throw new IllegalArgumentException("不支持的 sourceTXID 类型：" + sourceTXID.getClass().getName());
     }
+
+    private static List<ScriptChunk> chunksOf(Script script) {
+        byte[] raw = script.toUint8Array();
+        List<ScriptChunk> out = new java.util.ArrayList<>();
+        int i = 0;
+        while (i < raw.length) {
+            int op = raw[i] & 0xFF;
+            i++;
+            int len;
+            if (op == 0) {
+                out.add(new ScriptChunk(OP.OP_0));
+                continue;
+            } else if (op >= 1 && op <= 75) {
+                len = op;
+            } else if (op == 76) {
+                if (i >= raw.length) break;
+                len = raw[i] & 0xFF;
+                i++;
+            } else if (op == 77) {
+                if (i + 1 >= raw.length) break;
+                len = (raw[i] & 0xFF) | ((raw[i + 1] & 0xFF) << 8);
+                i += 2;
+            } else if (op == 78) {
+                if (i + 3 >= raw.length) break;
+                len = (raw[i] & 0xFF) | ((raw[i + 1] & 0xFF) << 8)
+                        | ((raw[i + 2] & 0xFF) << 16) | ((raw[i + 3] & 0xFF) << 24);
+                i += 4;
+            } else {
+                out.add(new ScriptChunk(op));
+                continue;
+            }
+            if (i + len > raw.length) {
+                len = raw.length - i;
+            }
+            List<Integer> data = new java.util.ArrayList<>(len);
+            for (int k = 0; k < len; k++) {
+                data.add(raw[i + k] & 0xFF);
+            }
+            i += len;
+            out.add(new ScriptChunk(op, data));
+        }
+        return out;
+    }
+
 }
