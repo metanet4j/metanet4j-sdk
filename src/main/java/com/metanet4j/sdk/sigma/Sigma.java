@@ -432,12 +432,6 @@ public class Sigma implements PreSignHash {
         throw new IllegalArgumentException("不支持的 sourceTXID 类型：" + sourceTXID.getClass().getName());
     }
 
-    private static List<ScriptChunk> chunksOf(Script script) {
-        // 委托给全项目唯一实现（见 migration-rules §60：此前四个类各存一份副本，
-        // 其边界分支需在四处重复覆盖；收敛为一份后只需覆盖一次）。
-        return com.metanet4j.sdk.utils.ScriptHelper.chunksOf(script);
-    }
-
 
 
 }
