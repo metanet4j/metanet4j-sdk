@@ -89,6 +89,23 @@ class SignerTransactionContractTest {
     }
 
     @Test
+    void singleInputSigningTreatsAThrowingProviderAsNoKey() {
+        // 覆盖 OrdinalsTransactionSigner 的 `:73—75`（套路②：让协作者抛错）：
+        //     key = keyProvider == null ? null : keyProvider.findKeyFromPubHash(pubKeyHash);
+        // 被 try/catch 包住 —— 本项目提供者**找不到密钥时抛 RuntimeException 而非返回 null**
+        // （§132 已确认、BapProviderKeyBagTest 明确要求该行为），故该 catch 是**必需**的：
+        // 它把"抛错"与"返回 null"两种表现统一为"取不到密钥"。
+        Transaction tx = transactionWithPaymentInput();
+        SigningKeyProvider throwing = pubkeyHash -> {
+            throw new IllegalStateException("模拟提供者找不到密钥");
+        };
+
+        assertFalse(OrdinalsTransactionSigner.signInput(tx, 0, throwing,
+                        TransactionSignature.SIGHASH_ALL, false),
+                "提供者抛错时应视同取不到密钥并返回 false，而非把原始异常外泄给调用方");
+    }
+
+    @Test
     void singleInputSigningSkipsUnrecognizableScripts() {
         // 覆盖 §90.2 列的 OrdinalsTransactionSigner 两处（套路①/③）：
         //   :57 连接输出**无锁定脚本** → 按空脚本处理；
