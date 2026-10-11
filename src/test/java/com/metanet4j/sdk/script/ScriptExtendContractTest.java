@@ -410,4 +410,39 @@ class ScriptExtendContractTest {
         assertEquals(redeem.length, updated.getChunks().get(3).data.size(), "后缀 redeemScript 应原样保留");
     }
 
+
+    @Test
+    void walksTheDataNullLegAndTheUpperBoundOfEachRangeCheck() {
+        // 覆盖 §98 方法下仍缺的两类"另一侧"：
+        //   ① `:77`／`:87` 的 `chunks.get(n).data != null` —— **该合取的第一腿**（数据为 null 的推送段）；
+        //   ② `:111` 的 `op > OP.OP_16` —— 公钥数**越上界**（§255 只用了 OP_0 越下界）。
+        byte[] h20 = new byte[20];
+        java.util.Arrays.fill(h20, (byte) 7);
+
+        // ① isSentToAddress：段数 5、前后操作码皆对，但**第 2 段是无数据的操作码**（OP_1）
+        //    注意这与"长度为 19"不同：那里 data 非 null、只是长度不符；这里 data 本身为 null。
+        byte[] noData = {0x76, (byte) 0xa9, 0x51, (byte) 0x88, (byte) 0xac};
+        assertFalse(ScriptExtend.isSentToAddress(Script.fromBinary(noData)),
+                "第 2 段无数据（data 为 null）时不应判为 P2PKH");
+
+        // ② isPayToScriptHash：段数 3、第 0 与第 2 段皆对，但**第 1 段是无数据的操作码**
+        byte[] noDataP2sh = {(byte) 0xa9, 0x51, (byte) 0x87};
+        assertFalse(ScriptExtend.isPayToScriptHash(Script.fromBinary(noDataP2sh)),
+                "第 1 段无数据（data 为 null）时不应判为 P2SH");
+
+        // ③ isSentToMultiSig：公钥数（倒数第二段）**越上界**——用 OP_17
+        byte[] pk33 = new byte[33];
+        pk33[0] = 0x02;
+        java.util.Arrays.fill(pk33, 1, 33, (byte) 3);
+        byte[] overTotal = new byte[1 + 34 + 34 + 1 + 1];
+        int i = 0;
+        overTotal[i++] = 0x52;                                     // OP_2（应签名数，合法）
+        overTotal[i++] = 0x21; System.arraycopy(pk33, 0, overTotal, i, 33); i += 33;
+        overTotal[i++] = 0x21; System.arraycopy(pk33, 0, overTotal, i, 33); i += 33;
+        overTotal[i++] = 0x61;                                     // OP_17（公钥数，越上界）
+        overTotal[i] = (byte) 0xae;
+        assertFalse(ScriptExtend.isSentToMultiSig(Script.fromBinary(overTotal)),
+                "公钥数超出 OP_16 时应判否");
+    }
+
 }
