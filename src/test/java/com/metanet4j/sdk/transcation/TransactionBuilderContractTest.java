@@ -173,6 +173,37 @@ class TransactionBuilderContractTest {
     }
 
     @Test
+    void changeAmountToleratesMissingOrNonNumericFields() {
+        // 覆盖 §95 所列若干兜底（套路①：传坏输入）——**入口按 §99 的结论改为 `calculateChangeAmount`**：
+        //   :157 lockingScriptOf —— 输入无连接输出、或其无锁定脚本时返回空脚本；
+        //   :309—312 satoshisOf —— 无连接输出、或 satoshis 非 Number 时返回 null；
+        //   :333 inputSum —— 上游为 null 时按 0 计；
+        //   :342 outputSum —— 输出 satoshis 非 Number 时按 0 计。
+        // （:289 outputSize 的 null 侧已由 §99 判定不可达——其唯一调用点传入的是硬编码的非 null P2PKH 输出。）
+        TransactionBuilder builder = new TransactionBuilder(bap, keyProvider);
+        builder.addInput(utxo(9, 0, 20_000))                    // 对照：正常输入
+                .addOutput(BsvAmount.valueOf(777), paymentAddress);
+
+        // 追加"无来源交易"的输入 → satoshisOf 返回 null → inputSum 按 0 计
+        builder.getTargetTransaction().inputs.add(new TransactionInput(
+                new BsvHashBytes(new byte[32]).toString(), 0, new Script()));
+
+        // 注：**"锁定脚本为 null 的输出"暂不放入**——实测它会让 calculateChangeAmount 抛 NPE
+        //（见 migration-rules §100：某条路径未对 lockingScript 判空）。该现象已单独记录，
+        // 待定性后再决定是补测还是登记；本用例先覆盖其余可达的兜底。
+
+        // 追加"satoshis 非 Number"的输出 → outputSum 按 0 计（新 SDK 的类型宽松使这是真实可能状态）
+        com.metanet4j.bsv.transaction.TransactionOutput nonNumeric =
+                new com.metanet4j.bsv.transaction.TransactionOutput(new Script(), 0d);
+        nonNumeric.satoshis = com.metanet4j.bsv.primitives.Undefined.INSTANCE;
+        builder.getTargetTransaction().outputs.add(nonNumeric);
+
+        BsvAmount change = builder.calculateChangeAmount(
+                builder.getTargetTransaction(), paymentAddress, BsvAmount.valueOf(0));
+        assertNotNull(change, "字段残缺时仍应算出找零（各兜底生效），而非抛错");
+    }
+
+    @Test
     void prepareInputsRejectsNullProviderAndToleratesUnusableInputs() {
         // 覆盖 §95 所列 TransactionBuilder 的三处（:`246—247`、`:253—254`、`:174—181`）。
         // prepareInputsForSigning 是 protected，而本测试类与之**同包**，故可直接调用。
@@ -252,6 +283,12 @@ class TransactionBuilderContractTest {
                 new com.metanet4j.bsv.script.Script()
                         .writeOpCode(com.metanet4j.bsv.script.OP.OP_1).toUint8Array()));
         assertEquals(1, scriptOnly.getTargetTransaction().inputs.size(), "无地址有脚本时应正常加入输入");
+
+        // ④ **既无地址也无脚本** → 走 `else if` 的假侧：锁定脚本保持为空，输入仍应被加入
+        TransactionBuilder neither = new TransactionBuilder(bap, keyProvider);
+        neither.addInput(new BsvUtxo(hash, 0, 20_000L, 0, false, null, null));
+        assertEquals(1, neither.getTargetTransaction().inputs.size(),
+                "既无地址也无脚本时应仍加入输入（锁定脚本留空）");
     }
 
     @Test
