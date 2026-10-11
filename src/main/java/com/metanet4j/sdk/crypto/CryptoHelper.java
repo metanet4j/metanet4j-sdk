@@ -66,15 +66,6 @@ public final class CryptoHelper {
         return generateChlidCryptoBase(parentDeterministicKey, childIndex, BsvNetwork.MAINNET);
     }
 
-    private static List<String> generateWordList() {
-        List<String> dictionary = Bip39WordlistEn.VALUE;
-        Set<Integer> indexSet = new HashSet<>();
-        while (indexSet.size() != 12) {
-            indexSet.add(RandomUtil.randomInt(0, dictionary.size() - 1));
-        }
-        return indexSet.stream().map(dictionary::get).collect(Collectors.toList());
-    }
-
     private static CryptoBase getCryptoBase(BsvNetwork parameters, HD deterministicKey)
             throws InvalidKeyException {
         CryptoBase cryptoBase = new CryptoBase();
