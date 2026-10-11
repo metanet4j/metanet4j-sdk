@@ -77,7 +77,7 @@ public class RemoteOrdTransactionTemplate {
         transactionBuilder.addOrdOutput(destinationAddress, Base64.decode(inscription.getDataB64()), inscription.getContentType(), metaData, RemoteSignType.CURRENT);
 
 
-        return postTxBuild(changeAddress, feePerKb, bapBase, remoteSignType, this.doBsmSign, this.doInputSign, transactionBuilder);
+        return postTxBuild(changeAddress, feePerKb, bapBase, remoteSignType, this.doBsmSign, this.doInputSign, transactionBuilder, resolveKeyProvider(transactionSigner, bapBase));
 
 
     }
@@ -139,7 +139,7 @@ public class RemoteOrdTransactionTemplate {
             transactionBuilder.addOutput(BsvAmount.SATOSHI, destinationAddress);
         }
 
-        return postTxBuild(changeAddress, feePerKb, bapBase, remoteSignType, this.doBsmSign, this.doInputSign, transactionBuilder);
+        return postTxBuild(changeAddress, feePerKb, bapBase, remoteSignType, this.doBsmSign, this.doInputSign, transactionBuilder, resolveKeyProvider(transactionSigner, bapBase));
     }
 
 
@@ -236,7 +236,8 @@ public class RemoteOrdTransactionTemplate {
         BapDataLockBuilder bapDataLockBuilder = new BapDataLockBuilder(bapBase, true, remoteSignType);
         transactionBuilder.addDataOutput(bapDataLockBuilder.buildRoot());
         return postTxBuild(changeAddress, feePerKb, bapBase, remoteSignType,
-                this.doBsmSign, this.doInputSign, transactionBuilder).build();
+                this.doBsmSign, this.doInputSign, transactionBuilder,
+                resolveKeyProvider(transactionSigner, bapBase)).build();
     }
 
     public Transaction createPostOrdinal(List<AddressEnhance> payAddressEnhanceList,
@@ -283,7 +284,7 @@ public class RemoteOrdTransactionTemplate {
         }
     }
 
-    private RemoteOrdTransactionBuilder postTxBuild(AddressEnhance changeAddress, long feePerKb, BapBaseCore bapBase, RemoteSignType remoteSignType, boolean doBsmSign, boolean doInputSign, RemoteOrdTransactionBuilder transactionBuilder) {
+    private RemoteOrdTransactionBuilder postTxBuild(AddressEnhance changeAddress, long feePerKb, BapBaseCore bapBase, RemoteSignType remoteSignType, boolean doBsmSign, boolean doInputSign, RemoteOrdTransactionBuilder transactionBuilder, SigningKeyProvider keyProvider) {
         if (doBsmSign) {
             transactionBuilder.addSigmaSign(bapBase, remoteSignType);
         }
@@ -295,7 +296,7 @@ public class RemoteOrdTransactionTemplate {
             log.info("verify result:" + verify);
         }
         if (doInputSign) {
-            return transactionBuilder.signTx(null, true);
+            return transactionBuilder.signTx(keyProvider, true);
         } else {
             return transactionBuilder;
         }

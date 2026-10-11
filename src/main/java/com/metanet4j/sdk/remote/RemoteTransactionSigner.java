@@ -51,9 +51,15 @@ public class RemoteTransactionSigner {
             }
             Script scriptPubKey = sourceOutput.lockingScript == null
                     ? new Script() : sourceOutput.lockingScript;
+            // 兼容两类输入：标准 P2PKH 与 Ordinals 铭文脚本
+            // （铭文脚本以 P2PKH 前缀开头后接铭文包络，其公钥哈希在固定位置）。
+            // 旧实现在此只认 P2PKH，会把铭文输入整体跳过、导致该输入没有签名。
             byte[] pubKeyHash = pubKeyHashOf(scriptPubKey);
             if (pubKeyHash.length == 0) {
-                log.warn("输入 {} 的锁定脚本不是 P2PKH，跳过远程签名回填。", i);
+                pubKeyHash = com.metanet4j.sdk.utils.TxHelperExtend.getPubKeyHashByOrdinalScript(scriptPubKey);
+            }
+            if (pubKeyHash.length == 0) {
+                log.warn("输入 {} 的锁定脚本既非 P2PKH 也非 Ordinals 铭文，跳过远程签名回填。", i);
                 continue;
             }
             PreSignHashContext context;
