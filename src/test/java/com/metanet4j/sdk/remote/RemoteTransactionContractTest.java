@@ -127,6 +127,45 @@ class RemoteTransactionContractTest {
     }
 
     @Test
+    void remoteSignerPrefersContextPublicKeyThenFallsBackToLocalKey() {
+        // 覆盖 RemoteTransactionSigner 中 `pubKeyBytes` 的**嵌套三元**（:83—85）与随之的跳过（:86—88）：
+        //   ① context 有公钥 → 用它（既有用例的正常路径已覆盖）；
+        //   ② context **无公钥**、但有本地密钥 → 用本地公钥；
+        //   ③ context 无公钥、且**无本地密钥** → pubKeyBytes 为 null → 跳过该输入（不失败）。
+        // 构造要点：注册预签名上下文时**只设签名、不设公钥**（见本类 sign(...) 会 setPublicKey）。
+        RemoteTransactionBuilder builder = new RemoteTransactionBuilder(remoteBap, keyProvider);
+        builder.addInput(paymentUtxo(1))
+                .addOutput(BsvAmount.valueOf(777), paymentAddress)
+                .changeAddress(paymentAddress);
+        Transaction tx = builder.getTargetTransaction();
+
+        List<PreSignHashContext> requests = builder.getTxInputSignHash(false, remoteBap);
+        PreSignHashContext request = requests.get(0);
+        request.setSigB64(Base64.encode(toBytes(paymentKey.sign(request.getPreSignHash()).toDER())));
+        // **刻意不设公钥**——以走到"无上下文公钥"的那一侧
+        PreSignHashUtils.setPreSignHashContext(request);
+
+        RemoteTransactionSigner signer = new RemoteTransactionSigner();
+
+        // ② 有本地密钥 → 用本地公钥拼装解锁脚本，整批成功
+        assertTrue(signer.signInputs(tx, keyProvider, TransactionSignature.SIGHASH_ALL, false),
+                "无上下文公钥但有本地密钥时，应改用本地公钥完成回填");
+
+        // ③ 提供者解析不到密钥 → 无上下文公钥、也无本地密钥 → 跳过该输入（返回 true，不失败）
+        RemoteTransactionBuilder builder2 = new RemoteTransactionBuilder(remoteBap, keyProvider);
+        builder2.addInput(paymentUtxo(1))
+                .addOutput(BsvAmount.valueOf(777), paymentAddress)
+                .changeAddress(paymentAddress);
+        Transaction tx2 = builder2.getTargetTransaction();
+        PreSignHashContext request2 = builder2.getTxInputSignHash(false, remoteBap).get(0);
+        request2.setSigB64(Base64.encode(toBytes(paymentKey.sign(request2.getPreSignHash()).toDER())));
+        PreSignHashUtils.setPreSignHashContext(request2);
+
+        assertTrue(signer.signInputs(tx2, pubkeyHash -> null, TransactionSignature.SIGHASH_ALL, false),
+                "两者皆无时应跳过该输入、而非让整批失败");
+    }
+
+    @Test
     void remoteSignerSkipsInputsItCannotResolveInsteadOfFailing() {
         // 覆盖 RemoteTransactionSigner.signInputs 的三处早期守卫（均为真实可达的"跳过"语义）：
         // :43—44 交易为 null；:53—54 连接输出无锁定脚本；:62—64 脚本既非 P2PKH 也非 Ordinals 铭文。
