@@ -119,6 +119,16 @@ class OrdTransactionBuilderContractTest {
         return new BsvUtxo(hash(hashByte), index, 1L, 0, false, null, inscription.toUint8Array());
     }
 
+    @Test
+    void addOrdInputWithoutScriptFallsBackToAnEmptyScript() {
+        // 覆盖 addOrdInput 的 utxo.getScript() == null 分支：无脚本时应回退为空 Script 而非抛错
+        OrdTransactionBuilder builder = new OrdTransactionBuilder(bap, keyProvider);
+        AddressEnhance addr = AddressEnhance.fromPrivateKey(PrivateKey.of(BigInteger.valueOf(77)));
+        BsvUtxo noScript = new BsvUtxo(hash(9), 0, 20_000L, 0, false, addr.toBase58(), null);
+
+        assertSame(builder, builder.addOrdInput(noScript), "应支持链式调用并正常接受无脚本 utxo");
+    }
+
     private BsvUtxo utxoFor(AddressEnhance address, int hashByte, long index, long satoshis) {
         return new BsvUtxo(hash(hashByte), index, satoshis, 0, false, address.toBase58(),
                 new P2PKH().lock(address.toBase58()).toUint8Array());
