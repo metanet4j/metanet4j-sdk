@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.bitcoinsv.bitcoinjsv.crypto.MnemonicCode;
 import java.util.HashSet;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -19,7 +18,10 @@ class MasterPrivateKeyContractTest {
         List<String> words = MasterPrivateKey.generateLongWordList();
         assertEquals(24, words.size());
         assertEquals(24, new HashSet<>(words).size());
-        assertTrue(MnemonicCode.INSTANCE.getWordList().containsAll(words));
+        // 旧库用 MnemonicCode.INSTANCE.getWordList() 取 BIP39 英文单词表；
+        // 新架构下业务侧已提供等价入口 MasterPrivateKey.wordList()（单词表副本），
+        // 用它可避免测试再依赖 SDK 的 compat 层。
+        assertTrue(MasterPrivateKey.wordList().containsAll(words));
         assertEquals(12, MasterPrivateKey.generateWordList().size());
         assertTrue(MasterPrivateKey.generateWordList(0).isEmpty());
         assertThrows(IllegalArgumentException.class, () -> MasterPrivateKey.generateWordList(-1));
