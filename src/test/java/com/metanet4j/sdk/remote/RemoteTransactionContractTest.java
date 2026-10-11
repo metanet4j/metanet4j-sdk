@@ -114,6 +114,26 @@ class RemoteTransactionContractTest {
     }
 
     @Test
+    void skipsInputsWhoseSourceTransactionIsNotATransaction() {
+        // 覆盖 sourceOutputOf 判断中**第一个条件**（`instanceof Transaction`）的假侧：
+        // 新 SDK 的 `TransactionInput.sourceTransaction` 默认是哨兵 `Undefined.INSTANCE`，
+        // 即"从未被解析/回填过"的真实初始状态——此时 sourceOutputOf 应返回 null，调用方跳过该输入。
+        RemoteTransactionBuilder builder = new RemoteTransactionBuilder(remoteBap, keyProvider);
+
+        TransactionInput neverResolved = new TransactionInput(
+                new BsvHashBytes(new byte[32]).toString(), 0, new Script());
+        // 刻意**不设置** sourceTransaction，保留其默认哨兵值
+        builder.getTargetTransaction().inputs.add(neverResolved);
+        builder.addInput(paymentUtxo(1));   // 对照：正常带输出的输入
+        builder.addOutput(BsvAmount.valueOf(1), paymentAddress);
+
+        List<PreSignHashContext> requests = builder.getTxInputSignHash(false, remoteBap);
+
+        assertEquals(1, requests.size(),
+                "sourceTransaction 非 Transaction 的输入应被跳过，仅对照输入产出待签哈希");
+    }
+
+    @Test
     void skipsInputsWhoseSourceTransactionHasNoOutputs() {
         // 覆盖 RemoteTransactionBuilder.sourceOutputOf 的三个条件
         // （`instanceof Transaction` && `outputs != null` && `!outputs.isEmpty()`）：
