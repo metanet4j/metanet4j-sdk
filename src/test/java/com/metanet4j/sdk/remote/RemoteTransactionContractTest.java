@@ -127,6 +127,32 @@ class RemoteTransactionContractTest {
     }
 
     @Test
+    void remoteSignerSkipsInputsItCannotResolveInsteadOfFailing() {
+        // 覆盖 RemoteTransactionSigner.signInputs 的三处早期守卫（均为真实可达的"跳过"语义）：
+        // :43—44 交易为 null；:53—54 连接输出无锁定脚本；:62—64 脚本既非 P2PKH 也非 Ordinals 铭文。
+        RemoteTransactionSigner signer = new RemoteTransactionSigner();
+
+        // :43—44 空交易 → 返回 false（而非抛错）
+        assertFalse(signer.signInputs(null, keyProvider,
+                TransactionSignature.SIGHASH_ALL, false), "null 交易应返回 false");
+
+        // :53—54 连接输出无锁定脚本 → 按空脚本处理；:62—64 空脚本既非 P2PKH 也非铭文 → 跳过该输入
+        Transaction tx = new Transaction();
+        TransactionInput input = new TransactionInput(
+                new BsvHashBytes(new byte[32]).toString(), 0, new Script());
+        Transaction source = new Transaction();
+        source.outputs.add(new com.metanet4j.bsv.transaction.TransactionOutput(null, 1d));
+        input.sourceTransaction = source;
+        tx.inputs.add(input);
+
+        assertTrue(signer.signInputs(tx, keyProvider, TransactionSignature.SIGHASH_ALL, false),
+                "无法识别的脚本应被跳过、而非让整批签名失败");
+        // 该输入未被回填（unlockingScript 仍是构造时的值）
+        assertSame(Script.class, asScript(input.unlockingScript).getClass(),
+                "被跳过的输入不应被改写为新的解锁脚本");
+    }
+
+    @Test
     void skipsInputsWhoseSourceTransactionHasNullOutputs() {
         // 覆盖 sourceOutputOf 三条件中**中间那个**（`source.outputs != null`）的假侧：
         // §216 覆盖了第三个条件（outputs 为空）、§219 覆盖了第一个（instanceof），本轮补齐中间条件。
