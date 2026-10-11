@@ -9,6 +9,7 @@ import com.metanet4j.sdk.address.AddressEnhance;
 import com.metanet4j.sdk.crypto.MasterPrivateKey;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
@@ -147,5 +148,16 @@ public class BapBaseTest {
 
     }
 
+
+
+    @Test
+    void rejectsEmptyRootPathWhenDerivingTheNextChildNumbers() {
+        // 覆盖 nextChildNumbers 中 `Assert.isTrue(!root.isEmpty(), "root 路径不能为空")` 的失败侧：
+        // 该私有静态方法的唯一调用点在第 88 行（fromRootChildNumberList），故经该 public 入口传入空路径即可触达。
+        assertThrows(IllegalArgumentException.class,
+                () -> BapBase.fromRootChildNumberList(TestData.masterPrivateKey,
+                        BapPath.of(java.util.List.of()), new DefaultBapBaseConfig()),
+                "空 root 路径应被拒绝");
+    }
 
 }
