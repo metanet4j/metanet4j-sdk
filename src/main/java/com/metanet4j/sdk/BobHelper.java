@@ -98,9 +98,11 @@ public class BobHelper {
             JSONObject e = new JSONObject();
             e.put("v", satoshisOf(txOutput.satoshis));
             try {
-                e.put("a", isOpReturn(script) ? "false" : addressOfScript(script));
+                // 与基线一致：仅「OP_FALSE + OP_RETURN」（创世后形态）记 "false"；
+                // 纯 OP_RETURN 走地址解析、失败时回退**可读操作码名**（旧 Script.toString()）。
+                e.put("a", isOpReturnAfterGenesis(script) ? "false" : addressOfScript(script));
             } catch (RuntimeException ex) {
-                e.put("a", script.toString());
+                e.put("a", opcodeNames(script));
             }
             e.put("i", i);
 
@@ -395,6 +397,30 @@ public class BobHelper {
             out.add(new ScriptChunk(op, data));
         }
         return out;
+    }
+
+
+    /** 是否为「OP_FALSE + OP_RETURN」形态（旧库 isOpReturnAfterGenesis）。 */
+    private static boolean isOpReturnAfterGenesis(Script script) {
+        List<ScriptChunk> cs = chunksOf(script);
+        return cs.size() >= 2 && cs.get(0).op == OP.OP_0 && cs.get(1).op == OP.OP_RETURN;
+    }
+
+
+    /** 把脚本渲染为可读操作码名（去掉新 SDK 的 "OP_" 前缀），与旧库 Script.toString() 对齐。 */
+    private static String opcodeNames(Script script) {
+        StringBuilder sb = new StringBuilder();
+        for (ScriptChunk chunk : chunksOf(script)) {
+            if (sb.length() > 0) {
+                sb.append(' ');
+            }
+            String name = OP.name(chunk.op);
+            if (name == null) {
+                name = String.valueOf(chunk.op);
+            }
+            sb.append(name.startsWith("OP_") ? name.substring(3) : name);
+        }
+        return sb.toString();
     }
 
 }

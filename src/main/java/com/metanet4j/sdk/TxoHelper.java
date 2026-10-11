@@ -98,13 +98,13 @@ public class TxoHelper {
             JSONObject e = new JSONObject();
             e.put("v", satoshisOf(txOutput.satoshis));
             // 与旧实现一致：OP_RETURN 记 "false"，其余脚本尽量解析为地址，无法解析时回退脚本 hex
-            String scriptAddress = "false";
-            if (!isOpReturn(script)) {
-                try {
-                    scriptAddress = addressOfScript(script);
-                } catch (RuntimeException ex) {
-                    scriptAddress = script.toHex();
-                }
+            // 与基线一致：仅「OP_FALSE + OP_RETURN」记 "false"；
+            // 纯 OP_RETURN 走地址解析、失败时回退**可读操作码名**（旧 Script.toString()）。
+            String scriptAddress;
+            try {
+                scriptAddress = isOpReturnAfterGenesis(script) ? "false" : addressOfScript(script);
+            } catch (RuntimeException ex) {
+                scriptAddress = opcodeNames(script);
             }
             e.put("a", scriptAddress);
             e.put("i", i);
@@ -255,6 +255,14 @@ target.put("o" + j, OP.name(scriptChunk.op));
             sb.append(name.startsWith("OP_") ? name.substring(3) : name);
         }
         return sb.toString();
+    }
+
+
+    /** 是否为「OP_FALSE + OP_RETURN」形态（旧库 isOpReturnAfterGenesis）。 */
+    private static boolean isOpReturnAfterGenesis(Script script) {
+        List<com.metanet4j.bsv.script.ScriptChunk> cs = script.getChunks();
+        return cs.size() >= 2 && cs.get(0).op == com.metanet4j.bsv.script.OP.OP_0
+                && cs.get(1).op == com.metanet4j.bsv.script.OP.OP_RETURN;
     }
 
 }
