@@ -118,17 +118,10 @@ public class OrdTransactionTemplate {
      * @param keyBag
      * @return
      */
-    public Transaction createBapOrdinal(List<AddressEnhance> payAddressEnhanceList,
-                                        UTXOProvider<AddressEnhance, BsvUtxo> utxoProvider,
-                                        AddressEnhance destinationAddress,
-                                        AddressEnhance changeAddress,
-                                        long feePerKb,
-                                        BapBase bapBase,
-                                        SigningKeyProvider keyProvider) {
-
-        return createBapOrdinal(payAddressEnhanceList, utxoProvider, destinationAddress, changeAddress, feePerKb, bapBase, keyProvider);
-
-    }
+    // 说明：此处原有一个收 `BapBase` 的便捷重载，它只是转调收 `BapBaseCore` 的实现。
+    // 但 `BapBase` 是 `BapBaseCore` 的子类，Java 重载解析对 7 参调用**永远选中更具体的它自己**，
+    // 于是转调变成**无限递归**（实测 StackOverflowError，栈内全部是 createBapOrdinal 本行）。
+    // 已删除该冗余重载：传 `BapBase` 的调用会自动解析到 `BapBaseCore` 版本（migration-rules §43）。
 
 
 
