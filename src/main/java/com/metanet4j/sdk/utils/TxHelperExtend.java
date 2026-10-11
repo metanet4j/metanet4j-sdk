@@ -37,7 +37,7 @@ public final class TxHelperExtend {
      */
     public static boolean isSentToOrdinals(Script connectedScript) {
         try {
-            List<ScriptChunk> chunks = connectedScript.getChunks();
+            List<ScriptChunk> chunks = chunksOf(connectedScript);
             return chunks.size() >= 13
                     && chunks.get(0).op == OP.OP_DUP
                     && chunks.get(1).op == OP.OP_HASH160
@@ -67,7 +67,7 @@ public final class TxHelperExtend {
         if (!isSentToOrdinals(script)) {
             return new byte[0];
         }
-        return dataOf(script.getChunks().get(2));
+        return dataOf(chunksOf(script).get(2));
     }
 
     /** 由 Ordinals 脚本（Base64）解析 P2PKH 地址。 */
@@ -138,7 +138,7 @@ public final class TxHelperExtend {
 
     /** P2PKH 锁定脚本的公钥哈希；非 P2PKH 返回空数组。 */
     private static byte[] pubKeyHashOfP2pkh(Script script) {
-        List<ScriptChunk> chunks = script.getChunks();
+        List<ScriptChunk> chunks = chunksOf(script);
         if (chunks.size() == 5
                 && chunks.get(0).op == OP.OP_DUP
                 && chunks.get(1).op == OP.OP_HASH160
@@ -159,4 +159,48 @@ public final class TxHelperExtend {
         }
         return out;
     }
+
+    private static List<ScriptChunk> chunksOf(Script script) {
+        byte[] raw = script.toUint8Array();
+        List<ScriptChunk> out = new java.util.ArrayList<>();
+        int i = 0;
+        while (i < raw.length) {
+            int op = raw[i] & 0xFF;
+            i++;
+            int len;
+            if (op == 0) {
+                out.add(new ScriptChunk(OP.OP_0));
+                continue;
+            } else if (op >= 1 && op <= 75) {
+                len = op;
+            } else if (op == 76) {
+                if (i >= raw.length) break;
+                len = raw[i] & 0xFF;
+                i++;
+            } else if (op == 77) {
+                if (i + 1 >= raw.length) break;
+                len = (raw[i] & 0xFF) | ((raw[i + 1] & 0xFF) << 8);
+                i += 2;
+            } else if (op == 78) {
+                if (i + 3 >= raw.length) break;
+                len = (raw[i] & 0xFF) | ((raw[i + 1] & 0xFF) << 8)
+                        | ((raw[i + 2] & 0xFF) << 16) | ((raw[i + 3] & 0xFF) << 24);
+                i += 4;
+            } else {
+                out.add(new ScriptChunk(op));
+                continue;
+            }
+            if (i + len > raw.length) {
+                len = raw.length - i;
+            }
+            List<Integer> data = new java.util.ArrayList<>(len);
+            for (int k = 0; k < len; k++) {
+                data.add(raw[i + k] & 0xFF);
+            }
+            i += len;
+            out.add(new ScriptChunk(op, data));
+        }
+        return out;
+    }
+
 }
