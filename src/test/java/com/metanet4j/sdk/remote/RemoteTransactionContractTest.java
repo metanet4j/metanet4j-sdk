@@ -114,6 +114,30 @@ class RemoteTransactionContractTest {
     }
 
     @Test
+    void skipsInputsWhoseSourceTransactionHasNoOutputs() {
+        // 覆盖 RemoteTransactionBuilder.sourceOutputOf 的三个条件
+        // （`instanceof Transaction` && `outputs != null` && `!outputs.isEmpty()`）：
+        // 该私有方法经 getTxInputSignHash 间接触达——**输出为空时它返回 null，调用方随即跳过该输入**。
+        RemoteTransactionBuilder builder = new RemoteTransactionBuilder(remoteBap, keyProvider);
+
+        // 条件三的假侧：sourceTransaction 是 Transaction，但 outputs 为空
+        Transaction withEmptyOutputs = new Transaction();
+        TransactionInput emptySource = new TransactionInput(
+                new BsvHashBytes(new byte[32]).toString(), 0, new Script());
+        emptySource.sourceTransaction = withEmptyOutputs;   // 显式置为「无输出的来源交易」
+        // addInput 只接受 TransactionOutput／utxo，故此处直接把自造输入放进目标交易
+        builder.getTargetTransaction().inputs.add(emptySource);
+        // 对照组：正常带输出的来源交易（走条件全真的一侧）
+        builder.addInput(paymentUtxo(1));
+        builder.addOutput(BsvAmount.valueOf(1), paymentAddress);
+
+        List<PreSignHashContext> requests = builder.getTxInputSignHash(false, remoteBap);
+
+        assertEquals(1, requests.size(),
+                "无输出的来源交易应被跳过，仅带输出的那个输入产出待签哈希");
+    }
+
+    @Test
     void treatsAnOutputWithoutLockingScriptAsAnEmptyScript() {
         // 覆盖 RemoteTransactionBuilder 中 `sourceOutput.lockingScript == null ? new Script() : ...`
         // 的空值兜底侧（与 §148 处理 OrdTransactionBuilder 的同名模式一致）。
