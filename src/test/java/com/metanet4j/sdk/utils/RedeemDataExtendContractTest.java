@@ -1,61 +1,61 @@
 package com.metanet4j.sdk.utils;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
-import io.bitcoinsv.bitcoinjsv.core.ECKey;
-import io.bitcoinsv.bitcoinjsv.script.Script;
-import io.bitcoinsv.bitcoinjsv.script.ScriptBuilder;
-import io.bitcoinsv.bitcoinjsv.temp.RedeemData;
+import com.metanet4j.bsv.script.OP;
+import com.metanet4j.bsv.script.Script;
+import com.metanet4j.sdk.PrivateKey;
 import java.math.BigInteger;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import org.junit.jupiter.api.Test;
 
+/**
+ * {@link RedeemDataExtend} 的取值契约。
+ *
+ * <p><b>设计变更（计划 §3）</b>：旧实现持有 {@code List<ECKey> keys}、按
+ * {@code ECKey.PUBKEY_COMPARATOR} 排序并可从旧库 {@code RedeemData} 适配而来；
+ * 新实现是**值类型**——只持有一把业务私钥与可选的 P2SH 赎回脚本，
+ * 因为「按公钥哈希在 KeyBag 中反查密钥」的能力已随旧抽象取消，改为调用方经
+ * {@code SigningKeyProvider} 显式提供。
+ *
+ * <p>随之取消的覆盖（已在 migration-rules §25.2 登记）：密钥排序、列表防御性复制、
+ * 旧 {@code RedeemData} 适配、"从多个密钥中挑选有私钥者"。这些行为在新架构下不再存在，
+ * 不是迁移遗漏。
+ */
 class RedeemDataExtendContractTest {
 
     @Test
-    void sortsKeysAndKeepsAnIndependentList() {
-        ECKey first = ECKey.fromPrivate(BigInteger.valueOf(3));
-        ECKey second = ECKey.fromPrivate(BigInteger.TWO);
-        Script script = new ScriptBuilder().build();
-        List<ECKey> input = new ArrayList<>(List.of(first, second));
-        List<ECKey> expected = new ArrayList<>(input);
-        expected.sort(ECKey.PUBKEY_COMPARATOR);
-        Collections.reverse(input);
+    void holdsTheKeyAndTheRedeemScript() {
+        PrivateKey key = PrivateKey.of(BigInteger.TWO);
+        Script script = new Script().writeOpCode(OP.OP_1);
 
-        RedeemDataExtend data = RedeemDataExtend.of(input, script);
-        input.clear();
+        RedeemDataExtend data = RedeemDataExtend.of(key, script);
 
-        assertEquals(expected, data.keys);
-        assertNotSame(input, data.keys);
+        assertSame(key, data.getFullKey());
         assertSame(script, data.redeemScript);
-        assertSame(expected.stream().filter(ECKey::hasPrivKey).findFirst().orElseThrow(), data.getFullKey());
+        assertArrayEquals(key.getPubKey(), data.getPubKeyBytes(), "公钥字节应取所持私钥的压缩公钥");
+        assertEquals(key.getKey().toHex(), data.getKeyHex());
     }
 
     @Test
-    void adaptsLibraryRedeemDataAndSelectsAvailablePrivateKey() {
-        ECKey privateKey = ECKey.fromPrivate(BigInteger.TWO);
-        ECKey publicOnly = ECKey.fromPublicOnly(ECKey.fromPrivate(BigInteger.valueOf(3)).getPubKey());
-        Script script = new ScriptBuilder().build();
-        RedeemData libraryData = RedeemData.of(List.of(publicOnly, privateKey), script);
+    void absentKeyIsRepresentedAsNull() {
+        RedeemDataExtend data = RedeemDataExtend.of(null, new Script());
 
-        RedeemDataExtend data = RedeemDataExtend.of(libraryData);
-        assertEquals(2, data.keys.size());
-        assertSame(script, data.redeemScript);
-        assertSame(privateKey, data.getFullKey());
-        assertNull(RedeemDataExtend.of(List.of(publicOnly), script).getFullKey());
-        assertNull(RedeemDataExtend.of(List.of(), script).getFullKey());
+        assertNull(data.getFullKey(), "无私钥时返回 null 而非抛错");
+        assertNull(data.getPubKeyBytes());
+        assertNull(data.getKeyHex());
     }
 
     @Test
-    void singleKeyFactoryReturnsNullForUnknownKey() {
-        Script script = new ScriptBuilder().build();
-        assertNull(RedeemDataExtend.of((ECKey) null, script));
-        ECKey key = ECKey.fromPrivate(BigInteger.valueOf(3));
-        assertSame(key, RedeemDataExtend.of(key, script).getFullKey());
+    void redeemScriptMayBeAbsentForNonP2shInputs() {
+        PrivateKey key = PrivateKey.of(BigInteger.valueOf(3));
+
+        RedeemDataExtend data = new RedeemDataExtend(key, null);
+
+        assertSame(key, data.key);
+        assertNull(data.redeemScript, "非 P2SH 输入的赎回脚本为空");
+        assertSame(data.key, data.getFullKey());
     }
 }
