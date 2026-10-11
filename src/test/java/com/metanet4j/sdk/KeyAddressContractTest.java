@@ -50,7 +50,8 @@ class KeyAddressContractTest {
         assertArrayEquals(hash160, publicKey.getPubKeyHash());
         assertArrayEquals(pubKey, PublicKey.fromBytes(pubKey).getPubKeyBytes());
         assertArrayEquals(pubKey, PublicKey.fromHex(pubHex).getPubKeyBytes());
-        assertEquals(com.metanet4j.bsv.primitives.PrivateKey.fromString("2", 16), privateKey.getKey());
+        assertEquals(com.metanet4j.bsv.primitives.PrivateKey.fromString("2", 16).toHex(),
+                privateKey.getKey().toHex(), "新 SDK 私钥类型无 equals，比对 32 字节 hex");
         assertArrayEquals(privateKey.getPrivKeyBytes(), privateKey.getPrivKeyBytes());
         assertEquals(privateKey.getPrivKey(), privateKey.getPrivKey());
         BsvHashBytes digest = BsvHashBytes.of(new byte[] {1, 2, 3});
@@ -78,7 +79,7 @@ class KeyAddressContractTest {
     @Test
     void rejectsBadLengthChecksumAndCompressionMarker() {
         assertThrows(InvalidKeyException.class, () -> PrivateKey.fromWIF("short"));
-        assertThrows(RuntimeException.class,
+        assertThrows(com.metanet4j.sdk.exception.InvalidKeyException.class,
                 () -> PrivateKey.fromWIF(COMPRESSED_MAIN.substring(0, 51) + "1"));
         assertThrows(InvalidKeyException.class,
                 () -> PrivateKey.fromWIF("KwDiBf89QgGbjEhKnhXJuH7LrciVrZi3qYjgd9M7rFU74NTaiiru"));
