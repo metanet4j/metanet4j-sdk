@@ -144,4 +144,17 @@ class SignerTransactionContractTest {
         }
         return new Script();
     }
+
+    @Test
+    void reportsTheHashFlagsItWasConstructedWith() {
+        // 覆盖 §82 清单中的 ExtendForSignTransaction.getHashFlags（简单 getter，回传构造时传入的 hashFlags）。
+        // 这里取一个同时含基础类型与 ANYONECANPAY／FORKID 位的值，确保**原样回传**而非被规范化。
+        int flags = TransactionSignature.SIGHASH_SINGLE
+                | TransactionSignature.SIGHASH_ANYONECANPAY
+                | TransactionSignature.SIGHASH_FORKID;
+        ExtendForSignTransaction signer = new ExtendForSignTransaction(new Transaction(), flags, true, false);
+
+        assertEquals(flags, signer.getHashFlags(), "getHashFlags 应原样回传构造时传入的 flags");
+    }
+
 }
