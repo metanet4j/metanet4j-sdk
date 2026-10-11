@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import cn.hutool.core.codec.Base64;
+import com.metanet4j.bsv.script.OP;
 import com.metanet4j.bsv.script.Script;
 import com.metanet4j.bsv.script.ScriptChunk;
 import com.metanet4j.bsv.script.templates.P2PKH;
@@ -141,6 +142,45 @@ class TxHelperExtendContractTest {
         // 对非铭文脚本（含空脚本）返回空列表——覆盖该方法体与装箱循环。
         assertTrue(TxHelperExtend.pubKeyHashList(new Script()).isEmpty(),
                 "非铭文脚本应得到空列表");
+    }
+
+    @Test
+    void coversMalformedScriptBranchesOfTheOrdinalHelpers() {
+        // 「chunk 数不足 13」→ isSentToOrdinals 的短路分支
+        assertFalse(TxHelperExtend.isSentToOrdinals(new Script()));
+
+        // 13 个 chunk 但首段不是 OP_DUP → 第二段短路分支
+        List<ScriptChunk> wrongFirst = new ArrayList<>();
+        wrongFirst.add(new ScriptChunk(OP.OP_1));
+        for (int i = 1; i < 13; i++) {
+            wrongFirst.add(new ScriptChunk(OP.OP_1));
+        }
+        assertFalse(TxHelperExtend.isSentToOrdinals(new Script(wrongFirst)));
+
+        // pubKeyHashOfP2pkh 的五段结构判定只能经 getConnectedRedeemDataExtend 触发
+        // （pubKeyHashList 只走铭文路径，对纯 P2PKH 返回空——这是该访问器的既定语义）。
+        BapBase owner = BapBase.fromOnlyMasterPrivateKey(TestData.masterPrivateKey);
+        BapBase.BapProviderKeyBag bag = new BapBase.BapProviderKeyBag(owner);
+        Script p2pkh = new P2PKH().lock(owner.getPayAccountAddress().toBase58());
+        List<ScriptChunk> ok = new ArrayList<>(p2pkh.getChunks());
+        assertNotNull(TxHelperExtend.getConnectedRedeemDataExtend(output(p2pkh), bag),
+                "合法 P2PKH 且密钥可解析时应能得到赎回数据");
+
+        // 逐位破坏五段结构，覆盖各条件为假的分支（同时覆盖「公钥哈希为空 → 返回 null」分支）
+        for (int i : new int[] {0, 1, 3, 4}) {
+            List<ScriptChunk> broken = new ArrayList<>(ok);
+            broken.set(i, new ScriptChunk(OP.OP_1));
+            assertNull(TxHelperExtend.getConnectedRedeemDataExtend(output(new Script(broken)), bag),
+                    "第 " + i + " 段被破坏后不应判为 P2PKH");
+        }
+        // 第 2 段 data 为 null → 覆盖 dataOf 的 null 分支
+        List<ScriptChunk> nullData = new ArrayList<>(ok);
+        nullData.set(2, new ScriptChunk(20));
+        assertNull(TxHelperExtend.getConnectedRedeemDataExtend(output(new Script(nullData)), bag),
+                "公钥哈希段无数据时不应判为 P2PKH");
+        // chunk 数不等于 5 → 首个短路分支
+        assertNull(TxHelperExtend.getConnectedRedeemDataExtend(
+                output(new Script(List.of(new ScriptChunk(OP.OP_DUP)))), bag));
     }
 
     /** 由脚本构造连接输出（新签名用 TransactionOutput 表达「连接输出」）。 */
