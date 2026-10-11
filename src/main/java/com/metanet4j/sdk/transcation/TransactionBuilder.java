@@ -295,8 +295,18 @@ public class TransactionBuilder {
 
     /** 把来源输出挂到输入上（新 SDK 用 sourceTransaction 携带连接输出）。 */
     private static void attachSourceOutput(TransactionInput input, TransactionOutput output) {
+        // 【R6 修正】合成来源交易时，**必须把输出放在 input.sourceOutputIndex 所指的位置**——
+        // 原实现固定放在 0 号，而 UTXO 的 vout 常不为 0（如测试夹具的 "vout": 1），
+        // 于是 TxHelperExtend.sourceOutputOf 按索引取值时越界、取不到金额与锁定脚本
+        //（表现为找零为负 ⇒ "satoshis must be a positive integer or zero"）。
         Transaction source = new Transaction();
-        source.outputs = Lists.newArrayList(output);
+        List<TransactionOutput> outputs = Lists.newArrayList();
+        int index = Math.max(input.sourceOutputIndex, 0);
+        for (int i = 0; i < index; i++) {
+            outputs.add(new TransactionOutput(new Script(), 0d));   // 占位，使目标索引存在
+        }
+        outputs.add(output);
+        source.outputs = outputs;
         input.sourceTransaction = source;
     }
 
