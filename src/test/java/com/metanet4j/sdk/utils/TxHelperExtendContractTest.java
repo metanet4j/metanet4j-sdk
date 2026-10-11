@@ -212,6 +212,49 @@ class TxHelperExtendContractTest {
     }
 
     @Test
+    void coversChunkShapesThatSurviveOnlyAsRawBytes() {
+        // 以**原始字节**构造脚本：new Script(List<ScriptChunk>) 会重新序列化，
+        // 「空推送」「纯操作码」这类精确形态只有直接给字节才能保真。
+        byte[] head = {(byte) 0x76, (byte) 0xa9, 0x14, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
+                9, 9, (byte) 0x88, (byte) 0xac, 0x00, 0x63, 0x03, 0x6f, 0x72, 0x64, 0x51};
+        byte[] tail = {0x00, 0x03, 1, 2, 3, (byte) 0x68};
+
+        // 第 9 段 = OP_PUSHDATA1 且长度 0 → data 为空列表，覆盖 !data.isEmpty() 为假的一侧
+        byte[] emptyPush = new byte[head.length + 2 + tail.length];
+        System.arraycopy(head, 0, emptyPush, 0, head.length);
+        emptyPush[head.length] = 0x4c;
+        emptyPush[head.length + 1] = 0x00;
+        System.arraycopy(tail, 0, emptyPush, head.length + 2, tail.length);
+        assertFalse(TxHelperExtend.isSentToOrdinals(Script.fromBinary(emptyPush)),
+                "第 9 段为空推送时不应判为铭文");
+
+        // 第 9 段 = 纯操作码 OP_1 → data 为 null，覆盖 data != null 为假的一侧
+        byte[] opcodePush = new byte[head.length + 1 + tail.length];
+        System.arraycopy(head, 0, opcodePush, 0, head.length);
+        opcodePush[head.length] = 0x51;
+        System.arraycopy(tail, 0, opcodePush, head.length + 1, tail.length);
+        assertFalse(TxHelperExtend.isSentToOrdinals(Script.fromBinary(opcodePush)),
+                "第 9 段为纯操作码时不应判为铭文");
+
+        // 第 2 段 = 纯操作码（无数据）但其余各段齐备 → 覆盖 dataOf(chunks.get(2)) != null 为假
+        byte[] noHash = {(byte) 0x76, (byte) 0xa9, 0x51, (byte) 0x88, (byte) 0xac, 0x00, 0x63, 0x03, 0x6f, 0x72,
+                0x64, 0x51, 0x03, 1, 2, 3, 0x00, 0x03, 1, 2, 3, (byte) 0x68};
+        assertFalse(TxHelperExtend.isSentToOrdinals(Script.fromBinary(noHash)),
+                "第 2 段无数据时不应判为铭文");
+
+        // 对照：由原始字节拼出的合法脚本应判为铭文
+        byte[] full = new byte[noHash.length + 20];
+        System.arraycopy(noHash, 0, full, 0, 2);
+        full[2] = 0x14;
+        for (int i = 0; i < 20; i++) {
+            full[3 + i] = 9;
+        }
+        System.arraycopy(noHash, 3, full, 23, noHash.length - 3);
+        assertTrue(TxHelperExtend.isSentToOrdinals(Script.fromBinary(full)),
+                "由原始字节拼出的合法脚本应判为铭文");
+    }
+
+    @Test
     void rejectsMissingConnectedOutputWhenResolvingSpendInfo() {
         // 覆盖 getConnectedRedeemDataExtend 中「连接输出为空」的短路分支
         BapBase bap = BapBase.fromOnlyMasterPrivateKey(TestData.masterPrivateKey);
