@@ -24,6 +24,22 @@ import java.util.List;
  */
 public final class ScriptExtend {
 
+    /**
+     * SIGHASH 基础类型映射为解锁模板的 {@code signOutputs} 取值（all／none／single）。
+     *
+     * <p>集中在此处，避免解锁模板的构造方各自硬编码（历史上
+     * {@code OrdinalsTransactionSigner} 与 {@code RemoteTransactionSigner} 曾把它写死为 "all"，
+     * 导致调用方传入的 SIGHASH 被静默丢弃）。
+     */
+    public static String signOutputsOf(int hashFlags) {
+        int base = hashFlags & 31;
+        return switch (base) {
+            case 2 -> "none";
+            case 3 -> "single";
+            default -> "all";
+        };
+    }
+
     /** 单个签名占用的估算字节数，与原库 {@code Script.SIG_SIZE} 一致。 */
     public static final int SIG_SIZE = 75;
 

@@ -65,7 +65,7 @@ public class OrdinalsTransactionSigner {
             log.warn("No local key found for input {}", inputIndex);
             return false;
         }
-        txIn.unlockingScriptTemplate = new P2PKH().unlock(key.getKey(), "all", anyoneCanPay,
+        txIn.unlockingScriptTemplate = new P2PKH().unlock(key.getKey(), ScriptExtend.signOutputsOf(hashFlags), anyoneCanPay,
                 satoshisOf(sourceOutput));
         return true;
     }

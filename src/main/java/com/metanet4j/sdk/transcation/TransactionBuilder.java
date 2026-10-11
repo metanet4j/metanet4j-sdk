@@ -255,14 +255,9 @@ public class TransactionBuilder {
         }
     }
 
-    /** SIGHASH 基础类型映射为解锁模板的 {@code signOutputs} 取值。 */
+    /** SIGHASH 基础类型映射为解锁模板的 {@code signOutputs} 取值（与 ScriptExtend 共用同一实现）。 */
     private static String signOutputsOf(int hashFlags) {
-        int base = hashFlags & 31;
-        return switch (base) {
-            case TransactionSignature.SIGHASH_NONE -> "none";
-            case TransactionSignature.SIGHASH_SINGLE -> "single";
-            default -> "all";
-        };
+        return ScriptExtend.signOutputsOf(hashFlags);
     }
 
     public static String broadcast(String raw, Broadcaster broadcaster) {

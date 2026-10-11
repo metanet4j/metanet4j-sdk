@@ -13,6 +13,7 @@ import com.metanet4j.sdk.PrivateKey;
 import com.metanet4j.sdk.address.AddressEnhance;
 import com.metanet4j.sdk.bap.SigningKeyProvider;
 import com.metanet4j.sdk.context.PreSignHashContext;
+import com.metanet4j.sdk.script.ScriptExtend;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,7 +71,7 @@ public class RemoteTransactionSigner {
             }
             // 远程返回的是 DER（含 sighash 尾字节）的 Base64
             Signature signature = Signature.fromDER(Base64.decode(context.getSigB64()));
-            txIn.unlockingScriptTemplate = new P2PKH().unlock(key.getKey(), "all", anyoneCanPay,
+            txIn.unlockingScriptTemplate = new P2PKH().unlock(key.getKey(), ScriptExtend.signOutputsOf(hashFlags), anyoneCanPay,
                     satoshisOf(sourceOutput));
             // toChecksigFormat 是子类 TransactionSignature 的能力：签名器产出即该类型
             List<Integer> checksig = new java.util.ArrayList<>();
