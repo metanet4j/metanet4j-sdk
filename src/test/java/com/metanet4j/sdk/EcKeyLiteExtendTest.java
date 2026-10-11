@@ -2,10 +2,13 @@ package com.metanet4j.sdk;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import cn.hutool.core.util.HexUtil;
+import com.metanet4j.base.bsv.BsvHashBytes;
 import com.metanet4j.bsv.primitives.PublicKey;
 import java.math.BigInteger;
 import java.util.List;
@@ -64,4 +67,33 @@ class EcKeyLiteExtendTest {
         }
         return out;
     }
+
+    @Test
+    void guardsNullKeysMalformedSignaturesAndPublicOnlySigning() {
+        // 覆盖 EcKeyLiteExtend 的守卫与错误路径（6 处缺口）：
+        // :30 构造器中 `priv == null ? null : …` 的 null 侧、:34—35「两参皆空」的抛错、
+        // :85—86 与 :100—101 的两处「签名不合法即返回 false」、:163—164「仅公钥不可签名」的抛错。
+        EcKeyLiteExtend withPriv = EcKeyLiteExtend.fromPrivate(SCALAR);
+        BsvHashBytes digest = BsvHashBytes.of(new byte[32]);
+
+        // :34—35 私钥与公钥不能同时为空
+        assertThrows(IllegalArgumentException.class, () -> new EcKeyLiteExtend(null, null),
+                "两参皆空应被拒绝");
+
+        // :30 的 null 侧——只传公钥（仅验签场景）
+        EcKeyLiteExtend pubOnly = new EcKeyLiteExtend(null, withPriv.getPublicKey());
+        assertNull(pubOnly.getPrivateKey(), "仅传公钥时不应携带私钥");
+
+        // :85—86 两种「签名不合法」：null 与长度非 65
+        assertFalse(withPriv.verify(digest, (byte[]) null), "null 签名应返回 false");
+        assertFalse(withPriv.verify(digest, new byte[64]), "长度非 65 的签名应返回 false");
+
+        // :100—101 的 null 侧——Base64 签名为 null 时短路返回 false（不做解码）
+        assertFalse(withPriv.verify(digest, (String) null), "null 的 Base64 签名应返回 false");
+
+        // :163—164 仅公钥实例不可签名
+        assertThrows(IllegalStateException.class, () -> pubOnly.signHash(new byte[32]),
+                "仅含公钥的实例签名时应报错而非静默产出无效签名");
+    }
+
 }
