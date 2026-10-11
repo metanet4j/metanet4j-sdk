@@ -51,11 +51,19 @@ class ScriptHelperContractTest {
                 () -> ScriptHelper.getAddressByOrdinalScript(tooShort),
                 "chunk 数不足时应拒绝");
 
-        String thirdChunkWithoutData = java.util.Base64.getEncoder().encodeToString(
+        // 第 3 个 chunk 为**纯操作码**（chunk.data == null）——覆盖 || 右侧为真的分支
+        String thirdChunkIsOpcodeOnly = java.util.Base64.getEncoder().encodeToString(
+                new byte[] {(byte) 0x51, (byte) 0x51, (byte) 0x51});
+        assertThrows(IllegalArgumentException.class,
+                () -> ScriptHelper.getAddressByOrdinalScript(thirdChunkIsOpcodeOnly),
+                "第 3 个 chunk 无数据时应拒绝");
+
+        // 另一种无数据形态：PUSHDATA1 且声明长度为 0（data 为空列表而非 null）
+        String thirdChunkPushesNothing = java.util.Base64.getEncoder().encodeToString(
                 new byte[] {(byte) 0x51, (byte) 0x51, (byte) 0x4c, 0x00});
         assertThrows(IllegalArgumentException.class,
-                () -> ScriptHelper.getAddressByOrdinalScript(thirdChunkWithoutData),
-                "第 3 个 chunk 无数据时应拒绝");
+                () -> ScriptHelper.getAddressByOrdinalScript(thirdChunkPushesNothing),
+                "第 3 个 chunk 推送空数据时也不应得到地址");
     }
 
     @Test
@@ -68,6 +76,7 @@ class ScriptHelperContractTest {
         assertEquals(1, ScriptHelper.chunksOf(Script.fromBinary(new byte[] {0x4d, 0x02, 0x00, 1, 2})).size()); // PUSHDATA2
         assertEquals(1, ScriptHelper.chunksOf(Script.fromBinary(new byte[] {0x4e, 0x02, 0, 0, 0, 1, 2})).size()); // PUSHDATA4
         assertEquals(1, ScriptHelper.chunksOf(Script.fromBinary(new byte[] {(byte) 0x76})).size());            // 纯操作码
+        assertEquals(1, ScriptHelper.chunksOf(Script.fromBinary(new byte[] {(byte) 0x4f})).size());            // op=79：>75 且非 PUSHDATA，走末位 else
 
         // 越界：声明长度超出剩余字节 → 走「len = raw.length - i」修正分支
         assertEquals(1, ScriptHelper.chunksOf(Script.fromBinary(new byte[] {0x4c, 0x0a, 1, 2})).size());
