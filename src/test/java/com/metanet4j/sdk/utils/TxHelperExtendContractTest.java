@@ -58,7 +58,7 @@ class TxHelperExtendContractTest {
     void rejectsOrdinaryAndIncompleteInscriptionScripts() {
         BapBase bap = BapBase.fromOnlyMasterPrivateKey(TestData.masterPrivateKey);
         AddressEnhance destination = bap.getOrdAddress();
-        Script payment = new P2PKH().lock(destination.getHash160());
+        Script payment = new P2PKH().lock(destination.toBase58());
         Script inscription = OrdScriptBuilder.buildInscription(destination,
                 new byte[] {1}, "application/octet-stream", null);
 
@@ -103,7 +103,7 @@ class TxHelperExtendContractTest {
                 "赎回脚本应回填连接输出的锁定脚本");
         assertEquals(bap.getOrdPrivateKey().getPrivKey(), ordinal.getFullKey().getPrivKey());
 
-        Script payment = new P2PKH().lock(destination.getHash160());
+        Script payment = new P2PKH().lock(destination.toBase58());
         RedeemDataExtend ordinary = TxHelperExtend.getConnectedRedeemDataExtend(output(payment), bag);
         assertNotNull(ordinary);
         assertArrayEquals(payment.toUint8Array(), ordinary.redeemScript.toUint8Array());

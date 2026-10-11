@@ -90,7 +90,7 @@ class TransactionBuilderContractTest {
         };
         Transaction funding = new Transaction();
         funding.outputs.add(new TransactionOutput(
-                new P2PKH().lock(paymentAddress.getHash160()), 5_000d));
+                new P2PKH().lock(paymentAddress.toBase58()), 5_000d));
 
         TransactionBuilder builder = new TransactionBuilder(bap, keyProvider);
         builder.addInputs(List.of(bap.getPayAccountAddress()), provider)
@@ -158,7 +158,7 @@ class TransactionBuilderContractTest {
     void constructorsPreserveTheExistingTransactionAndKeyProvider() {
         AddressEnhance testAddress = bap.getPayAccountAddress();
         Transaction existing = new Transaction();
-        existing.outputs.add(new TransactionOutput(new P2PKH().lock(testAddress.getHash160()), 11d));
+        existing.outputs.add(new TransactionOutput(new P2PKH().lock(testAddress.toBase58()), 11d));
 
         TransactionBuilder builder = new TransactionBuilder(bap, existing, keyProvider);
         assertSame(existing, builder.getTargetTransaction());
@@ -217,7 +217,7 @@ class TransactionBuilderContractTest {
         hash[0] = (byte) hashByte;
         return new BsvUtxo(BsvHashBytes.of(hash), index, satoshis, 0, false,
                 paymentAddress.toBase58(),
-                new P2PKH().lock(paymentAddress.getHash160()).toUint8Array());
+                new P2PKH().lock(paymentAddress.toBase58()).toUint8Array());
     }
 
     private static List<Integer> toBoxed(byte[] data) {

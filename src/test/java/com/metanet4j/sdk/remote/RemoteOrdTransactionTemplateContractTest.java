@@ -135,7 +135,7 @@ class RemoteOrdTransactionTemplateContractTest {
 
         assertEquals(2, sent.inputs.size());
         assertEquals(BsvAmount.SATOSHI, BsvAmount.fromSdkValue(sent.outputs.get(0).satoshis));
-        assertArrayEquals(new P2PKH().lock(destination.getHash160()).toUint8Array(),
+        assertArrayEquals(new P2PKH().lock(destination.toBase58()).toUint8Array(),
                 sent.outputs.get(0).lockingScript.toUint8Array());
         assertTrue(inputSum(sent).getValue() > outputSum(sent).getValue());
         for (int i = 0; i < sent.inputs.size(); i++) {
@@ -171,7 +171,7 @@ class RemoteOrdTransactionTemplateContractTest {
             Transaction sent = new RemoteOrdTransactionTemplate(false, false).sendOrdinal(
                     bap, ordinalUtxo(), paymentUtxo(), destination, paymentAddress,
                     500, attempt, null, keyBag);
-            assertArrayEquals(new P2PKH().lock(destination.getHash160()).toUint8Array(),
+            assertArrayEquals(new P2PKH().lock(destination.toBase58()).toUint8Array(),
                     sent.outputs.get(0).lockingScript.toUint8Array());
             assertEquals(BsvAmount.SATOSHI, BsvAmount.fromSdkValue(sent.outputs.get(0).satoshis));
         }
@@ -188,7 +188,7 @@ class RemoteOrdTransactionTemplateContractTest {
         assertArrayEquals(ordinalUtxo().getScript(),
                 sourceOutput(tx, 0).lockingScript.toUint8Array());
         assertEquals(BsvAmount.SATOSHI, BsvAmount.fromSdkValue(tx.outputs.get(0).satoshis));
-        assertArrayEquals(new P2PKH().lock(destination.getHash160()).toUint8Array(),
+        assertArrayEquals(new P2PKH().lock(destination.toBase58()).toUint8Array(),
                 tx.outputs.get(0).lockingScript.toUint8Array());
         assertEquals(0, unlockingScriptBytes(tx, 0).length);
         assertEquals(0, unlockingScriptBytes(tx, 1).length);
@@ -216,7 +216,7 @@ class RemoteOrdTransactionTemplateContractTest {
         Transaction signed = completed.build();
 
         assertEquals(2, signed.inputs.size());
-        assertArrayEquals(new P2PKH().lock(destination.getHash160()).toUint8Array(),
+        assertArrayEquals(new P2PKH().lock(destination.toBase58()).toUint8Array(),
                 signed.outputs.get(0).lockingScript.toUint8Array());
         assertEquals(BsvAmount.SATOSHI, BsvAmount.fromSdkValue(signed.outputs.get(0).satoshis));
         assertEquals(inputSum(signed), outputSum(signed).add(completed.getFee()));
@@ -276,7 +276,7 @@ class RemoteOrdTransactionTemplateContractTest {
                             paymentAddress, 500, attempt, null, RemoteSignType.CURRENT);
             assertEquals(2, builder.build().inputs.size());
             assertEquals(BsvAmount.SATOSHI, BsvAmount.fromSdkValue(builder.build().outputs.get(0).satoshis));
-            assertArrayEquals(new P2PKH().lock(destination.getHash160()).toUint8Array(),
+            assertArrayEquals(new P2PKH().lock(destination.toBase58()).toUint8Array(),
                     builder.build().outputs.get(0).lockingScript.toUint8Array());
         }
     }

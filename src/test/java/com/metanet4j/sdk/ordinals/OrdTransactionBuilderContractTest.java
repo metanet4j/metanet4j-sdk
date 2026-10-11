@@ -44,7 +44,7 @@ class OrdTransactionBuilderContractTest {
     @Test
     void constructorsKeepTheSelectedTransactionAndKeyProvider() {
         Transaction existing = new Transaction();
-        existing.addOutput(new TransactionOutput(new P2PKH().lock(paymentAddress.getHash160()), 546d));
+        existing.addOutput(new TransactionOutput(new P2PKH().lock(paymentAddress.toBase58()), 546d));
 
         OrdTransactionBuilder defaults = new OrdTransactionBuilder(bap, keyProvider);
         OrdTransactionBuilder withExisting = new OrdTransactionBuilder(bap, existing, keyProvider);
@@ -121,7 +121,7 @@ class OrdTransactionBuilderContractTest {
 
     private BsvUtxo utxoFor(AddressEnhance address, int hashByte, long index, long satoshis) {
         return new BsvUtxo(hash(hashByte), index, satoshis, 0, false, address.toBase58(),
-                new P2PKH().lock(address.getHash160()).toUint8Array());
+                new P2PKH().lock(address.toBase58()).toUint8Array());
     }
 
     private BsvHashBytes hash(int firstByte) {

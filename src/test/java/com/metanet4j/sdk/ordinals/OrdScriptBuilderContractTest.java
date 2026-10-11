@@ -38,7 +38,7 @@ class OrdScriptBuilderContractTest {
         byte[] content = {0, 1, 2, 3};
         Script script = OrdScriptBuilder.buildInscription(DESTINATION, content, "image/png", null);
         List<ScriptChunk> chunks = script.getChunks();
-        List<ScriptChunk> payment = new P2PKH().lock(DESTINATION.getHash160()).getChunks();
+        List<ScriptChunk> payment = new P2PKH().lock(DESTINATION.toBase58()).getChunks();
 
         assertEquals(13, chunks.size());
         for (int i = 0; i < payment.size(); i++) {
@@ -55,7 +55,7 @@ class OrdScriptBuilderContractTest {
 
     @Test
     void missingContentOrMediaTypeKeepsOrdEnvelopeOut() {
-        byte[] payment = new P2PKH().lock(DESTINATION.getHash160()).toUint8Array();
+        byte[] payment = new P2PKH().lock(DESTINATION.toBase58()).toUint8Array();
         assertArrayEquals(payment, OrdScriptBuilder.buildInscription(DESTINATION, null, null, null).toUint8Array());
         assertArrayEquals(payment,
                 OrdScriptBuilder.buildInscription(DESTINATION, new byte[] {1}, null, null).toUint8Array());
@@ -65,7 +65,7 @@ class OrdScriptBuilderContractTest {
 
     @Test
     void mapMetadataRequiresAppAndTypeAndOmitsCommandField() {
-        byte[] payment = new P2PKH().lock(DESTINATION.getHash160()).toUint8Array();
+        byte[] payment = new P2PKH().lock(DESTINATION.toBase58()).toUint8Array();
         assertArrayEquals(payment,
                 OrdScriptBuilder.buildInscription(DESTINATION, null, null, new ORDMap()).toUint8Array());
         ORDMap typeOnly = new ORDMap();

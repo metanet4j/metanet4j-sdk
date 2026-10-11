@@ -120,10 +120,10 @@ class SignerTransactionContractTest {
         input.sequence = 0xffff_ffffL;
         Transaction source = new Transaction();
         source.outputs = Lists.newArrayList(new TransactionOutput(
-                new P2PKH().lock(payAddress.getHash160()), 20_000d));
+                new P2PKH().lock(payAddress.toBase58()), 20_000d));
         input.sourceTransaction = source;
         tx.inputs.add(input);
-        tx.outputs.add(new TransactionOutput(new P2PKH().lock(payAddress.getHash160()), 19_000d));
+        tx.outputs.add(new TransactionOutput(new P2PKH().lock(payAddress.toBase58()), 19_000d));
         return tx;
     }
 

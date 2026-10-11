@@ -181,7 +181,7 @@ class RemoteTransactionContractTest {
         hash[0] = 8;
         tx.inputs.add(new TransactionInput(new BsvHashBytes(hash).toString(), 0, new Script()));
         tx.outputs.add(new TransactionOutput(
-                new P2PKH().lock(paymentAddress.getHash160()), 777d));
+                new P2PKH().lock(paymentAddress.toBase58()), 777d));
         ExtendForSignTransaction proposed = new ExtendForSignTransaction(
                 tx, TransactionSignature.SIGHASH_ALL, true, false);
 
@@ -211,7 +211,7 @@ class RemoteTransactionContractTest {
         hash[0] = (byte) firstHashByte;
         return new BsvUtxo(BsvHashBytes.of(hash), 0, 20_000L, 0, false,
                 paymentAddress.toBase58(),
-                new P2PKH().lock(paymentAddress.getHash160()).toUint8Array());
+                new P2PKH().lock(paymentAddress.toBase58()).toUint8Array());
     }
 
     private void sign(PreSignHashContext request, PrivateKey key) {

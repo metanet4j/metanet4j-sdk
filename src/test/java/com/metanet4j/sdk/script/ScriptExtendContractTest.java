@@ -32,7 +32,7 @@ class ScriptExtendContractTest {
 
     @Test
     void estimatesSpendSizeForCommonAndOrdinalScripts() {
-        Script address = new P2PKH().lock(KEY_ADDRESS.getHash160());
+        Script address = new P2PKH().lock(KEY_ADDRESS.toBase58());
         Script rawKey = rawKeyScript();
         Script multiSig = multiSigScript();
         Script p2sh = p2shScript(multiSig);
@@ -58,7 +58,7 @@ class ScriptExtendContractTest {
 
     @Test
     void insertsSignaturesAtTheCorrectPositionForEachScriptType() {
-        Script address = new P2PKH().lock(KEY_ADDRESS.getHash160());
+        Script address = new P2PKH().lock(KEY_ADDRESS.toBase58());
         Script rawKey = rawKeyScript();
         Script multiSig = multiSigScript();
         Script p2sh = p2shScript(multiSig);

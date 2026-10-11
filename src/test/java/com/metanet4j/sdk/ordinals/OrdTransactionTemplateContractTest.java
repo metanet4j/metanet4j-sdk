@@ -99,7 +99,7 @@ class OrdTransactionTemplateContractTest {
                 null, null, keyBag);
 
         assertEquals(BsvAmount.SATOSHI, BsvAmount.fromSdkValue(signed.outputs.get(0).satoshis));
-        assertArrayEquals(new P2PKH().lock(destination.getHash160()).toUint8Array(),
+        assertArrayEquals(new P2PKH().lock(destination.toBase58()).toUint8Array(),
                 signed.outputs.get(0).lockingScript.toUint8Array());
         assertSpendable(signed);
     }
@@ -113,7 +113,7 @@ class OrdTransactionTemplateContractTest {
                 ordinalUtxo(10), paymentUtxo(11), destination, payment, 500,
                 inscription("", "text/plain"), null, keyBag);
 
-        byte[] ordinaryOutput = new P2PKH().lock(destination.getHash160()).toUint8Array();
+        byte[] ordinaryOutput = new P2PKH().lock(destination.toBase58()).toUint8Array();
         assertArrayEquals(ordinaryOutput, missingContent.outputs.get(0).lockingScript.toUint8Array());
         assertArrayEquals(ordinaryOutput, missingData.outputs.get(0).lockingScript.toUint8Array());
     }
@@ -202,7 +202,7 @@ class OrdTransactionTemplateContractTest {
 
     private BsvUtxo paymentUtxo(int firstHashByte) {
         return new BsvUtxo(hash(firstHashByte), 0, 20_000L, 0, false, payment.toBase58(),
-                new P2PKH().lock(payment.getHash160()).toUint8Array());
+                new P2PKH().lock(payment.toBase58()).toUint8Array());
     }
 
     private BsvUtxo ordinalUtxo(int firstHashByte) {
