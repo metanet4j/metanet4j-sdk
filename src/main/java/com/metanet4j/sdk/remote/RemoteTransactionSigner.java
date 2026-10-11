@@ -116,11 +116,8 @@ public class RemoteTransactionSigner {
     }
 
     private static TransactionOutput sourceOutputOf(TransactionInput input) {
-        if (input.sourceTransaction instanceof Transaction source && source.outputs != null
-                && !source.outputs.isEmpty()) {
-            return source.outputs.get(0);
-        }
-        return null;
+        // 【§87 收敛】原为四处各一份的私有副本，现委托全项目唯一实现（TxHelperExtend）。
+        return com.metanet4j.sdk.utils.TxHelperExtend.sourceOutputOf(input);
     }
 
     private static Double satoshisOf(TransactionOutput output) {
@@ -128,20 +125,10 @@ public class RemoteTransactionSigner {
     }
 
     private static byte[] pubKeyHashOf(Script script) {
-        List<ScriptChunk> chunks = script.getChunks();
-        if (chunks.size() == 5
-                && chunks.get(0).op == OP.OP_DUP
-                && chunks.get(1).op == OP.OP_HASH160
-                && chunks.get(2).data != null && chunks.get(2).data.size() == 20
-                && chunks.get(3).op == OP.OP_EQUALVERIFY
-                && chunks.get(4).op == OP.OP_CHECKSIG) {
-            byte[] hash = new byte[20];
-            for (int i = 0; i < hash.length; i++) {
-                hash[i] = (byte) (int) chunks.get(2).data.get(i);
-            }
-            return hash;
-        }
-        return new byte[0];
+        // 【§87 收敛】原为三处各一份的私有副本，现委托全项目唯一实现。
+        // 注意：唯一实现内部用的是 ScriptHelper.chunksOf（**非**上游截断版 Script.getChunks()），
+        // 故本处一并消除了一处潜在的脚本截断风险。
+        return com.metanet4j.sdk.utils.TxHelperExtend.pubKeyHashOfP2pkh(script);
     }
 
     private static List<Integer> toBoxed(byte[] data) {
