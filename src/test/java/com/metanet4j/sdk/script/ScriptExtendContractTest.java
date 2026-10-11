@@ -184,6 +184,9 @@ class ScriptExtendContractTest {
         Script p2sh = Script.fromBinary(p2shBytes());
         Script multisig = Script.fromBinary(multisigBytes());
 
+        // 前提确认：这些谓词按**段数**先行短路，故送入的脚本必须是 5 段，
+        // 否则各 `&&` 的右操作数根本不会被求值（本断言同时把该前提固定在测试里）。
+        assertEquals(5, p2pkh.getChunks().size(), "P2PKH 原始字节应解析为 5 段");
         assertTrue(ScriptExtend.isSentToAddress(p2pkh), "应识别 P2PKH");
         assertFalse(ScriptExtend.isSentToAddress(p2sh), "P2SH 不应被判为 P2PKH");
 
@@ -276,6 +279,53 @@ class ScriptExtendContractTest {
         assertEquals(expectedOp, op,
                 sigLen + " 字节的签名应使用操作码 0x" + Integer.toHexString(expectedOp)
                         + "，实际 0x" + Integer.toHexString(op));
+    }
+
+
+    @Test
+    void rejectsScriptsThatHaveTheRightShapeButOneWrongOpCodeOrLength() {
+        // §98 的结论：各谓词是多条件合取，**只覆盖两端是不够的**——
+        // 必须补上"**段数正确、但某一操作码或长度不符**"这一中间情形，否则各 `&&` 的短路右侧永远不走。
+        // 本用例逐个谓词给出该情形，与上一用例（真侧）互为对照。
+        byte[] h20 = new byte[20];
+        java.util.Arrays.fill(h20, (byte) 7);
+
+        // ① isSentToAddress：段数为 5，但第 2 段长度为 19（≠20）
+        byte[] shortHash = new byte[24];
+        shortHash[0] = 0x76; shortHash[1] = (byte) 0xa9; shortHash[2] = 0x13;
+        System.arraycopy(h20, 0, shortHash, 3, 19);
+        shortHash[22] = (byte) 0x88; shortHash[23] = (byte) 0xac;
+        assertFalse(ScriptExtend.isSentToAddress(Script.fromBinary(shortHash)),
+                "第 2 段长度为 19 时不应判为 P2PKH");
+
+        // ② isSentToAddress：段数为 5、长度对，但第 3 段是 OP_EQUAL 而非 OP_EQUALVERIFY
+        byte[] wrongOp = new byte[25];
+        System.arraycopy(p2pkhBytes(), 0, wrongOp, 0, 25);
+        wrongOp[23] = (byte) 0x87;                      // OP_EQUAL（应为 OP_EQUALVERIFY）
+        assertFalse(ScriptExtend.isSentToAddress(Script.fromBinary(wrongOp)),
+                "第 3 段不是 OP_EQUALVERIFY 时不应判为 P2PKH");
+
+        // ③ isPayToScriptHash：段数为 3，但第 1 段长度为 19
+        byte[] shortHash160 = new byte[22];
+        shortHash160[0] = (byte) 0xa9; shortHash160[1] = 0x13;
+        System.arraycopy(h20, 0, shortHash160, 2, 19);
+        shortHash160[21] = (byte) 0x87;
+        assertFalse(ScriptExtend.isPayToScriptHash(Script.fromBinary(shortHash160)),
+                "第 1 段长度为 19 时不应判为 P2SH");
+
+        // ④ isPayToScriptHash：段数与长度都对，但第 2 段不是 OP_EQUAL
+        byte[] wrongTail = p2shBytes();
+        wrongTail[wrongTail.length - 1] = (byte) 0xac;  // OP_CHECKSIG（应为 OP_EQUAL）
+        assertFalse(ScriptExtend.isPayToScriptHash(Script.fromBinary(wrongTail)),
+                "第 2 段不是 OP_EQUAL 时不应判为 P2SH");
+
+        // ⑤ isSentToRawPubKey：段数为 2，但"公钥"只有 32 字节（既非 33 也非 65）
+        byte[] shortPubKey = new byte[1 + 32 + 1];
+        shortPubKey[0] = 0x20;                          // push 32 字节
+        System.arraycopy(h20, 0, shortPubKey, 1, 20);
+        shortPubKey[33] = (byte) 0xac;                  // OP_CHECKSIG
+        assertFalse(ScriptExtend.isSentToRawPubKey(Script.fromBinary(shortPubKey)),
+                "公钥长度既非 33 也非 65 时不应判为 P2PK");
     }
 
 }
