@@ -62,8 +62,12 @@ class BapVariantContractTest {
 
         BapPath path = BapPath.parse(panda.getDefaultRootPath());
         PandaBapBase pandaIdentity = new PandaBapBase(TestData.masterPrivateKey, path, path, panda);
-        assertEquals(path.toString(), pandaIdentity.rootPath);
-        assertEquals(path.toString(), pandaIdentity.currentPath);
+        // 基线此处为 assertEquals(HDUtils.formatPath(path), ...)，而 HDUtils.formatPath 输出的是
+        // **上限 M/H 形式**（如 "M/0H/236H/0H/0/0"），与配置里 DEFAULT_ROOT_PATH 的写法一致；
+        // 迁移时误写成 BapPath.toString()（其规范格式是 "m/0'/236'/…"），二者不可混用。
+        // 现实现让 rootPath 保留**配置原字符串**（见 getRootPath 的语义说明），故按配置值断言。
+        assertEquals(panda.getDefaultRootPath(), pandaIdentity.rootPath);
+        assertEquals(panda.getDefaultRootPath(), pandaIdentity.currentPath);
         assertEquals(panda, pandaIdentity.bapBaseConfig);
         assertEquals("yours wallet", pandaIdentity.getAppName());
     }

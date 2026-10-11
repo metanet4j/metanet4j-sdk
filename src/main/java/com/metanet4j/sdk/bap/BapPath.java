@@ -126,6 +126,29 @@ public final class BapPath {
     }
 
     /** 标准小写路径串（{@code m/44'/236'/1'/0/0}）；空路径输出 {@code m}。 */
+    /**
+     * 以**上限 M/H 形式**渲染（如 {@code M/0H/236H/0H/0/0}），等价旧库 {@code HDUtils.formatPath}。
+     *
+     * <p>与 {@link #toString()}（{@code m/0'/236'/…}）**并存且各有用途**：
+     * 配置常量（{@code DefaultBapBaseConfig.DEFAULT_ROOT_PATH} 等）与本类实例暴露的
+     * {@code rootPath}/{@code currentPath} 沿用上限形式（BapVariantContractTest 与 BapBaseLifecycleTest
+     * 均按此断言），而 {@code toString()} 的规范形式由 BapPathTest 固定。
+     */
+    public String toDisplayPath() {
+        if (indices.isEmpty()) {
+            return "M";
+        }
+        StringBuilder out = new StringBuilder("M");
+        for (Long index : indices) {
+            boolean hardened = (index & HARDENED_BIT) != 0;
+            out.append('/').append(index & ~HARDENED_BIT);
+            if (hardened) {
+                out.append('H');
+            }
+        }
+        return out.toString();
+    }
+
     @Override
     public String toString() {
         if (indices.isEmpty()) {

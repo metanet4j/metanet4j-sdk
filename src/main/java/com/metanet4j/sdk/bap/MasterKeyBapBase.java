@@ -32,10 +32,12 @@ public abstract class MasterKeyBapBase extends BapBaseAbstract {
         // 而 BapPath.toString() 的规范格式是 "m/424150'/…"（由 BapPathTest 固定）。
         // 早期实现直接渲染，导致 BapBaseLifecycleTest 的
         // assertEquals(config.getDefaultRootPath(), getRootPath()) 失败。
-        this.rootPath = bapBaseConfig != null && bapBaseConfig.getDefaultRootPath() != null
-                ? bapBaseConfig.getDefaultRootPath()
-                : rootChildNumberList.toString();
-        this.currentPath = currentNumberList.toString();
+        // 两者都用「上限 M/H 形式」渲染，与旧库 HDUtils.formatPath 一致
+        // （同时满足 BapVariantContractTest 对 root/currentPath 的断言
+        //   与 BapBaseLifecycleTest 对 getRootPath() 等于配置原字符串的断言——
+        //   因配置常量本身即用该形式书写，二者字符串相等）。
+        this.rootPath = rootChildNumberList.toDisplayPath();
+        this.currentPath = currentNumberList.toDisplayPath();
 
         // 注意：不能在这里计算 identityKey —— getRootAddress() 被 BapBase 覆写，
         // 而 BapBase.rootPrivateKey 要等本构造器返回后才赋值，提前调用会 NPE。
