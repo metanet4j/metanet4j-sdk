@@ -145,6 +145,58 @@ class TxHelperExtendContractTest {
     }
 
     @Test
+    void coversPushdataEncodingVariantsAndTheOrdinalHashLookup() {
+        // isPushData 的末位操作数为 `op < OP_PUSHDATA1`，其**假侧**只有在 push 采用
+        // PUSHDATA1／2／4 编码时才会走到（writeBin 按数据长度自动选择编码：
+        // <76 直接推送、<256 用 PUSHDATA1、<65536 用 PUSHDATA2）。
+        List<Integer> hash20 = new ArrayList<>();
+        for (int i = 0; i < 20; i++) {
+            hash20.add(9);
+        }
+        List<Integer> ord = List.of(0x6F, 0x72, 0x64);
+
+        for (int payloadSize : new int[] {3, 100, 300}) {
+            List<Integer> payload = new ArrayList<>();
+            for (int i = 0; i < payloadSize; i++) {
+                payload.add(i & 0xFF);
+            }
+            Script script = new Script();
+            script.writeOpCode(OP.OP_DUP).writeOpCode(OP.OP_HASH160).writeBin(hash20)
+                    .writeOpCode(OP.OP_EQUALVERIFY).writeOpCode(OP.OP_CHECKSIG)
+                    .writeOpCode(OP.OP_0).writeOpCode(OP.OP_IF).writeBin(ord)
+                    .writeOpCode(OP.OP_1).writeBin(payload)
+                    .writeOpCode(OP.OP_0).writeBin(payload)
+                    .writeOpCode(OP.OP_ENDIF);
+
+            assertTrue(TxHelperExtend.isSentToOrdinals(script),
+                    payloadSize + " 字节负载（不同 push 编码）仍应判为铭文");
+            // 同一脚本走公钥哈希提取路径——覆盖 getPubKeyHashByOrdinalScript 内部
+            // 的 chunksOf 调用与 pubKeyHashList 的循环
+            assertEquals(hash20, TxHelperExtend.pubKeyHashList(script),
+                    "ordinal 脚本应能取出第 2 段的公钥哈希");
+        }
+
+        // 第 9 段改用纯操作码（chunk.data == null 且 op == 0）→ 覆盖 isPushData 左侧为假的两种情形
+        Script opcodeSlot = new Script();
+        opcodeSlot.writeOpCode(OP.OP_DUP).writeOpCode(OP.OP_HASH160).writeBin(hash20)
+                .writeOpCode(OP.OP_EQUALVERIFY).writeOpCode(OP.OP_CHECKSIG)
+                .writeOpCode(OP.OP_0).writeOpCode(OP.OP_IF).writeBin(ord)
+                .writeOpCode(OP.OP_1).writeOpCode(OP.OP_0)
+                .writeOpCode(OP.OP_0).writeBin(List.of(1, 2, 3))
+                .writeOpCode(OP.OP_ENDIF);
+        assertFalse(TxHelperExtend.isSentToOrdinals(opcodeSlot), "第 9 段非推送数据时不应判为铭文");
+    }
+
+    @Test
+    void rejectsMissingConnectedOutputWhenResolvingSpendInfo() {
+        // 覆盖 getConnectedRedeemDataExtend 中「连接输出为空」的短路分支
+        BapBase bap = BapBase.fromOnlyMasterPrivateKey(TestData.masterPrivateKey);
+        assertNull(TxHelperExtend.getConnectedRedeemDataExtend(
+                        null, new BapBase.BapProviderKeyBag(bap)),
+                "连接输出为空时应返回 null 而非抛错");
+    }
+
+    @Test
     void walksTheWholeOrdinalLockingScriptChainAndItsFailureSides() {
         // isSentToOrdinals 是一条 13 段判定链；本用例构造**合法**的 Ordinals 锁定脚本
         // 使其全部为真，再逐段破坏以覆盖各短路分支，另覆盖 catch 分支。
