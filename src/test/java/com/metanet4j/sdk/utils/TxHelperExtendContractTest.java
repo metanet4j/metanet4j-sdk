@@ -185,6 +185,30 @@ class TxHelperExtendContractTest {
                 .writeOpCode(OP.OP_0).writeBin(List.of(1, 2, 3))
                 .writeOpCode(OP.OP_ENDIF);
         assertFalse(TxHelperExtend.isSentToOrdinals(opcodeSlot), "第 9 段非推送数据时不应判为铭文");
+
+        // 第 9 段：data 为非空列表但 op == 0 → 覆盖 isPushData 中 op != 0 为假的一侧
+        List<ScriptChunk> withZeroOp = new ArrayList<>();
+        withZeroOp.add(new ScriptChunk(OP.OP_DUP));
+        withZeroOp.add(new ScriptChunk(OP.OP_HASH160));
+        withZeroOp.add(new ScriptChunk(20, hash20));
+        withZeroOp.add(new ScriptChunk(OP.OP_EQUALVERIFY));
+        withZeroOp.add(new ScriptChunk(OP.OP_CHECKSIG));
+        withZeroOp.add(new ScriptChunk(OP.OP_0));
+        withZeroOp.add(new ScriptChunk(OP.OP_IF));
+        withZeroOp.add(new ScriptChunk(3, ord));
+        withZeroOp.add(new ScriptChunk(OP.OP_1));
+        withZeroOp.add(new ScriptChunk(0, List.of(1, 2, 3)));
+        withZeroOp.add(new ScriptChunk(OP.OP_0));
+        withZeroOp.add(new ScriptChunk(3, List.of(1, 2, 3)));
+        withZeroOp.add(new ScriptChunk(OP.OP_ENDIF));
+        assertFalse(TxHelperExtend.isSentToOrdinals(new Script(withZeroOp)),
+                "第 9 段 op 为 0 时不应判为铭文");
+
+        // 第 9 段：data 为空列表 → 覆盖 isPushData 中 !data.isEmpty() 为假的一侧
+        List<ScriptChunk> withEmptyData = new ArrayList<>(withZeroOp);
+        withEmptyData.set(9, new ScriptChunk(OP.OP_PUSHDATA1, List.of()));
+        assertFalse(TxHelperExtend.isSentToOrdinals(new Script(withEmptyData)),
+                "第 9 段推送空数据时不应判为铭文");
     }
 
     @Test
@@ -194,6 +218,24 @@ class TxHelperExtendContractTest {
         assertNull(TxHelperExtend.getConnectedRedeemDataExtend(
                         null, new BapBase.BapProviderKeyBag(bap)),
                 "连接输出为空时应返回 null 而非抛错");
+        // 5 段 P2PKH 形状但第 3 段数据长度 19 ≠ 20 → 覆盖 pubKeyHashOfP2pkh 中
+        // `dataOf(...).length == ADDRESS_LENGTH` 为假的一侧
+        List<Integer> hash19 = new ArrayList<>();
+        for (int i = 0; i < 19; i++) {
+            hash19.add(7);
+        }
+        List<ScriptChunk> shortHashP2pkh = new ArrayList<>();
+        shortHashP2pkh.add(new ScriptChunk(OP.OP_DUP));
+        shortHashP2pkh.add(new ScriptChunk(OP.OP_HASH160));
+        shortHashP2pkh.add(new ScriptChunk(19, hash19));
+        shortHashP2pkh.add(new ScriptChunk(OP.OP_EQUALVERIFY));
+        shortHashP2pkh.add(new ScriptChunk(OP.OP_CHECKSIG));
+        assertNull(TxHelperExtend.getConnectedRedeemDataExtend(
+                        new com.metanet4j.bsv.transaction.TransactionOutput(
+                                new Script(shortHashP2pkh), 1d),
+                        new BapBase.BapProviderKeyBag(bap)),
+                "公钥哈希长度为 19 时不应判为 P2PKH");
+
         // 输出非空但其锁定脚本为 null → 覆盖 || 右侧为真的分支
         assertNull(TxHelperExtend.getConnectedRedeemDataExtend(
                         new com.metanet4j.bsv.transaction.TransactionOutput(null, 1d),

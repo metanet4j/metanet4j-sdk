@@ -83,7 +83,9 @@ public final class TxHelperExtend {
 
     /** 推送数据的字节形式；无数据时返回 {@code null}。 */
     private static byte[] dataOf(ScriptChunk chunk) {
-        if (chunk == null || chunk.data == null) {
+        // 调用方只传 chunks.get(i)（永不为 null），故不设 chunk == null 判断——
+        // 该侧不可达（§62.4 方案 C）。
+        if (chunk.data == null) {
             return null;
         }
         byte[] bytes = new byte[chunk.data.size()];
