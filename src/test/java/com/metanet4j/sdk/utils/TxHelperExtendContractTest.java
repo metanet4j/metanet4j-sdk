@@ -215,8 +215,13 @@ class TxHelperExtendContractTest {
     void coversChunkShapesThatSurviveOnlyAsRawBytes() {
         // 以**原始字节**构造脚本：new Script(List<ScriptChunk>) 会重新序列化，
         // 「空推送」「纯操作码」这类精确形态只有直接给字节才能保真。
-        byte[] head = {(byte) 0x76, (byte) 0xa9, 0x14, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-                9, 9, (byte) 0x88, (byte) 0xac, 0x00, 0x63, 0x03, 0x6f, 0x72, 0x64, 0x51};
+        // 注意：`0x14` 声明的推送长度是 **20 字节**，其后的哈希必须**正好 20 个**——
+        // 初版只写了 18 个（后接 0x88 0xac），解析器于是把这两个字节当作哈希的一部分吃掉，
+        // 其后所有 chunk 整体错位、判定链在第 3 段即短路，目标分支自然未触达。
+        // 该错位由 §47.3 的**有界诊断**定位（仅打印 head 各字节值与 chunk 数，不打印整段 hex）。
+        byte[] head = {(byte) 0x76, (byte) 0xa9, 0x14,
+                9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
+                (byte) 0x88, (byte) 0xac, 0x00, 0x63, 0x03, 0x6f, 0x72, 0x64, 0x51};
         byte[] tail = {0x00, 0x03, 1, 2, 3, (byte) 0x68};
 
         // 第 9 段 = OP_PUSHDATA1 且长度 0 → data 为空列表，覆盖 !data.isEmpty() 为假的一侧
