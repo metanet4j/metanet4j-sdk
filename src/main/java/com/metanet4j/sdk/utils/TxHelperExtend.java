@@ -157,7 +157,12 @@ public final class TxHelperExtend {
             com.metanet4j.bsv.transaction.TransactionInput input) {
         if (input.sourceTransaction instanceof com.metanet4j.bsv.transaction.Transaction source
                 && source.outputs != null && !source.outputs.isEmpty()) {
-            return source.outputs.get(0);
+            // 【R6 修正】原实现硬编码取 outputs.get(0)，**忽略了 input.sourceOutputIndex**——
+            // 当来源交易有多个输出（或输入指向非 0 号输出）时会取到**错误的锁定脚本与金额**，
+            // 表现为签名期 "The lockingScript or input sourceTransaction is required" 或验签失败。
+            // 现按索引取，并在越界时返回 null（与"无可用连接输出"同一语义）。
+            int index = input.sourceOutputIndex;
+            return index >= 0 && index < source.outputs.size() ? source.outputs.get(index) : null;
         }
         return null;
     }
