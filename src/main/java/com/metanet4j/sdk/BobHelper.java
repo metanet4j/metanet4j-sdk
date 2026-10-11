@@ -146,7 +146,9 @@ public class BobHelper {
                 globalCellItems.add(cellItem);
             }
 
-            if ((scriptChunk.op > OP.OP_16 || scriptChunk.op == OP.OP_0)) {
+            // 注意：此处**不得**再加 `|| op == OP_0`——OP_0(OP_FALSE) 已由上一个 if 分支处理，
+            // 加上会造成同一 cell 被加入两次（基线此条件仅为 op > OP_16）。
+            if (scriptChunk.op > OP.OP_16) {
                 cellItem.put("op", scriptChunk.op);
                 cellItem.put("ops", OP.name(scriptChunk.op));
                 cellItem.put("i", currentCellItemIndex);
