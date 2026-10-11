@@ -71,7 +71,9 @@ public class SigHashExtend {
         params.scope = scope;
 
         byte[] preimage = TransactionSignature.formatBip143(params);
-        return BsvHashBytes.fromList(Hash.hash256(toBoxed(preimage), null));
+        // 双 SHA-256 的结果是**内部序**字节，必须用 of(byte[]) 直接承载；
+        // 曾误用 fromList(List)（按显示序解释）导致摘要整体反序、与独立计算器不一致。
+        return BsvHashBytes.of(toBytes(Hash.hash256(toBoxed(preimage), null)));
     }
 
     /** 摘要的 hex 形式（显示序），便于日志与断言。 */
@@ -106,6 +108,14 @@ public class SigHashExtend {
     /** sequence 字段为 {@code Long} 且可省略，缺省按 0xffffffff。 */
     private static long sequenceOf(Long sequence) {
         return sequence == null ? 0xffff_ffffL : sequence;
+    }
+
+    private static byte[] toBytes(List<? extends Number> values) {
+        byte[] out = new byte[values == null ? 0 : values.size()];
+        for (int i = 0; i < out.length; i++) {
+            out[i] = (byte) (values.get(i).intValue() & 0xFF);
+        }
+        return out;
     }
 
     private static List<Double> toBoxed(byte[] data) {
