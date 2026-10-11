@@ -238,4 +238,44 @@ class ScriptExtendContractTest {
                 "内部公钥长度既非 33 也非 65 时应判否");
     }
 
+
+    @Test
+    void replacesTheSignatureInPlaceAndPicksThePushOpCodeByLength() {
+        // 覆盖 §94 所列最后两块：updateScriptWithSignature 的**下标守卫**（:142—144）与**插入分支**（:152—155），
+        // 以及经它触达的 pushDataOpCode 的**四档长度选择**（:222—231）。
+        // 脚本用原始字节构造：OP_0 | 占位签名(push 1 字节) | 后缀(redeemScript)
+        byte[] redeem = p2shBytes();
+        byte[] raw = new byte[1 + 2 + 1 + redeem.length];
+        int i = 0;
+        raw[i++] = 0x00;                       // 前置：OP_0
+        raw[i++] = 0x01; raw[i++] = (byte) 0xAA;   // 待替换的签名位（1 字节占位）
+        raw[i++] = (byte) redeem.length;       // 后缀：把 redeemScript 推入
+        System.arraycopy(redeem, 0, raw, i, redeem.length);
+        Script scriptSig = Script.fromBinary(raw);
+
+        // ① 下标越界：负值与"可用位数的上界"各一次（上界取 size-prefix-suffix，验证其为排他）
+        int usable = scriptSig.getChunks().size() - 1 - 1;
+        assertThrows(IllegalArgumentException.class,
+                () -> ScriptExtend.updateScriptWithSignature(scriptSig, new byte[71], -1, 1, 1),
+                "负下标应被拒绝");
+        assertThrows(IllegalArgumentException.class,
+                () -> ScriptExtend.updateScriptWithSignature(scriptSig, new byte[71], usable, 1, 1),
+                "越界下标应被拒绝（上界为排他）");
+
+        // ② 插入分支 + 四档推送长度：分别用 10／76／256／65536 字节的签名
+        assertPushOpCode(scriptSig, 10, 10);            // < OP_PUSHDATA1 → 直接用长度本身
+        assertPushOpCode(scriptSig, 76, 0x4c);          // OP_PUSHDATA1
+        assertPushOpCode(scriptSig, 256, 0x4d);         // OP_PUSHDATA2
+        assertPushOpCode(scriptSig, 65536, 0x4e);       // OP_PUSHDATA4
+    }
+
+    /** 用给定长度的"签名"替换下标 0，并断言写回的 chunk 使用了期望的推送操作码。 */
+    private static void assertPushOpCode(Script scriptSig, int sigLen, int expectedOp) {
+        Script updated = ScriptExtend.updateScriptWithSignature(scriptSig, new byte[sigLen], 0, 1, 1);
+        int op = updated.getChunks().get(1).op;   // 下标 0 是前置 OP_0，签名位紧随其后
+        assertEquals(expectedOp, op,
+                sigLen + " 字节的签名应使用操作码 0x" + Integer.toHexString(expectedOp)
+                        + "，实际 0x" + Integer.toHexString(op));
+    }
+
 }
