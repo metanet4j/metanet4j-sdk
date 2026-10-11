@@ -145,6 +145,96 @@ class TxHelperExtendContractTest {
     }
 
     @Test
+    void walksTheWholeOrdinalLockingScriptChainAndItsFailureSides() {
+        // isSentToOrdinals 是一条 13 段判定链；本用例构造**合法**的 Ordinals 锁定脚本
+        // 使其全部为真，再逐段破坏以覆盖各短路分支，另覆盖 catch 分支。
+        List<Integer> hash20 = new ArrayList<>();
+        for (int i = 0; i < 20; i++) {
+            hash20.add(9);
+        }
+        List<Integer> ord = List.of(0x6F, 0x72, 0x64);   // "ord"
+        List<Integer> payload = List.of(1, 2, 3);
+
+        java.util.function.BiFunction<Integer, List<Integer>, Script> build = (brokenAt, _ignored) -> {
+            Script script = new Script();
+            for (int i = 0; i < 13; i++) {
+                switch (i) {
+                    case 0 -> script.writeOpCode(OP.OP_DUP);
+                    case 1 -> script.writeOpCode(OP.OP_HASH160);
+                    case 2 -> script.writeBin(hash20);
+                    case 3 -> script.writeOpCode(OP.OP_EQUALVERIFY);
+                    case 4 -> script.writeOpCode(OP.OP_CHECKSIG);
+                    case 5 -> script.writeOpCode(OP.OP_0);
+                    case 6 -> script.writeOpCode(OP.OP_IF);
+                    case 7 -> script.writeBin(ord);
+                    case 8 -> script.writeOpCode(OP.OP_1);
+                    case 9 -> script.writeBin(payload);
+                    case 10 -> script.writeOpCode(OP.OP_0);
+                    case 11 -> script.writeBin(payload);
+                    default -> script.writeOpCode(OP.OP_ENDIF);
+                }
+            }
+            return script;
+        };
+
+        assertTrue(TxHelperExtend.isSentToOrdinals(build.apply(-1, null)),
+                "完整的 13 段 Ordinals 脚本应判定为铭文");
+
+        // null 入参触发 catch 分支
+        assertFalse(TxHelperExtend.isSentToOrdinals(null), "null 脚本应安全返回 false");
+
+        // 逐段破坏（把某一段换成 OP_1 或改写其数据）——覆盖各条件为假的分支
+        // 注意：第 8 段本就应为 OP_1，用 OP_1 替换等于未破坏，故不列入；
+        // 第 9／11 段是 pushdata，其变体由下面的 isPushData 用例覆盖。
+        for (int slot : new int[] {0, 1, 3, 4, 5, 6, 10, 12}) {
+            Script script = new Script();
+            for (int i = 0; i < 13; i++) {
+                if (i == slot) {
+                    script.writeOpCode(OP.OP_1);
+                } else {
+                    switch (i) {
+                        case 0 -> script.writeOpCode(OP.OP_DUP);
+                        case 1 -> script.writeOpCode(OP.OP_HASH160);
+                        case 2 -> script.writeBin(hash20);
+                        case 3 -> script.writeOpCode(OP.OP_EQUALVERIFY);
+                        case 4 -> script.writeOpCode(OP.OP_CHECKSIG);
+                        case 5 -> script.writeOpCode(OP.OP_0);
+                        case 6 -> script.writeOpCode(OP.OP_IF);
+                        case 7 -> script.writeBin(ord);
+                        case 8 -> script.writeOpCode(OP.OP_1);
+                        case 9 -> script.writeBin(payload);
+                        case 10 -> script.writeOpCode(OP.OP_0);
+                        case 11 -> script.writeBin(payload);
+                        default -> script.writeOpCode(OP.OP_ENDIF);
+                    }
+                }
+            }
+            assertFalse(TxHelperExtend.isSentToOrdinals(script), "第 " + slot + " 段被破坏后不应判为铭文");
+        }
+
+        // 第 7 段数据不是 "ord" → 覆盖 Arrays.equals 为假的一侧
+        Script wrongTag = new Script();
+        for (int i = 0; i < 13; i++) {
+            switch (i) {
+                case 0 -> wrongTag.writeOpCode(OP.OP_DUP);
+                case 1 -> wrongTag.writeOpCode(OP.OP_HASH160);
+                case 2 -> wrongTag.writeBin(hash20);
+                case 3 -> wrongTag.writeOpCode(OP.OP_EQUALVERIFY);
+                case 4 -> wrongTag.writeOpCode(OP.OP_CHECKSIG);
+                case 5 -> wrongTag.writeOpCode(OP.OP_0);
+                case 6 -> wrongTag.writeOpCode(OP.OP_IF);
+                case 7 -> wrongTag.writeBin(List.of(1, 2, 3));
+                case 8 -> wrongTag.writeOpCode(OP.OP_1);
+                case 9 -> wrongTag.writeBin(payload);
+                case 10 -> wrongTag.writeOpCode(OP.OP_0);
+                case 11 -> wrongTag.writeBin(payload);
+                default -> wrongTag.writeOpCode(OP.OP_ENDIF);
+            }
+        }
+        assertFalse(TxHelperExtend.isSentToOrdinals(wrongTag), "标记不是 ord 时不应判为铭文");
+    }
+
+    @Test
     void coversMalformedScriptBranchesOfTheOrdinalHelpers() {
         // 「chunk 数不足 13」→ isSentToOrdinals 的短路分支
         assertFalse(TxHelperExtend.isSentToOrdinals(new Script()));
