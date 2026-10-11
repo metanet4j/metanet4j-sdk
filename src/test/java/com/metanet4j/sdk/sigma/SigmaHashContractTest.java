@@ -110,8 +110,12 @@ class SigmaHashContractTest {
 
     private static Transaction transaction(byte[] prevHash, long index, Script outputScript) {
         Transaction tx = new Transaction();
-        TransactionInput input = new TransactionInput(new BsvHashBytes(prevHash).toString(),
-                (int) index, new Script());
+        // sourceTXID 是**显示序 hex**，而 Sigma.getInputHash 会把它的字节**原样**放入 outpoint
+        // （与旧库 input.getOutpoint().getHash().getBytes() 同序，见 §57 的基线直跑取证）。
+        // 故此处须用「不做反转」的 hex 编码，使原样解码后恰好还原传入的 prevHash——
+        // 若写成 new BsvHashBytes(prevHash).toString()（其 toString 会反转），解码后即与传入字节相反。
+        TransactionInput input = new TransactionInput(
+                cn.hutool.core.util.HexUtil.encodeHexStr(prevHash), (int) index, new Script());
         input.sequence = 0xffff_ffffL;
         tx.inputs.add(input);
         tx.outputs.add(new TransactionOutput(outputScript, 100d));
