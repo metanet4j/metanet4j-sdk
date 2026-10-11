@@ -138,25 +138,31 @@ target.put("o" + j, OP.name(scriptChunk.op));
         }
     }
 
-    /** 新 SDK 的解锁脚本字段可能是 {@code Script}，也可能是字节列表。 */
+    /**
+     * 取解锁脚本。
+     *
+     * <p>与 {@code BobHelper.asScript} 同源、同理由（migration-rules §62）：
+     * 公共入口只有 hex 形式，解析器与签名器对该字段只会产出 {@code Script}
+     * （未签名时为默认哨兵 {@code Undefined}，落兜底返回空脚本），
+     * 故 {@code byte[]}／{@code List<?>} 分支**不可达**，按 §62.4 方案 C 收敛。
+     */
     private static Script toScript(Object unlockingScript) {
         if (unlockingScript instanceof Script script) {
             return script;
         }
-        if (unlockingScript instanceof byte[] bytes) {
-            return Script.fromBinary(bytes);
-        }
-        if (unlockingScript instanceof List<?> list) {
-            byte[] bytes = new byte[list.size()];
-            for (int i = 0; i < bytes.length; i++) {
-                bytes[i] = (byte) ((Number) list.get(i)).intValue();
-            }
-            return Script.fromBinary(bytes);
-        }
         return new Script();
     }
 
-    /** txid 的显示序 hex；{@code sourceTXID} 可能是 hex 串或字节列表。 */
+    /**
+     * txid 的显示序 hex。
+     *
+     * <p>该字段由 SDK 解析器赋**显示序 hex 串**，故只需处理 {@code String} 与兜底；
+     * 原实现另有 {@code byte[]}／{@code List<?>} 两个分支，但新 SDK 的
+     * {@code TransactionInput.unlockingScript}/{@code sourceTXID} 虽声明为 {@code Object}，
+     * **解析器对同一字段只产出一种类型**，而本项目公共入口只有 hex 形式
+     * （{@code toTxo(String)}），故那两个分支**不可达**（migration-rules §62）。
+     * 按 §62.4 方案 C「简化代码、消除不可达分支」收敛为此形态。
+     */
     private static String txidOf(Object sourceTXID) {
         if (sourceTXID == null) {
             return BsvHashBytes.ZERO_HASH.toString();
@@ -164,17 +170,7 @@ target.put("o" + j, OP.name(scriptChunk.op));
         if (sourceTXID instanceof String text) {
             return text;
         }
-        if (sourceTXID instanceof byte[] bytes) {
-            return new BsvHashBytes(bytes).toString();
-        }
-        if (sourceTXID instanceof List<?> list) {
-            byte[] bytes = new byte[list.size()];
-            for (int i = 0; i < bytes.length; i++) {
-                bytes[i] = (byte) ((Number) list.get(i)).intValue();
-            }
-            return new BsvHashBytes(bytes).toString();
-        }
-        return sourceTXID.toString();
+        return String.valueOf(sourceTXID);
     }
 
     /** 金额字段可能是 {@code Undefined}、数字或字符串。 */

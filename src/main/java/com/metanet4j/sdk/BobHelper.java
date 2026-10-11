@@ -250,20 +250,18 @@ public class BobHelper {
     }
 
 
-    /** 解锁脚本字段可能是 {@code Script}、{@code byte[]} 或字节列表。 */
+    /**
+     * 取解锁脚本。
+     *
+     * <p>该字段由 SDK 解析器与签名器赋 {@code Script}（生产侧唯一赋值点是
+     * {@code RemoteTransactionSigner}）；未签名输入则为默认哨兵 {@code Undefined}，
+     * 落到兜底返回空脚本。原实现另有 {@code byte[]}／{@code List<?>} 两个分支，
+     * 但公共入口只有 hex 形式（{@code toBob(String)}），**那两个分支不可达**
+     * （migration-rules §62）。按 §62.4 方案 C 收敛为此形态。
+     */
     private static Script asScript(Object unlockingScript) {
         if (unlockingScript instanceof Script script) {
             return script;
-        }
-        if (unlockingScript instanceof byte[] bytes) {
-            return Script.fromBinary(bytes);
-        }
-        if (unlockingScript instanceof java.util.List<?> list) {
-            byte[] bytes = new byte[list.size()];
-            for (int i = 0; i < bytes.length; i++) {
-                bytes[i] = (byte) ((Number) list.get(i)).intValue();
-            }
-            return Script.fromBinary(bytes);
         }
         return new Script();
     }
