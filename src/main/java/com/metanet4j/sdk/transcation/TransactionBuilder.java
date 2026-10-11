@@ -225,7 +225,10 @@ public class TransactionBuilder {
         try {
             targetTransaction.sign().toCompletableFuture().join();
         } catch (RuntimeException e) {
-            throw new SignErrorException();
+            // 【R6 改进】原实现抛出无 message、无 cause 的 SignErrorException，
+            // 把"签名为何失败"的关键信息完全丢弃（任何调用方都只能看到一句无信息量的 SignError）。
+            // 现改为携带原异常，保留根因的类与消息；SignErrorException 的类型契约不变。
+            throw new SignErrorException(String.valueOf(e), e);
         }
         return targetTransaction;
     }
