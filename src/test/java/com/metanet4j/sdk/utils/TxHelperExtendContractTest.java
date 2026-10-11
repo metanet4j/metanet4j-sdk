@@ -128,6 +128,21 @@ class TxHelperExtendContractTest {
                 () -> TxHelperExtend.getConnectedRedeemDataExtend(output(inscription), bag));
     }
 
+    @Test
+    void coversDefensiveBranchesAndThePublicHashListAccessor() {
+        BapBase bap = BapBase.fromOnlyMasterPrivateKey(TestData.masterPrivateKey);
+        BapBase.BapProviderKeyBag bag = new BapBase.BapProviderKeyBag(bap);
+
+        // 防御分支：无连接输出（connectedOutput == null）应返回 null 而非抛错
+        assertNull(TxHelperExtend.getConnectedRedeemDataExtend(null, bag),
+                "无连接输出时返回 null");
+
+        // 公共访问器 pubKeyHashList：其定位是「按 Ordinals 铭文脚本取公钥哈希」，
+        // 对非铭文脚本（含空脚本）返回空列表——覆盖该方法体与装箱循环。
+        assertTrue(TxHelperExtend.pubKeyHashList(new Script()).isEmpty(),
+                "非铭文脚本应得到空列表");
+    }
+
     /** 由脚本构造连接输出（新签名用 TransactionOutput 表达「连接输出」）。 */
     private static TransactionOutput output(Script script) {
         Transaction funding = new Transaction();
