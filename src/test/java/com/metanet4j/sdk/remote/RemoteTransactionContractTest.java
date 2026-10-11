@@ -42,7 +42,7 @@ class RemoteTransactionContractTest {
     private final RemoteBapBase remoteBap = new RemoteBapBase(bap.getRootAddress(),
             bap.getPreviouAddress(), bap.getCurrentAddress(), bap.getPayAccountAddress(),
             bap.getOrdAddress(), bap.getAppName());
-    private final AddressEnhance paymentAddress = new AddressEnhance(bap.getPayAccountAddress());
+    private final AddressEnhance paymentAddress = bap.getPayAccountAddress();
     private final PrivateKey paymentKey = bap.getPayAccountKey();
 
     @AfterEach
@@ -52,8 +52,7 @@ class RemoteTransactionContractTest {
 
     @Test
     void requestsAndAppliesRemotePaymentSignatureInMemory() {
-        RemoteTransactionBuilder builder = new RemoteTransactionBuilder(remoteBap,
-                new RemoteTransactionSigner());
+        RemoteTransactionBuilder builder = new RemoteTransactionBuilder(remoteBap, keyProvider);
         builder.addInput(paymentUtxo(1))
                 .addOutput(BsvAmount.valueOf(777), paymentAddress)
                 .changeAddress(paymentAddress);
@@ -75,8 +74,7 @@ class RemoteTransactionContractTest {
 
     @Test
     void routesPaymentAndOrdinalHashesToTheirRespectiveAddresses() {
-        RemoteTransactionBuilder builder = new RemoteTransactionBuilder(remoteBap,
-                new RemoteTransactionSigner());
+        RemoteTransactionBuilder builder = new RemoteTransactionBuilder(remoteBap, keyProvider);
         builder.addInput(paymentUtxo(2));
         Script inscription = OrdScriptBuilder.buildInscription(bap.getOrdAddress(),
                 "prior".getBytes(StandardCharsets.US_ASCII), "text/plain", null);
@@ -96,8 +94,7 @@ class RemoteTransactionContractTest {
 
     @Test
     void collectsOnlyUnsignedDataHashesAndSkipsDisconnectedInputs() {
-        RemoteTransactionBuilder builder = new RemoteTransactionBuilder(remoteBap,
-                new RemoteTransactionSigner());
+        RemoteTransactionBuilder builder = new RemoteTransactionBuilder(remoteBap, keyProvider);
         PreSignHashContext pending = new PreSignHashContext();
         LockingScriptBuilder data = mock(LockingScriptBuilder.class);
         Script script = new Script().writeOpCode(OP.OP_RETURN).writeBin(java.util.List.of(1));
@@ -119,8 +116,7 @@ class RemoteTransactionContractTest {
 
     @Test
     void signsTheRequestedSingleAnyoneCanPayHash() {
-        RemoteTransactionBuilder builder = new RemoteTransactionBuilder(remoteBap,
-                new RemoteTransactionSigner());
+        RemoteTransactionBuilder builder = new RemoteTransactionBuilder(remoteBap, keyProvider);
         builder.addInput(paymentUtxo(4)).addOutput(BsvAmount.valueOf(777), paymentAddress);
         PreSignHashContext request = builder.getTxInputSignHash(
                 TransactionSignature.SIGHASH_SINGLE, true, remoteBap).get(0);
