@@ -142,6 +142,33 @@ class TransactionBuilderContractTest {
     }
 
     @Test
+    void addInputHandlesAllThreeUtxoShapes() {
+        // 覆盖 §90.3 列的 addInput 三分支（套路①/③）：
+        //   ① 有合法地址 → 用 P2PKH 锁定脚本；
+        //   ② **地址非法** → 解析抛错被 catch、锁定脚本留空，但**该输入仍应被加入**；
+        //   ③ **无地址但有脚本** → 用 UTXO 自带的脚本。
+        BsvHashBytes hash = new BsvHashBytes(new byte[32]);
+
+        // ① 合法地址
+        TransactionBuilder withAddress = new TransactionBuilder(bap, keyProvider);
+        withAddress.addInput(new BsvUtxo(hash, 0, 20_000L, 0, false, paymentAddress.toBase58(), null));
+        assertEquals(1, withAddress.getTargetTransaction().inputs.size(), "合法地址应正常加入输入");
+
+        // ② 地址非法——**不应抛错**，而是记录告警并把锁定脚本留空
+        TransactionBuilder badAddress = new TransactionBuilder(bap, keyProvider);
+        badAddress.addInput(new BsvUtxo(hash, 0, 20_000L, 0, false, "not-a-valid-address", null));
+        assertEquals(1, badAddress.getTargetTransaction().inputs.size(),
+                "地址非法时应仍加入输入（锁定脚本留空），而非让 addInput 失败");
+
+        // ③ 无地址但有脚本 → 用 UTXO 自带脚本
+        TransactionBuilder scriptOnly = new TransactionBuilder(bap, keyProvider);
+        scriptOnly.addInput(new BsvUtxo(hash, 0, 20_000L, 0, false, null,
+                new com.metanet4j.bsv.script.Script()
+                        .writeOpCode(com.metanet4j.bsv.script.OP.OP_1).toUint8Array()));
+        assertEquals(1, scriptOnly.getTargetTransaction().inputs.size(), "无地址有脚本时应正常加入输入");
+    }
+
+    @Test
     void broadcastDelegatesOnlyToTheProvidedLocalFunction() {
         AtomicReference<String> receivedRaw = new AtomicReference<>();
 
