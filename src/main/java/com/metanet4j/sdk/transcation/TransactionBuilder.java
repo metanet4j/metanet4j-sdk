@@ -169,7 +169,7 @@ public class TransactionBuilder {
      */
     protected long getUnLockScriptSize(TransactionInput transactionInput, Script script) {
         // 能取到私钥时按实际公钥长度计费；取不到时保守按 65 字节（由 ScriptExtend 处理 pubKeyLen<=0）
-        byte[] pubKeyHash = pubKeyHashOf(script);
+        byte[] pubKeyHash = pubKeyHashWithOrdinalsFallback(script);
         int pubKeyLen = -1;
         if (keyProvider != null && pubKeyHash.length > 0) {
             com.metanet4j.sdk.PrivateKey key = keyProvider.findKeyFromPubHash(pubKeyHash);
@@ -242,7 +242,7 @@ public class TransactionBuilder {
         String signOutputs = signOutputsOf(hashFlags);
         for (int i = 0; i < transaction.inputs.size(); i++) {
             TransactionInput input = transaction.inputs.get(i);
-            byte[] pubKeyHash = pubKeyHashOf(lockingScriptOf(input));
+            byte[] pubKeyHash = pubKeyHashWithOrdinalsFallback(lockingScriptOf(input));
             if (pubKeyHash.length == 0) {
                 continue;
             }
@@ -346,4 +346,20 @@ public class TransactionBuilder {
     public interface Broadcaster {
         String broadcast(String raw);
     }
+
+    /**
+     * 取锁定脚本对应的公钥哈希，**兼容 Ordinals 铭文输入**。
+     *
+     * <p>铭文脚本以 P2PKH 前缀开头后接铭文包络（13 个 chunk），`pubKeyHashOf` 只认 5 chunk 的
+     * 纯 P2PKH，会返回空；旧实现在此处只认 P2PKH，导致**铭文输入被整体跳过、解锁脚本始终为空**
+     * （与 RemoteTransactionSigner 修过的同类问题一致，见 migration-rules §96）。
+     */
+    private static byte[] pubKeyHashWithOrdinalsFallback(Script script) {
+        byte[] pubKeyHash = pubKeyHashOf(script);
+        if (pubKeyHash.length == 0) {
+            pubKeyHash = com.metanet4j.sdk.utils.TxHelperExtend.getPubKeyHashByOrdinalScript(script);
+        }
+        return pubKeyHash;
+    }
+
 }
