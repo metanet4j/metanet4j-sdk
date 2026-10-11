@@ -62,6 +62,9 @@ public class PrivateKey {
             if (!expected.equals(checksum)) {
                 throw new InvalidKeyException("WIF 校验和不匹配：" + wif);
             }
+            // 后续的版本字节与压缩标记检查都必须针对**去掉校验和**的载荷，
+            // 否则会把校验和末字节误当成压缩标记（曾导致压缩 WIF 被误判为非法）。
+            payload = body;
         } catch (RuntimeException e) {
             throw new InvalidKeyException("WIF 解码失败：" + wif, e);
         }
@@ -104,7 +107,13 @@ public class PrivateKey {
 
     /** 导出 WIF。 */
     public String toWif(BsvNetwork network) {
-        return (String) key.toWif(List.of(network.getDumpedPrivateKeyHeader()));
+        if (compressed) {
+            return (String) key.toWif(List.of(network.getDumpedPrivateKeyHeader()));
+        }
+        // 新 SDK 的 PrivateKey.toWif 固定追加 0x01（只产出压缩 WIF），
+        // 故非压缩 WIF 需自行按 Base58Check 组装：版本字节 + 32 字节私钥（不追加 0x01）。
+        List<Number> data = new java.util.ArrayList<>(key.toArray("be", 32));
+        return Utils.toBase58Check(data, List.of(network.getDumpedPrivateKeyHeader()));
     }
 
     /** 当前网络。 */
