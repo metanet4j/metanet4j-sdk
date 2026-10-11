@@ -73,9 +73,26 @@ public class PrivateKeyTest {
         assertThrows(InvalidKeyException.class, () -> PrivateKey.fromWIF(null),
                 "空 WIF 应被拒绝");
 
-        // :68—69 WIF 解码失败（非 base58 字符）
-        assertThrows(InvalidKeyException.class, () -> PrivateKey.fromWIF("not-a-valid-wif!!!"),
-                "无法解码的 WIF 应转为 InvalidKeyException");
+        // :68—69 WIF 解码/校验失败。
+        // 【重要修正 §95】此处原用 "not-a-valid-wif!!!"，但**它根本到不了本行**——
+        // fromWIF 的**首个检查是长度必须为 51 或 52**，17 字符的串在那里就被拒了，
+        // 于是断言虽然通过、`try` 内的这段却一次也没执行（"假覆盖"，与 §92 同型）。
+        // 现改为**长度合规（51 字符）、首字符可被识别为主网、但校验和必然不匹配**的串，
+        // 以确保异常确实来自 `try` 内的校验和/解码步骤。
+        // 注意（实测所得）：**光让校验和错是不够的**——校验和检查在 try 内**直接抛**
+        // "WIF 校验和不匹配"，**不经过 :68—69 的 catch**。
+        // 要真正走到 catch，必须让 `Utils.fromBase58(...)` **自己抛错**，
+        // 而长度又须合规 ⇒ 用 **51 字符、但含非法 base58 字符**的串
+        // （base58 字母表不含 0、O、I、l，此处用 '0'）。
+        String undecodable = "K" + "0".repeat(50);
+        assertEquals(51, undecodable.length(), "构造的串长度须为 51，否则会被更早的长度检查拦下");
+        InvalidKeyException decodeFailure = assertThrows(InvalidKeyException.class,
+                () -> PrivateKey.fromWIF(undecodable),
+                "长度合规但无法 base58 解码的 WIF 应转为 InvalidKeyException");
+        // **关键**：断言消息来自 `:69`（"WIF 解码失败"），以**证明异常确实由 `try` 内抛出**。
+        // 只断言异常类型是不够的——§225 的旧写法与 §92 都栽在"异常来自别处却以为覆盖了目标"。
+        assertTrue(decodeFailure.getMessage().startsWith("WIF 解码失败"),
+                "异常应来自 try 内的解码/校验步骤，而非更早的长度检查；实际为：" + decodeFailure.getMessage());
     }
 
 
