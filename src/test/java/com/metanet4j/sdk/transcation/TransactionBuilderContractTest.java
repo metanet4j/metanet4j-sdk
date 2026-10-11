@@ -173,6 +173,27 @@ class TransactionBuilderContractTest {
     }
 
     @Test
+    void preparingInputsToleratesASourceOutputWithoutLockingScript() {
+        // 覆盖 `lockingScriptOf`（:303）的 `||` **第二腿**：`output.lockingScript == null`。
+        // §267／§280 的样本里，连接输出要么不存在（第一腿为真）、要么锁定脚本非 null（两腿皆假），
+        // **"输出存在但其锁定脚本为 null"这一组合从未走过**——即 §283 所说的"调用点组合"。
+        // 经 `prepareInputsForSigning` 的 `:252` 触达（该处本身对 null 有兜底，故可安全构造）。
+        TransactionBuilder builder = new TransactionBuilder(bap, keyProvider);
+        Transaction tx = new Transaction();
+        TransactionInput input = new TransactionInput(
+                new BsvHashBytes(new byte[32]).toString(), 0, new Script());
+        Transaction source = new Transaction();
+        source.outputs.add(new com.metanet4j.bsv.transaction.TransactionOutput(null, 1d));
+        input.sourceTransaction = source;
+        tx.inputs.add(input);
+
+        // 不应抛错：锁定脚本取不到时应**兜底为空脚本**，从而该输入因"公钥哈希为空"被跳过
+        builder.prepareInputsForSigning(tx, keyProvider,
+                TransactionSignature.SIGHASH_ALL, false);
+        assertNull(input.unlockingScriptTemplate, "锁定脚本缺失的输入不应被设上解锁模板");
+    }
+
+    @Test
     void feeEstimationResolvesTheKeyLengthOnlyWhenBothPreconditionsHold() {
         // 覆盖 §95 所列 `TransactionBuilder:174`／`:180—181`：
         //     if (keyProvider != null && pubKeyHash.length > 0) {
