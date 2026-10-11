@@ -35,10 +35,6 @@
             <artifactId>jsonrpc4j</artifactId>
         </dependency>
 
-        <dependency>
-            <groupId>io.bitcoinsv.jcl</groupId>
-            <artifactId>jcl-store-levelDB</artifactId>
-        </dependency>
 
         <dependency>
             <groupId>com.metanet4j</groupId>
@@ -46,16 +42,7 @@
             <version>0.2.0</version>
         </dependency>
 
-        <dependency>
-            <groupId>io.bitcoinsv.bitcoinjsv</groupId>
-            <artifactId>bitcoinj-legacy</artifactId>
-            <version>1.0.4</version>
-        </dependency>
 
-        <dependency>
-            <groupId>io.bitcoinsv.bitcoinjsv</groupId>
-            <artifactId>bitcoinj-base</artifactId>
-        </dependency>
 
         <!-- 测试统一 JUnit 5（Jupiter），版本随 Boot BOM -->
         <dependency>

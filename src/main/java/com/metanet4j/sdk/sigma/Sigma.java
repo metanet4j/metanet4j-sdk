@@ -27,7 +27,7 @@ import com.metanet4j.bsv.transaction.TransactionInput;
 import com.metanet4j.bsv.transaction.TransactionOutput;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
-import org.spongycastle.pqc.math.linearalgebra.ByteUtils;
+
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -305,7 +305,7 @@ public class Sigma implements PreSignHash {
             throw new IllegalStateException("Input hash and data hash must be set");
         }
 
-        byte[] combined = ByteUtils.concatenate(this.inputHash.getBytes(),
+        byte[] combined = concatenate(this.inputHash.getBytes(),
                 this.dataHash.getBytes());
 
         return BsvHashBytes.of(combined);
@@ -426,4 +426,12 @@ public class Sigma implements PreSignHash {
 
 
 
+
+    /** 原用 BouncyCastle 系（spongycastle）的 ByteUtils.concatenate；R5 移除旧库传递依赖后改为本地实现。 */
+    private static byte[] concatenate(byte[] first, byte[] second) {
+        byte[] out = new byte[first.length + second.length];
+        System.arraycopy(first, 0, out, 0, first.length);
+        System.arraycopy(second, 0, out, first.length, second.length);
+        return out;
+    }
 }

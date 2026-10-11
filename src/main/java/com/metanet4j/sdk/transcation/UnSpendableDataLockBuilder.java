@@ -17,7 +17,7 @@ import com.metanet4j.sdk.utils.UtilsExtend;
 import com.metanet4j.base.bsv.BsvHashBytes;
 import com.metanet4j.bsv.script.OP;
 import com.metanet4j.bsv.script.Script;
-import org.spongycastle.util.encoders.Base64;
+import java.util.Base64;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
@@ -104,7 +104,7 @@ public abstract class UnSpendableDataLockBuilder<T extends UnSpendableDataLockBu
         this.dataList.add(ByteBuffer.wrap(ProtocolConstant.AIP_PROTOCOL.getBytes(Charsets.UTF_8)));
         this.dataList.add(ByteBuffer.wrap("BITCOIN_ECDSA".getBytes(Charsets.UTF_8)));
         this.dataList.add(ByteBuffer.wrap(unspendableDataSig.getSignAddress().getBytes(Charsets.UTF_8)));
-        this.dataList.add(ByteBuffer.wrap(Base64.decode(unspendableDataSig.getSigB64().getBytes(Charsets.UTF_8))));
+        this.dataList.add(ByteBuffer.wrap(Base64.getDecoder().decode(unspendableDataSig.getSigB64().getBytes(Charsets.UTF_8))));
         return (T) this;
     }
 
@@ -135,7 +135,7 @@ public abstract class UnSpendableDataLockBuilder<T extends UnSpendableDataLockBu
                     "the SignType is PREVIOUS,so sign previous privateKey not allow null when signOpReturnWithAIP");
             signatureBuffers.add(ByteBuffer.wrap(bapBase.getPreviouAddress().toBase58().getBytes(Charsets.UTF_8)));
             String sig = EcKeyLiteExtend.fromPrivateKey(bapBase.getPreviousPrivateKey().getKey()).signMessage(outputStream.toByteArray());
-            signatureBuffers.add(ByteBuffer.wrap(Base64.decode(sig.getBytes(Charsets.UTF_8))));
+            signatureBuffers.add(ByteBuffer.wrap(Base64.getDecoder().decode(sig.getBytes(Charsets.UTF_8))));
 
         } else if (signType == SignType.CURRENT) {
             Assert.notNull(bapBase.getCurrentAddress(),
@@ -144,7 +144,7 @@ public abstract class UnSpendableDataLockBuilder<T extends UnSpendableDataLockBu
                     "the SignType is CURRENT,so sign current privateKey not allow null when signOpReturnWithAIP");
             signatureBuffers.add(ByteBuffer.wrap(bapBase.getCurrentAddress().toBase58().getBytes(Charsets.UTF_8)));
             String sig = EcKeyLiteExtend.fromPrivateKey(bapBase.getCurrentPrivateKey().getKey()).signMessage(outputStream.toByteArray());
-            signatureBuffers.add(ByteBuffer.wrap(Base64.decode(sig.getBytes(Charsets.UTF_8))));
+            signatureBuffers.add(ByteBuffer.wrap(Base64.getDecoder().decode(sig.getBytes(Charsets.UTF_8))));
         } else if (signType == SignType.ROOT) {
             Assert.notNull(bapBase.getRootAddress(),
                     "the SignType is ROOT,so sign root address not allow null when signOpReturnWithAIP");
@@ -152,7 +152,7 @@ public abstract class UnSpendableDataLockBuilder<T extends UnSpendableDataLockBu
                     "the SignType is ROOT,so sign root privateKey not allow null when signOpReturnWithAIP");
             signatureBuffers.add(ByteBuffer.wrap(bapBase.getRootAddress().getBytes(Charsets.UTF_8)));
             String sig = EcKeyLiteExtend.fromPrivateKey(bapBase.getRootPrivateKey().getKey()).signMessage(outputStream.toByteArray());
-            signatureBuffers.add(ByteBuffer.wrap(Base64.decode(sig.getBytes(Charsets.UTF_8))));
+            signatureBuffers.add(ByteBuffer.wrap(Base64.getDecoder().decode(sig.getBytes(Charsets.UTF_8))));
         } else {
             throw new IllegalArgumentException("local signing requires ROOT, PREVIOUS or CURRENT");
         }
