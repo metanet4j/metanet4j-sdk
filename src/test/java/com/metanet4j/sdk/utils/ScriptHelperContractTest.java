@@ -1,9 +1,11 @@
 package com.metanet4j.sdk.utils;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.metanet4j.bsv.script.OP;
+import com.metanet4j.bsv.script.Script;
 import com.metanet4j.bsv.script.ScriptChunk;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -37,4 +39,24 @@ class ScriptHelperContractTest {
     void rejectsNullChunk() {
         assertFalse(ScriptHelper.hasPushData(null));
     }
+
+    @Test
+    void splitsEveryPushdataVariantAndToleratesTruncatedScripts() {
+        // 覆盖 chunksOf 的全部解析分支（该方法已收敛为全项目唯一实现，见 migration-rules §60，
+        // 故此处一份测试即覆盖四个调用方所用的同一段逻辑）。
+        ScriptHelper.chunksOf(Script.fromBinary(new byte[] {0x00}));                 // op == 0 → OP_0
+        assertEquals(1, ScriptHelper.chunksOf(Script.fromBinary(new byte[] {0x02, 1, 2})).size());
+        assertEquals(1, ScriptHelper.chunksOf(Script.fromBinary(new byte[] {0x4c, 0x02, 1, 2})).size());      // PUSHDATA1
+        assertEquals(1, ScriptHelper.chunksOf(Script.fromBinary(new byte[] {0x4d, 0x02, 0x00, 1, 2})).size()); // PUSHDATA2
+        assertEquals(1, ScriptHelper.chunksOf(Script.fromBinary(new byte[] {0x4e, 0x02, 0, 0, 0, 1, 2})).size()); // PUSHDATA4
+        assertEquals(1, ScriptHelper.chunksOf(Script.fromBinary(new byte[] {(byte) 0x76})).size());            // 纯操作码
+
+        // 越界：声明长度超出剩余字节 → 走「len = raw.length - i」修正分支
+        assertEquals(1, ScriptHelper.chunksOf(Script.fromBinary(new byte[] {0x4c, 0x0a, 1, 2})).size());
+        // 越界：长度前缀本身不完整 → 各 break 分支
+        assertTrue(ScriptHelper.chunksOf(Script.fromBinary(new byte[] {0x4c})).isEmpty());
+        assertTrue(ScriptHelper.chunksOf(Script.fromBinary(new byte[] {0x4d, 0x02})).isEmpty());
+        assertTrue(ScriptHelper.chunksOf(Script.fromBinary(new byte[] {0x4e, 1, 2, 3})).isEmpty());
+    }
+
 }
