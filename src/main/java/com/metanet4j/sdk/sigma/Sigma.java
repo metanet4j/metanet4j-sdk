@@ -114,22 +114,22 @@ public class Sigma implements PreSignHash {
                 .writeBin(toBoxed(String.valueOf(vin).getBytes()));
 
         this.sig = new Sig(address, signature, Algorithm.BSM.toString(), vin, this.targetVout);
-        List<ScriptChunk> newScriptAsm = new ArrayList<>(chunksOf(this.getTargetTxOut().lockingScript));
+        List<ScriptChunk> newScriptAsm = new ArrayList<>(com.metanet4j.sdk.utils.ScriptHelper.chunksOf(this.getTargetTxOut().lockingScript));
         int existingCount = getSigInstanceCount();
         if (sigmaInstance > existingCount) {
             throw new IllegalArgumentException("Sigma instance is out of range: " + sigmaInstance);
         }
         if (sigmaInstance < existingCount) {
             int sigIndex = getSigInstancePosition();
-            for (int i = 0; i < chunksOf(signedScript).size(); i++) {
-                newScriptAsm.set(sigIndex + i, chunksOf(signedScript).get(i));
+            for (int i = 0; i < com.metanet4j.sdk.utils.ScriptHelper.chunksOf(signedScript).size(); i++) {
+                newScriptAsm.set(sigIndex + i, com.metanet4j.sdk.utils.ScriptHelper.chunksOf(signedScript).get(i));
             }
         } else {
             boolean containsOpReturn = newScriptAsm.stream()
                     .anyMatch(chunk -> chunk.op == OP.OP_RETURN);
             String separator = containsOpReturn ? "|" : "OP_RETURN";
             newScriptAsm.addAll(new Script().writeBin(toBoxed(separator.getBytes())).getChunks());
-            newScriptAsm.addAll(chunksOf(signedScript));
+            newScriptAsm.addAll(com.metanet4j.sdk.utils.ScriptHelper.chunksOf(signedScript));
         }
 
         // Clone the transaction and set the output script.
@@ -202,7 +202,7 @@ public class Sigma implements PreSignHash {
         TransactionOutput output = transaction.outputs.get(targetVout);
         Script outputScript = output.lockingScript;
 
-        List<ScriptChunk> chunks = chunksOf(outputScript);
+        List<ScriptChunk> chunks = com.metanet4j.sdk.utils.ScriptHelper.chunksOf(outputScript);
 
         for (int i = 0; i < chunks.size(); i++) {
             if (!ScriptHelper.hasPushData(chunks.get(i))) {
@@ -233,7 +233,7 @@ public class Sigma implements PreSignHash {
 
     public int getSigInstanceCount() {
         Script scriptPubKey = getTargetTxOut().lockingScript;
-        List<ScriptChunk> chunks = chunksOf(scriptPubKey);
+        List<ScriptChunk> chunks = com.metanet4j.sdk.utils.ScriptHelper.chunksOf(scriptPubKey);
 
         int count = 0;
         for (ScriptChunk chunk : chunks) {
@@ -249,7 +249,7 @@ public class Sigma implements PreSignHash {
 
     public int getSigInstancePosition() {
         Script scriptPubKey = getTargetTxOut().lockingScript;
-        List<ScriptChunk> chunks = chunksOf(scriptPubKey);
+        List<ScriptChunk> chunks = com.metanet4j.sdk.utils.ScriptHelper.chunksOf(scriptPubKey);
 
         int instance = 0;
         for (int i = 0; i < chunks.size(); i++) {
@@ -316,7 +316,7 @@ public class Sigma implements PreSignHash {
 
         TransactionOutput output = this.transaction.outputs.get(this.targetVout);
         Script scriptPubKey = output.lockingScript;
-        List<ScriptChunk> scriptChunks = chunksOf(scriptPubKey);
+        List<ScriptChunk> scriptChunks = com.metanet4j.sdk.utils.ScriptHelper.chunksOf(scriptPubKey);
 
         int occurrences = 0;
         for (int i = 0; i < scriptChunks.size(); i++) {
@@ -433,46 +433,9 @@ public class Sigma implements PreSignHash {
     }
 
     private static List<ScriptChunk> chunksOf(Script script) {
-        byte[] raw = script.toUint8Array();
-        List<ScriptChunk> out = new java.util.ArrayList<>();
-        int i = 0;
-        while (i < raw.length) {
-            int op = raw[i] & 0xFF;
-            i++;
-            int len;
-            if (op == 0) {
-                out.add(new ScriptChunk(OP.OP_0));
-                continue;
-            } else if (op >= 1 && op <= 75) {
-                len = op;
-            } else if (op == 76) {
-                if (i >= raw.length) break;
-                len = raw[i] & 0xFF;
-                i++;
-            } else if (op == 77) {
-                if (i + 1 >= raw.length) break;
-                len = (raw[i] & 0xFF) | ((raw[i + 1] & 0xFF) << 8);
-                i += 2;
-            } else if (op == 78) {
-                if (i + 3 >= raw.length) break;
-                len = (raw[i] & 0xFF) | ((raw[i + 1] & 0xFF) << 8)
-                        | ((raw[i + 2] & 0xFF) << 16) | ((raw[i + 3] & 0xFF) << 24);
-                i += 4;
-            } else {
-                out.add(new ScriptChunk(op));
-                continue;
-            }
-            if (i + len > raw.length) {
-                len = raw.length - i;
-            }
-            List<Integer> data = new java.util.ArrayList<>(len);
-            for (int k = 0; k < len; k++) {
-                data.add(raw[i + k] & 0xFF);
-            }
-            i += len;
-            out.add(new ScriptChunk(op, data));
-        }
-        return out;
+        // 委托给全项目唯一实现（见 migration-rules §60：此前四个类各存一份副本，
+        // 其边界分支需在四处重复覆盖；收敛为一份后只需覆盖一次）。
+        return com.metanet4j.sdk.utils.ScriptHelper.chunksOf(script);
     }
 
 

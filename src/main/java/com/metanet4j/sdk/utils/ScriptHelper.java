@@ -70,4 +70,58 @@ public class ScriptHelper {
         }
         return bytes;
     }
+
+    /**
+     * 按脚本字节自行切分 chunk（**全项目唯一实现**，四处调用方共用）。
+     *
+     * <p><b>为何不用 {@code Script.getChunks()}</b>：R1 接入的 bsv-sdk 0.2.0 的
+     * {@code Script.parseChunks} 会在遇到 {@code OP_RETURN} 后**停止切分**，
+     * 导致其后的 push 全部丢失；而本项目的 BOB tape 与 Ordinals 铭文恰好都是
+     * 「OP_RETURN 之后才是载荷」的形态。已登记为上游缺陷（migration-rules §40），
+     * 这里做等价规避：按 BIP 脚本编码自行解析，行为对正常脚本与上游一致。
+     * 上游修复后可回退为 {@code script.getChunks()}。
+     */
+    public static List<ScriptChunk> chunksOf(Script script) {
+        byte[] raw = script.toUint8Array();
+        List<ScriptChunk> out = new java.util.ArrayList<>();
+        int i = 0;
+        while (i < raw.length) {
+            int op = raw[i] & 0xFF;
+            i++;
+            int len;
+            if (op == 0) {
+                out.add(new ScriptChunk(OP.OP_0));
+                continue;
+            } else if (op >= 1 && op <= 75) {
+                len = op;
+            } else if (op == 76) {
+                if (i >= raw.length) break;
+                len = raw[i] & 0xFF;
+                i++;
+            } else if (op == 77) {
+                if (i + 1 >= raw.length) break;
+                len = (raw[i] & 0xFF) | ((raw[i + 1] & 0xFF) << 8);
+                i += 2;
+            } else if (op == 78) {
+                if (i + 3 >= raw.length) break;
+                len = (raw[i] & 0xFF) | ((raw[i + 1] & 0xFF) << 8)
+                        | ((raw[i + 2] & 0xFF) << 16) | ((raw[i + 3] & 0xFF) << 24);
+                i += 4;
+            } else {
+                out.add(new ScriptChunk(op));
+                continue;
+            }
+            if (i + len > raw.length) {
+                len = raw.length - i;
+            }
+            List<Integer> data = new java.util.ArrayList<>(len);
+            for (int k = 0; k < len; k++) {
+                data.add(raw[i + k] & 0xFF);
+            }
+            i += len;
+            out.add(new ScriptChunk(op, data));
+        }
+        return out;
+    }
+
 }
