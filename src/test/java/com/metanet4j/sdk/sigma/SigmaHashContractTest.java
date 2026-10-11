@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import cn.hutool.core.codec.Base64;
 import com.metanet4j.base.bsv.BsvAmount;
@@ -133,4 +134,30 @@ class SigmaHashContractTest {
     private static byte[] sha256(byte[] bytes) throws Exception {
         return MessageDigest.getInstance("SHA-256").digest(bytes);
     }
+
+    @Test
+    void rejectsUnresolvedAndNullSourceTxidWithItsCause() {
+        // 覆盖 Sigma.sourceTxidBytes 在 §86 收敛后保留的两条出口（§86.3「保留抛错兜底」）：
+        // :409 `instanceof String` 的**假侧**、:423 的抛错、以及 :424 中 **null 与非 null 两种取名分支**。
+        // 这两种输入都是**真实可达**的：字段默认是哨兵 Undefined（从未解析），也可能被显式置为 null。
+        Transaction tx = new Transaction();
+        TransactionInput input = new TransactionInput(
+                com.metanet4j.bsv.primitives.Undefined.INSTANCE, 0, new Script());
+        tx.inputs.add(input);
+        tx.outputs.add(new TransactionOutput(new Script(), 1d));
+        // ① 未解析（哨兵 Undefined）→ 抛错，消息中应含其类型名。
+        // 注：**异常在构造 Sigma 时即抛出**（构造器会预计算 inputHash），故 assertThrows 包裹的是构造调用。
+        IllegalArgumentException unresolved = assertThrows(IllegalArgumentException.class,
+                () -> new Sigma(null, tx), "未解析的 sourceTXID 应报错而非静默产出错误哈希");
+        assertTrue(unresolved.getMessage().contains("Undefined"),
+                "消息应指明实际类型，便于诊断；实际为：" + unresolved.getMessage());
+
+        // ② 显式 null → 同样抛错，且消息中为 "null"（**不在报错路径上再触发 NPE**）
+        input.sourceTXID = null;
+        IllegalArgumentException nullCase = assertThrows(IllegalArgumentException.class,
+                () -> new Sigma(null, tx), "null 的 sourceTXID 亦应报错");
+        assertTrue(nullCase.getMessage().contains("null"),
+                "null 情形应安全取名；实际为：" + nullCase.getMessage());
+    }
+
 }
