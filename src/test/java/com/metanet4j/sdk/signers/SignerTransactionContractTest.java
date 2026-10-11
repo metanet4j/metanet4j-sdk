@@ -166,6 +166,16 @@ class SignerTransactionContractTest {
     }
 
     @Test
+    void rejectsANullPartialTransaction() {
+        // 覆盖 ExtendForSignTransaction 构造器首部的 null 检查
+        // （`if (partialTx == null) throw new IllegalArgumentException(...)`）——
+        // 该守卫真实可达：调用方可能在没有待签交易时误建签名器，此时应立刻报错而非留下半初始化对象。
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                () -> new ExtendForSignTransaction(null, TransactionSignature.SIGHASH_ALL, true, false));
+        assertEquals("待签名交易不能为空", error.getMessage(), "应说明被拒绝的原因");
+    }
+
+    @Test
     void reportsTheHashFlagsItWasConstructedWith() {
         // 覆盖 §82 清单中的 ExtendForSignTransaction.getHashFlags（简单 getter，回传构造时传入的 hashFlags）。
         // 这里取一个同时含基础类型与 ANYONECANPAY／FORKID 位的值，确保**原样回传**而非被规范化。
