@@ -27,7 +27,14 @@ public abstract class MasterKeyBapBase extends BapBaseAbstract {
         this.masterPrivateKey = masterPrivateKey;
         this.rootChildNumberList = rootChildNumberList;
         this.currentNumberList = currentNumberList;
-        this.rootPath = rootChildNumberList.toString();
+        // getRootPath() 的语义是「返回**配置中的**根路径字符串」，而不是把解析后的路径重新渲染：
+        // 配置写作 "M/424150H/0H/0H/0H/0H/0H"（DefaultBapBaseConfig.DEFAULT_ROOT_PATH），
+        // 而 BapPath.toString() 的规范格式是 "m/424150'/…"（由 BapPathTest 固定）。
+        // 早期实现直接渲染，导致 BapBaseLifecycleTest 的
+        // assertEquals(config.getDefaultRootPath(), getRootPath()) 失败。
+        this.rootPath = bapBaseConfig != null && bapBaseConfig.getDefaultRootPath() != null
+                ? bapBaseConfig.getDefaultRootPath()
+                : rootChildNumberList.toString();
         this.currentPath = currentNumberList.toString();
 
         // 注意：不能在这里计算 identityKey —— getRootAddress() 被 BapBase 覆写，
