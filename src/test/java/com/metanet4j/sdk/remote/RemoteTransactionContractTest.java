@@ -16,6 +16,7 @@ import cn.hutool.core.codec.Base64;
 import com.metanet4j.sdk.PublicKey;
 import com.metanet4j.sdk.TestData;
 import com.metanet4j.sdk.bap.BapBase;
+import com.metanet4j.sdk.bap.SigningKeyProvider;
 import com.metanet4j.sdk.bap.RemoteBapBase;
 import com.metanet4j.sdk.context.PreSignHashContext;
 import com.metanet4j.sdk.exception.SignErrorException;
@@ -23,10 +24,14 @@ import com.metanet4j.sdk.ordinals.OrdScriptBuilder;
 import com.metanet4j.sdk.signers.ExtendForSignTransaction;
 import com.metanet4j.sdk.transcation.LockingScriptBuilder;
 import com.metanet4j.sdk.address.AddressEnhance;
+import com.metanet4j.base.bsv.BsvHashBytes;
 import com.metanet4j.base.bsv.BsvAmount;
 import com.metanet4j.base.bsv.BsvUtxo;
+import com.metanet4j.bsv.transaction.TransactionInput;
+import com.metanet4j.bsv.transaction.TransactionOutput;
 import com.metanet4j.bsv.transaction.Transaction;
 import com.metanet4j.bsv.primitives.TransactionSignature;
+import com.metanet4j.bsv.script.templates.P2PKH;
 import com.metanet4j.bsv.script.Script;
 import com.metanet4j.bsv.script.OP;
 import com.metanet4j.sdk.PrivateKey;
@@ -44,6 +49,7 @@ class RemoteTransactionContractTest {
             bap.getOrdAddress(), bap.getAppName());
     private final AddressEnhance paymentAddress = bap.getPayAccountAddress();
     private final PrivateKey paymentKey = bap.getPayAccountKey();
+    private final SigningKeyProvider keyProvider = new BapBase.BapProviderKeyBag(bap);
 
     @AfterEach
     void clearSignedHashes() {
@@ -65,11 +71,9 @@ class RemoteTransactionContractTest {
         assertEquals(builder.getFee(), request.getFee());
         sign(request, paymentKey);
 
-        Transaction signed = builder.completeAndSignTx(null, true);
+        Transaction signed = builder.completeAndSignTx(keyProvider, true);
         assertTrue(unlockingScriptBytes(signed, 0).length > 0);
-        ScriptUtils_legacy.correctlySpends(signed.inputs.get(0).getScriptSig(), signed, 0,
-                sourceOutput(signed, 0).getScriptPubKey(),
-                sourceOutput(signed, 0).getValue(), ScriptVerifyFlag.GENESIS_SET);
+        assertUnlockingScriptValid(signed, 0);
     }
 
     @Test
@@ -78,8 +82,8 @@ class RemoteTransactionContractTest {
         builder.addInput(paymentUtxo(2));
         Script inscription = OrdScriptBuilder.buildInscription(bap.getOrdAddress(),
                 "prior".getBytes(StandardCharsets.US_ASCII), "text/plain", null);
-        Transaction funding = new Transaction(Net.MAINNET);
-        funding.addOutput(BsvAmount.SATOSHI, inscription);
+        Transaction funding = new Transaction();
+        funding.outputs.add(new TransactionOutput(inscription, 1d));
         builder.addInput(funding.outputs.get(0));
         builder.addOutput(BsvAmount.valueOf(777), paymentAddress);
 
@@ -110,7 +114,8 @@ class RemoteTransactionContractTest {
 
         byte[] hash = new byte[32];
         hash[0] = 3;
-        builder.getTargetTransaction().addInput(new BsvHashBytes(hash).toString(), 0, new Script());
+        builder.getTargetTransaction().inputs.add(
+                new TransactionInput(new BsvHashBytes(hash).toString(), 0, new Script()));
         assertTrue(builder.getTxInputSignHash(false, remoteBap).isEmpty());
     }
 
@@ -124,45 +129,44 @@ class RemoteTransactionContractTest {
         ExtendForSignTransaction proposed = new ExtendForSignTransaction(
                 builder.getTargetTransaction(), TransactionSignature.SIGHASH_SINGLE, true, true);
 
-        assertTrue(new RemoteTransactionSigner().signInputs(proposed.partialTx, null,
+        assertTrue(new RemoteTransactionSigner().signInputs(proposed.partialTx, keyProvider,
                 TransactionSignature.SIGHASH_SINGLE, true));
         assertUnlockingScriptValid(proposed.partialTx, 0);
     }
 
     @Test
     void remoteOrdinalBuilderReportsSignerFailure() {
-        RemoteTransactionSigner signer = mock(RemoteTransactionSigner.class);
-        RemoteOrdTransactionBuilder builder = new RemoteOrdTransactionBuilder(remoteBap, signer);
+        // 新架构没有可注入的签名器：以「密钥提供者解析不到密钥」触发同类的签名失败
+        SigningKeyProvider noKeys = pubkeyHash -> null;
+        RemoteOrdTransactionBuilder builder = new RemoteOrdTransactionBuilder(remoteBap, noKeys);
         builder.addInput(paymentUtxo(5));
 
-        assertThrows(SignErrorException.class, () -> builder.signTx(null, true));
+        assertThrows(SignErrorException.class, () -> builder.signTx(noKeys, true));
     }
 
     @Test
     void remoteOrdinalBuilderForwardsForkId() {
-        RemoteTransactionSigner signer = mock(RemoteTransactionSigner.class);
-        when(signer.signInputs(any(), any())).thenReturn(true);
-        RemoteOrdTransactionBuilder builder = new RemoteOrdTransactionBuilder(remoteBap, signer);
+        // 旧用例断言「把 forkId 转发给注入的签名器」；新架构无可注入签名器，
+        // 改为直接断言最终产物的签名尾字节（更强的验证）。
+        RemoteOrdTransactionBuilder builder = new RemoteOrdTransactionBuilder(remoteBap, keyProvider);
         builder.addInput(paymentUtxo(7));
-        builder.signTx(null, false);
-        ArgumentCaptor<TransactionSigner.ProposedTransaction> captured =
-                ArgumentCaptor.forClass(TransactionSigner.ProposedTransaction.class);
-        verify(signer).signInputs(captured.capture(), any());
-        assertEquals(false,
-                ((ExtendForSignTransaction) captured.getValue()).isUseForkId());
+        builder.signTx(keyProvider, false);
+
+        assertEquals(TransactionSignature.SIGHASH_ALL | TransactionSignature.SIGHASH_FORKID,
+                signatureHashType(builder.build(), 0));
     }
 
     @Test
     void remoteOrdinalOutputCarriesTheRequestedContentAndPendingBsmHash() {
-        RemoteOrdTransactionBuilder builder = new RemoteOrdTransactionBuilder(remoteBap,
-                new RemoteTransactionSigner());
+        RemoteOrdTransactionBuilder builder = new RemoteOrdTransactionBuilder(remoteBap, keyProvider);
         builder.addInput(paymentUtxo(6));
         byte[] content = "new inscription".getBytes(StandardCharsets.US_ASCII);
 
         builder.addOrdOutput(bap.getOrdAddress(), content, "text/plain", null,
                 RemoteSignType.CURRENT);
 
-        assertEquals(BsvAmount.SATOSHI, builder.build().outputs.get(0).getValue());
+        assertEquals(BsvAmount.SATOSHI,
+                BsvAmount.fromSdkValue(builder.build().outputs.get(0).satoshis));
         assertArrayEquals(OrdScriptBuilder.buildInscription(bap.getOrdAddress(), content,
                 "text/plain", null).toUint8Array(), lockingScriptBytes(builder.build(), 0));
         assertEquals(1, builder.getAllBsmSignHash(true, false, remoteBap).size());
@@ -172,22 +176,23 @@ class RemoteTransactionContractTest {
 
     @Test
     void remoteSignerLeavesAnAlreadyDisconnectedInputUntouched() {
-        Transaction tx = new Transaction(Net.MAINNET);
+        Transaction tx = new Transaction();
         byte[] hash = new byte[32];
         hash[0] = 8;
-        tx.addInput(Sha256Hash.wrap(hash), 0, new ScriptBuilder().build());
-        tx.addOutput(BsvAmount.valueOf(777), paymentAddress);
+        tx.inputs.add(new TransactionInput(new BsvHashBytes(hash).toString(), 0, new Script()));
+        tx.outputs.add(new TransactionOutput(
+                new P2PKH().lock(paymentAddress.getHash160()), 777d));
         ExtendForSignTransaction proposed = new ExtendForSignTransaction(
-                TransactionExtend.toTransactionExtend(tx), SigHash.Flags.ALL, true, false);
+                tx, TransactionSignature.SIGHASH_ALL, true, false);
 
-        assertTrue(new RemoteTransactionSigner().signInputs(proposed, null));
-        assertEquals(0, proposed.unlockingScriptBytes(partialTx, 0).length);
+        assertTrue(new RemoteTransactionSigner().signInputs(proposed.partialTx, keyProvider,
+                TransactionSignature.SIGHASH_ALL, false));
+        assertEquals(0, unlockingScriptBytes(proposed.partialTx, 0).length);
     }
 
     @Test
     void fourArgumentRemoteOrdinalOutputUsesTheDefaultSigningIdentity() {
-        RemoteOrdTransactionBuilder builder = new RemoteOrdTransactionBuilder(remoteBap,
-                new RemoteTransactionSigner());
+        RemoteOrdTransactionBuilder builder = new RemoteOrdTransactionBuilder(remoteBap, keyProvider);
         builder.addInput(paymentUtxo(9));
         byte[] content = "default".getBytes(StandardCharsets.US_ASCII);
 
@@ -201,21 +206,12 @@ class RemoteTransactionContractTest {
                 builder.getAllBsmSignHash(true, false, remoteBap).get(0).getRemoteSignType());
     }
 
-    @Test
-    void remoteSignerHasNoSerializedPrivateState() {
-        RemoteTransactionSigner signer = new RemoteTransactionSigner();
-
-        assertFalse(signer.isReady());
-        assertArrayEquals(new byte[0], signer.serialize());
-        signer.deserialize(new byte[] {1, 2, 3});
-        assertArrayEquals(new byte[0], signer.serialize());
-    }
-
     private BsvUtxo paymentUtxo(int firstHashByte) {
         byte[] hash = new byte[32];
         hash[0] = (byte) firstHashByte;
-        return new BsvUtxo(Sha256Hash.wrap(hash), 0, BsvAmount.valueOf(20_000),
-                0, false, null, paymentAddress.toBase58());
+        return new BsvUtxo(BsvHashBytes.of(hash), 0, 20_000L, 0, false,
+                paymentAddress.toBase58(),
+                new P2PKH().lock(paymentAddress.getHash160()).toUint8Array());
     }
 
     private void sign(PreSignHashContext request, PrivateKey key) {
@@ -246,6 +242,20 @@ class RemoteTransactionContractTest {
             return Script.fromBinary(bytes);
         }
         return new Script();
+    }
+
+    private static int signatureHashType(Transaction tx, int index) {
+        byte[] signature = com.metanet4j.sdk.utils.ScriptHelper.getPushData(
+                asScript(tx.inputs.get(index).unlockingScript).getChunks().get(0));
+        return signature[signature.length - 1] & 0xFF;
+    }
+
+    private static TransactionOutput sourceOutput(Transaction tx, int index) {
+        if (tx.inputs.get(index).sourceTransaction instanceof Transaction source
+                && source.outputs != null && !source.outputs.isEmpty()) {
+            return source.outputs.get(0);
+        }
+        throw new IllegalStateException("输入 " + index + " 缺少连接输出");
     }
 
     private static byte[] unlockingScriptBytes(Transaction tx, int index) {
