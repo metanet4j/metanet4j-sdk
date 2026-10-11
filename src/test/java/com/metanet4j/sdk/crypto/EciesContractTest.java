@@ -1,6 +1,7 @@
 package com.metanet4j.sdk.crypto;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -51,6 +52,26 @@ class EciesContractTest {
         assertArrayEquals(encrypted, Base64.decode(encoded));
         assertArrayEquals(MessageDigest.getInstance("SHA-512").digest(plain),
                 DigestUtilExtend.sha512(plain));
+    }
+
+    @Test
+    void roundTripsTheBase64StringOverloads() throws Exception {
+        // 覆盖 §82 清单中的 Ecies.decrypt(String, PrivateKey) —— **两参的 Base64 字符串重载**。
+        // 既有用例用的是三参的 byte[] 重载（decrypt(byte[], PrivateKey, PublicKey)），
+        // 故该重载虽在真实流程中被使用、却一直未被覆盖（§81.2 所述"有调用点却未覆盖"的典型）。
+        PrivateKey recipient = PrivateKey.of(BigInteger.valueOf(5));
+        PrivateKey ephemeral = PrivateKey.of(BigInteger.valueOf(7));
+        String plain = "base64 round trip";
+
+        String encoded = Ecies.encrypt(plain, recipient.getPublicKey().getPublicKey(), ephemeral.getKey());
+        assertEquals(plain, Ecies.decrypt(encoded, recipient.getKey()),
+                "字符串重载的 encrypt 与 decrypt 应可往返");
+
+        // 与 byte[] 重载产出同一密文（两者只是编解码包装，不应产生差异）
+        assertArrayEquals(Base64.decode(encoded),
+                Ecies.encrypt(plain.getBytes(StandardCharsets.UTF_8),
+                        recipient.getPublicKey().getPublicKey(), ephemeral.getKey()),
+                "字符串与字节重载应产出相同密文");
     }
 
     @Test
