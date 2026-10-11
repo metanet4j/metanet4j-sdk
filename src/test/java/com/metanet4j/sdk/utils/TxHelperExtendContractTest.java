@@ -491,4 +491,54 @@ class TxHelperExtendContractTest {
         }
         return out;
     }
+
+    @Test
+    void walksTheSharedP2pkhShapeCheckWithRawByteScripts() {
+        // 覆盖 §87 收敛后**公共实现** pubKeyHashOfP2pkh 的五段判定。
+        // 与 §159 不同：此处用 **Script.fromBinary(原始字节)** 构造，
+        // 因为 `new Script(List<ScriptChunk>)` 会**重新序列化**、精确 chunk 形态未必保真（§179 的教训）。
+        // 经 getConnectedRedeemDataExtend 触发（它会先试铭文路径、再回退到本方法）。
+        BapBase owner = BapBase.fromOnlyMasterPrivateKey(TestData.masterPrivateKey);
+        BapBase.BapProviderKeyBag bag = new BapBase.BapProviderKeyBag(owner);
+
+        byte[] head = {(byte) 0x76, (byte) 0xa9};      // OP_DUP OP_HASH160
+        byte[] tail = {(byte) 0x88, (byte) 0xac};      // OP_EQUALVERIFY OP_CHECKSIG
+        byte[] hash20 = new byte[20];
+        java.util.Arrays.fill(hash20, (byte) 9);
+
+        // ① 合法：0x14 后接正好 20 字节
+        byte[] valid = new byte[2 + 1 + 20 + 2];
+        System.arraycopy(head, 0, valid, 0, 2);
+        valid[2] = 0x14;
+        System.arraycopy(hash20, 0, valid, 3, 20);
+        System.arraycopy(tail, 0, valid, 23, 2);
+
+        // ② 第 2 段无数据：以纯操作码 OP_1 占位 → dataOf 为 null
+        byte[] noData = {0x76, (byte) 0xa9, 0x51, (byte) 0x88, (byte) 0xac};
+
+        // ③ 第 2 段长度 19 ≠ 20
+        byte[] shortHash = new byte[2 + 1 + 19 + 2];
+        System.arraycopy(head, 0, shortHash, 0, 2);
+        shortHash[2] = 0x13;
+        System.arraycopy(hash20, 0, shortHash, 3, 19);
+        System.arraycopy(tail, 0, shortHash, 22, 2);
+
+        // 三种形态都应能走到判定并各自给出确定结果：
+        // 合法者因地址不属于本密钥包而在密钥查找处抛错（说明它**通过了**五段判定）；
+        // 另两者应因判定不成立而返回 null（不进入密钥查找）。
+        assertThrows(RuntimeException.class,
+                () -> TxHelperExtend.getConnectedRedeemDataExtend(
+                        new com.metanet4j.bsv.transaction.TransactionOutput(
+                                Script.fromBinary(valid), 1d), bag),
+                "合法五段 P2PKH 应通过判定并走到密钥查找（该地址不属于本密钥包故抛错）");
+        assertNull(TxHelperExtend.getConnectedRedeemDataExtend(
+                        new com.metanet4j.bsv.transaction.TransactionOutput(
+                                Script.fromBinary(noData), 1d), bag),
+                "第 2 段无数据时不应判为 P2PKH");
+        assertNull(TxHelperExtend.getConnectedRedeemDataExtend(
+                        new com.metanet4j.bsv.transaction.TransactionOutput(
+                                Script.fromBinary(shortHash), 1d), bag),
+                "第 2 段长度为 19 时不应判为 P2PKH");
+    }
+
 }
