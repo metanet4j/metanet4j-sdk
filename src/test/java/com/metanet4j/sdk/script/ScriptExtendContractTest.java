@@ -16,6 +16,8 @@ import com.metanet4j.sdk.utils.ScriptHelper;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -137,4 +139,65 @@ class ScriptExtendContractTest {
         }
         return out;
     }
+
+    // ---- §94：覆盖 ScriptExtend 的脚本形态识别谓词（全部为 public API） ----
+    // 一律用 **Script.fromBinary(原始字节)** 构造：`new Script(List<ScriptChunk>)` 会**重新序列化**，
+    // 精确 chunk 形态未必保真（§179 的教训），而这些谓词判定的正是 chunk 形态。
+
+    private static byte[] p2pkhBytes() {
+        byte[] h = new byte[20];
+        java.util.Arrays.fill(h, (byte) 7);
+        byte[] out = new byte[25];
+        out[0] = 0x76; out[1] = (byte) 0xa9; out[2] = 0x14;   // OP_DUP OP_HASH160 <push 20>
+        System.arraycopy(h, 0, out, 3, 20);
+        out[23] = (byte) 0x88; out[24] = (byte) 0xac;          // OP_EQUALVERIFY OP_CHECKSIG
+        return out;
+    }
+
+    private static byte[] p2shBytes() {
+        byte[] h = new byte[20];
+        java.util.Arrays.fill(h, (byte) 9);
+        byte[] out = new byte[23];
+        out[0] = (byte) 0xa9; out[1] = 0x14;                   // OP_HASH160 <push 20>
+        System.arraycopy(h, 0, out, 2, 20);
+        out[22] = (byte) 0x87;                                 // OP_EQUAL
+        return out;
+    }
+
+    private static byte[] multisigBytes() {
+        byte[] pk = new byte[33];
+        pk[0] = 0x02;
+        java.util.Arrays.fill(pk, 1, 33, (byte) 3);
+        byte[] out = new byte[1 + 34 + 34 + 1 + 1];
+        int i = 0;
+        out[i++] = 0x52;                                       // OP_2（需 2 个签名）
+        out[i++] = 0x21; System.arraycopy(pk, 0, out, i, 33); i += 33;
+        out[i++] = 0x21; System.arraycopy(pk, 0, out, i, 33); i += 33;
+        out[i++] = 0x52;                                       // OP_2（共 2 把公钥）
+        out[i] = (byte) 0xae;                                  // OP_CHECKMULTISIG
+        return out;
+    }
+
+    @Test
+    void recognizesEveryStandardScriptShape() {
+        Script p2pkh = Script.fromBinary(p2pkhBytes());
+        Script p2sh = Script.fromBinary(p2shBytes());
+        Script multisig = Script.fromBinary(multisigBytes());
+
+        assertTrue(ScriptExtend.isSentToAddress(p2pkh), "应识别 P2PKH");
+        assertFalse(ScriptExtend.isSentToAddress(p2sh), "P2SH 不应被判为 P2PKH");
+
+        assertTrue(ScriptExtend.isPayToScriptHash(p2sh), "应识别 P2SH");
+        assertFalse(ScriptExtend.isPayToScriptHash(p2pkh), "P2PKH 不应被判为 P2SH");
+
+        assertTrue(ScriptExtend.isSentToMultiSig(multisig), "应识别多签脚本");
+        assertFalse(ScriptExtend.isSentToMultiSig(p2pkh), "P2PKH 不应被判为多签");
+
+        assertEquals(2, ScriptExtend.getNumberOfSignaturesRequiredToSpend(multisig),
+                "OP_2 起步的多签应要求 2 个签名");
+        assertThrows(IllegalArgumentException.class,
+                () -> ScriptExtend.getNumberOfSignaturesRequiredToSpend(p2pkh),
+                "非多签脚本应被拒绝，而非返回无意义的数字");
+    }
+
 }
