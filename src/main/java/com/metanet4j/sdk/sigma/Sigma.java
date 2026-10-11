@@ -358,8 +358,10 @@ public class Sigma implements PreSignHash {
             }
         }
         // Use a dummy hash.
-        byte[] dummy = new byte[32];
-        return BsvHashBytes.of(dummy);
+        // 注意：契约要求的是**全零哈希本身**（BsvHashBytes.ZERO_HASH），
+        // 而 `BsvHashBytes.of(new byte[32])` 是对 32 个零字节做一次 SHA-256，
+        // 得到的是非零值（实测 25295f0d…）——曾因此使「无输入时用 dummy 哈希」的断言失败。
+        return BsvHashBytes.ZERO_HASH;
     }
 
     /**
