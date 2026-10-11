@@ -177,7 +177,14 @@ public class TransactionBuilder {
                 pubKeyLen = key.getPubKey().length;
             }
         }
-        return ScriptExtend.getNumberOfBytesRequiredToSpend(script, pubKeyLen, null);
+        try {
+            return ScriptExtend.getNumberOfBytesRequiredToSpend(script, pubKeyLen, null);
+        } catch (RuntimeException e) {
+            // 手续费估算不得因非标准锁定脚本而中断构链：退回保守的最大解锁脚本估算
+            // （签名 + 非压缩公钥），与「取不到密钥」时的口径一致。
+            log.debug("锁定脚本类型未识别，费用按保守值估算：{}", e.getMessage());
+            return ScriptExtend.SIG_SIZE + 65;
+        }
     }
 
     public BsvAmount getFee() {
