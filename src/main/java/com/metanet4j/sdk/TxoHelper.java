@@ -18,6 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import com.metanet4j.bsv.script.OP;
 
 /**
  * 交易 → TXO JSON 映射（与旧实现字段一致）。
@@ -73,7 +74,9 @@ public class TxoHelper {
                 outpoint.put("a", isStandardPubKey(pubKey)
                         ? addressOfPubKey(pubKey) : script.toHex());
             } else {
-                outpoint.put("a", script.toHex());
+                // 契约（冻结向量 V07）要求的是**可读操作码名**（如 "DUP HASH160"），
+                // 与旧库 Script.toString() 一致；早期实现给的是裸 hex（"76a9"）。
+                outpoint.put("a", opcodeNames(script));
             }
             Map<String, Object> entry = new LinkedHashMap<>();
             entry.put("e", outpoint);
@@ -237,4 +240,21 @@ target.put("o" + j, OP.name(scriptChunk.op));
         }
         return bytes;
     }
+
+    /** 把脚本渲染为可读操作码名（去掉新 SDK 的 "OP_" 前缀），与旧库 Script.toString() 对齐。 */
+    private static String opcodeNames(Script script) {
+        StringBuilder sb = new StringBuilder();
+        for (var chunk : script.getChunks()) {
+            if (sb.length() > 0) {
+                sb.append(' ');
+            }
+            String name = OP.name(chunk.op);
+            if (name == null) {
+                name = String.valueOf(chunk.op);
+            }
+            sb.append(name.startsWith("OP_") ? name.substring(3) : name);
+        }
+        return sb.toString();
+    }
+
 }
