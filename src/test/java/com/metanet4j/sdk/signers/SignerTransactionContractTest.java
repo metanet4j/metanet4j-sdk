@@ -89,6 +89,29 @@ class SignerTransactionContractTest {
     }
 
     @Test
+    void singleInputSigningRejectsNullTransactionAndOutOfRangeIndex() {
+        // 覆盖 §82 清单收口后仍余的三条件守卫（§240 查明剩余缺口以健壮性分支为主）：
+        //     if (tx == null || inputIndex < 0 || inputIndex >= tx.inputs.size()) throw new SignErrorException(…)
+        // 三个条件**各自**对应一种调用方错误，故逐条断言——"某一侧已覆盖"不等于"该合取式已覆盖"（§230）。
+        Transaction tx = transactionWithPaymentInput();   // 恰有 1 个输入
+
+        assertThrows(SignErrorException.class,
+                () -> OrdinalsTransactionSigner.signInput(null, 0, keyProvider,
+                        TransactionSignature.SIGHASH_ALL, false),
+                "交易为 null 应报签名错误");
+
+        assertThrows(SignErrorException.class,
+                () -> OrdinalsTransactionSigner.signInput(tx, -1, keyProvider,
+                        TransactionSignature.SIGHASH_ALL, false),
+                "负数下标应报签名错误");
+
+        assertThrows(SignErrorException.class,
+                () -> OrdinalsTransactionSigner.signInput(tx, tx.inputs.size(), keyProvider,
+                        TransactionSignature.SIGHASH_ALL, false),
+                "越界下标应报签名错误（上界为排他）");
+    }
+
+    @Test
     void ordinalBatchSigningRejectsNullAndSignsEveryInput() {
         // 覆盖 §82 清单中 OrdinalsTransactionSigner.signInputs（**批量**版本，与既有用例覆盖的
         // 静态 signInput（单输入）以及 RemoteTransactionSigner.signInputs（另一个类）都不同）。
