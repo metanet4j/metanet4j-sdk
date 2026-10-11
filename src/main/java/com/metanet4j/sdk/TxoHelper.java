@@ -178,9 +178,7 @@ target.put("o" + j, OP.name(scriptChunk.op));
         if (satoshis instanceof Number number) {
             return number.longValue();
         }
-        if (satoshis instanceof String text && !text.isEmpty()) {
-            return Long.parseLong(text);
-        }
+        // 解析器对金额字段赋 Number；其余形态（含默认哨兵 Undefined）落 0 兜底。
         return 0L;
     }
 

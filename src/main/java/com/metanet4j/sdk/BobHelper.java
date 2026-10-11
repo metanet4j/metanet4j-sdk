@@ -315,7 +315,13 @@ public class BobHelper {
         return bytes;
     }
 
-    /** txid 显示序 hex；sourceTXID 可能是 hex 串或字节。 */
+    /**
+     * txid 显示序 hex。
+     *
+     * <p>与 {@code TxoHelper.txidOf} 同源、同理由（migration-rules §62）：公共入口只有 hex 形式，
+     * 解析器对该字段只产出显示序 hex 串，故 {@code byte[]}／{@code List<?>} 分支**不可达**，
+     * 按 §62.4 方案 C 收敛为「{@code null} 守卫 + {@code String} + 兜底」。
+     */
     private static String txidOf(Object sourceTXID) {
         if (sourceTXID == null) {
             return BsvHashBytes.ZERO_HASH.toString();
@@ -323,17 +329,7 @@ public class BobHelper {
         if (sourceTXID instanceof String text) {
             return text;
         }
-        if (sourceTXID instanceof byte[] bytes) {
-            return new BsvHashBytes(bytes).toString();
-        }
-        if (sourceTXID instanceof List<?> list) {
-            byte[] bytes = new byte[list.size()];
-            for (int i = 0; i < bytes.length; i++) {
-                bytes[i] = (byte) ((Number) list.get(i)).intValue();
-            }
-            return new BsvHashBytes(bytes).toString();
-        }
-        return sourceTXID.toString();
+        return String.valueOf(sourceTXID);
     }
 
     /** 金额字段可能是 {@code Undefined}、数字或字符串。 */
@@ -341,9 +337,7 @@ public class BobHelper {
         if (satoshis instanceof Number number) {
             return number.longValue();
         }
-        if (satoshis instanceof String text && !text.isEmpty()) {
-            return Long.parseLong(text);
-        }
+        // 解析器对金额字段赋 Number；其余形态（含默认哨兵 Undefined）落 0 兜底。
         return 0L;
     }
 
