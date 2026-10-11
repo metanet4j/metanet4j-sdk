@@ -121,15 +121,15 @@ public class Sigma implements PreSignHash {
         }
         if (sigmaInstance < existingCount) {
             int sigIndex = getSigInstancePosition();
-            for (int i = 0; i < signedScript.getChunks().size(); i++) {
-                newScriptAsm.set(sigIndex + i, signedScript.getChunks().get(i));
+            for (int i = 0; i < chunksOf(signedScript).size(); i++) {
+                newScriptAsm.set(sigIndex + i, chunksOf(signedScript).get(i));
             }
         } else {
             boolean containsOpReturn = newScriptAsm.stream()
                     .anyMatch(chunk -> chunk.op == OP.OP_RETURN);
             String separator = containsOpReturn ? "|" : "OP_RETURN";
             newScriptAsm.addAll(new Script().writeBin(toBoxed(separator.getBytes())).getChunks());
-            newScriptAsm.addAll(signedScript.getChunks());
+            newScriptAsm.addAll(chunksOf(signedScript));
         }
 
         // Clone the transaction and set the output script.
@@ -233,7 +233,7 @@ public class Sigma implements PreSignHash {
 
     public int getSigInstanceCount() {
         Script scriptPubKey = getTargetTxOut().lockingScript;
-        List<ScriptChunk> chunks = scriptPubKey.getChunks();
+        List<ScriptChunk> chunks = chunksOf(scriptPubKey);
 
         int count = 0;
         for (ScriptChunk chunk : chunks) {
@@ -249,7 +249,7 @@ public class Sigma implements PreSignHash {
 
     public int getSigInstancePosition() {
         Script scriptPubKey = getTargetTxOut().lockingScript;
-        List<ScriptChunk> chunks = scriptPubKey.getChunks();
+        List<ScriptChunk> chunks = chunksOf(scriptPubKey);
 
         int instance = 0;
         for (int i = 0; i < chunks.size(); i++) {
@@ -316,7 +316,7 @@ public class Sigma implements PreSignHash {
 
         TransactionOutput output = this.transaction.outputs.get(this.targetVout);
         Script scriptPubKey = output.lockingScript;
-        List<ScriptChunk> scriptChunks = scriptPubKey.getChunks();
+        List<ScriptChunk> scriptChunks = chunksOf(scriptPubKey);
 
         int occurrences = 0;
         for (int i = 0; i < scriptChunks.size(); i++) {
@@ -464,5 +464,7 @@ public class Sigma implements PreSignHash {
         }
         return out;
     }
+
+
 
 }
