@@ -1,6 +1,7 @@
 package com.metanet4j.sdk.remote;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -94,6 +95,20 @@ class RemoteTransactionContractTest {
         assertEquals(bap.getPayAccountAddress().toBase58(), requests.get(0).getSignAddress());
         assertEquals(RemoteSignType.ORD, requests.get(1).getRemoteSignType());
         assertEquals(bap.getOrdAddress().toBase58(), requests.get(1).getSignAddress());
+    }
+
+    @Test
+    void treatsAnOutputWithoutLockingScriptAsAnEmptyScript() {
+        // 覆盖 RemoteTransactionBuilder 中 `sourceOutput.lockingScript == null ? new Script() : ...`
+        // 的空值兜底侧（与 §148 处理 OrdTransactionBuilder 的同名模式一致）。
+        RemoteTransactionBuilder builder = new RemoteTransactionBuilder(remoteBap, keyProvider);
+        builder.addInput(new TransactionOutput(null, 1d));
+        builder.addOutput(BsvAmount.valueOf(1), paymentAddress);
+
+        List<PreSignHashContext> requests =
+                assertDoesNotThrow(() -> builder.getTxInputSignHash(false, remoteBap),
+                        "锁定脚本为空的连接输出应按空脚本处理，而不应抛错");
+        assertEquals(1, requests.size(), "该输入仍应产出一条待签哈希");
     }
 
     @Test
