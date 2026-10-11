@@ -3,6 +3,7 @@ package com.metanet4j.sdk.utils;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.metanet4j.bsv.script.OP;
@@ -84,6 +85,17 @@ class ScriptHelperContractTest {
         assertTrue(ScriptHelper.chunksOf(Script.fromBinary(new byte[] {0x4c})).isEmpty());
         assertTrue(ScriptHelper.chunksOf(Script.fromBinary(new byte[] {0x4d, 0x02})).isEmpty());
         assertTrue(ScriptHelper.chunksOf(Script.fromBinary(new byte[] {0x4e, 1, 2, 3})).isEmpty());
+    }
+
+
+    @Test
+    void returnsNullTextForChunksThatAreNotPushData() {
+        // 覆盖 getPushDataAsString 的 null 侧（`data == null ? null : new String(...)`）：
+        // 非推送 chunk 的 getPushData 返回 null，故文本也应为 null —— 这正是其 javadoc 所述契约。
+        assertNull(ScriptHelper.getPushDataAsString(new ScriptChunk(OP.OP_1)),
+                "非推送 chunk 应返回 null 而非空串");
+        assertNull(ScriptHelper.getPushDataAsString(null),
+                "null chunk 亦应安全返回 null（hasPushData 对 null 返回 false）");
     }
 
 }
