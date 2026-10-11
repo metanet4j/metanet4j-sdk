@@ -114,6 +114,19 @@ class RemoteTransactionContractTest {
     }
 
     @Test
+    void ordBuilderAcceptsAnInputWithoutAScript() {
+        // 覆盖 RemoteOrdTransactionBuilder.addOrdInput 中 `utxo.getScript() == null ? new Script() : ...`
+        // 的空值兜底侧（与 §148 处理 OrdTransactionBuilder 的同名模式一致）。
+        // addOrdInput 是 public，且本测试类与之同包，故可直接构造调用。
+        RemoteOrdTransactionBuilder builder = new RemoteOrdTransactionBuilder(remoteBap, keyProvider);
+        BsvUtxo noScript = new BsvUtxo(new BsvHashBytes(new byte[32]), 0, 20_000L, 0, false,
+                paymentAddress.toBase58(), null);
+
+        assertSame(builder, builder.addOrdInput(noScript),
+                "无脚本的 utxo 应被接受，并支持链式调用");
+    }
+
+    @Test
     void skipsInputsWhoseSourceTransactionIsNotATransaction() {
         // 覆盖 sourceOutputOf 判断中**第一个条件**（`instanceof Transaction`）的假侧：
         // 新 SDK 的 `TransactionInput.sourceTransaction` 默认是哨兵 `Undefined.INSTANCE`，
