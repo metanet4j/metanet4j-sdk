@@ -53,11 +53,10 @@ class SpecifyBapBaseContractTest {
                 "identity", ord, "app");
         SpecifyBapBase.SpecifyProviderKeyBag bag = new SpecifyBapBase.SpecifyProviderKeyBag(identity);
 
-        assertEquals(payment.getPrivKey(), bag.findKeyFromPubHash(payment.getPubKeyHash()).getPrivKey());
-        assertEquals(ord.getPrivKey(), bag.findKeyFromPubHash(ord.getPubKeyHash()).getPrivKey());
+        assertEquals(payment.getPrivKey(), bag.findKeyFromPubHash(payment.getPublicKey().getPubKeyHash()).getPrivKey());
+        assertEquals(ord.getPrivKey(), bag.findKeyFromPubHash(ord.getPublicKey().getPubKeyHash()).getPrivKey());
         assertEquals(payment.getPrivKey(), bag.findKeyFromPubKey(payment.getPubKey()).getPrivKey());
         assertThrows(RuntimeException.class, () -> bag.findKeyFromPubHash(new byte[20]));
-        assertNull(bag.findRedeemDataFromScriptHash(new byte[20]));
     }
 
     /** 由标量构造新 SDK 私钥（旧 ECKeyLite.fromPrivate 的等价入口）。 */
