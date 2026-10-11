@@ -42,6 +42,20 @@ public class ScriptHelper {
     }
 
     /**
+     * 取推送数据的 UTF-8 文本；非推送 chunk 返回 {@code null}。
+     *
+     * <p><b>本方法曾在 §172 因「0 引用」被删除，§79.4 复核后恢复</b>：它是**公开访问器**
+     * （其添加提交 {@code a3746c5} 的说明即「ScriptHelper 增加推送数据访问器」），
+     * 而它封装的模式——{@code new String(getPushData(chunk), UTF_8)}——**在本模块内仍被重复 4 处**
+     * （{@code TxoHelper:130}、{@code Sigma:213/214/217}）。按 §79.3 补充的判断标准，
+     * **{@code public} 且 0 调用不构成死代码证据**（调用面含尚未迁移的 R4/R5 代码）。
+     */
+    public static String getPushDataAsString(ScriptChunk scriptChunk) {
+        byte[] data = getPushData(scriptChunk);
+        return data == null ? null : new String(data, java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    /**
      * 操作码是否直接推送数据：{@code 1..75}（直接长度）、{@code OP_PUSHDATA1/2/4}。
      * 对应新 SDK {@code Script.isPushOnly()} 的边界（{@code op <= OP_16}）。
      */
