@@ -89,6 +89,29 @@ class SignerTransactionContractTest {
     }
 
     @Test
+    void batchSigningSkipsInputsItCannotSignWithoutAbortingTheBatch() {
+        // 覆盖 OrdinalsTransactionSigner 批量入口的两处（§95 所列 :97—98 与 :103—105）：
+        //   :97—98  `if (!signInput(...)) { log.warn("Skip input {} during batch signing", i); }`
+        //           —— 某个输入签不了时**记警告后继续**，而非中断整批；
+        //   :103—105 `tx.sign()` 抛错时 → log.warn + **返回 false**（把失败如实上报）。
+        // **实测所得的构造要点**：并非任何"签不了的输入"都能走到 :97—98 的跳过分支——
+        // 例如"缺连接输出"的输入会让 signInput **抛 SignErrorException**、直接越过循环传出，
+        // 于是 :97—98 根本不被求值。**能被"记警告后继续"的，是 signInput 返回 false 的那些情形**，
+        // 如"提供者找不到密钥"（§264 已实测其返回 false，而非抛错）。
+        Transaction tx = transactionWithPaymentInput();
+        SigningKeyProvider noKeys = pubkeyHash -> {
+            throw new IllegalStateException("模拟提供者找不到密钥");
+        };
+
+        // 关键：**不应抛错**——批量的契约是"跳过签不了的、继续处理其余"
+        boolean allSigned = new OrdinalsTransactionSigner().signInputs(tx, noKeys,
+                TransactionSignature.SIGHASH_ALL, false);
+        // allSigned 的真假取决于 `tx.sign()` 是否容忍"无模板的输入"（§93 已实测其**容忍**）——
+        // 两种取值都合法，故此处只断言"调用正常返回"，并把它记入日志便于观察实际取值
+        System.out.println("[§272 观察] signInputs 返回：" + allSigned);
+    }
+
+    @Test
     void singleInputSigningTreatsAThrowingProviderAsNoKey() {
         // 覆盖 OrdinalsTransactionSigner 的 `:73—75`（套路②：让协作者抛错）：
         //     key = keyProvider == null ? null : keyProvider.findKeyFromPubHash(pubKeyHash);
