@@ -89,6 +89,26 @@ class SignerTransactionContractTest {
     }
 
     @Test
+    void ordinalBatchSigningRejectsNullAndSignsEveryInput() {
+        // 覆盖 §82 清单中 OrdinalsTransactionSigner.signInputs（**批量**版本，与既有用例覆盖的
+        // 静态 signInput（单输入）以及 RemoteTransactionSigner.signInputs（另一个类）都不同）。
+        OrdinalsTransactionSigner signer = new OrdinalsTransactionSigner();
+
+        // 分支一：null 交易直接返回 false（不去遍历 inputs，避免 NPE）
+        assertFalse(signer.signInputs(null, keyProvider, TransactionSignature.SIGHASH_ALL, false),
+                "null 交易应返回 false");
+
+        // 分支二：全部输入都能签时应返回 true，且交易被真正签名
+        Transaction tx = transactionWithPaymentInput();
+        assertTrue(signer.signInputs(tx, keyProvider, TransactionSignature.SIGHASH_ALL, false),
+                "全部输入均可签时应返回 true");
+        byte[] unlocking = ScriptHelper.getPushData(
+                asScript(tx.inputs.get(0).unlockingScript).getChunks().get(0));
+        assertEquals(TransactionSignature.SIGHASH_ALL | TransactionSignature.SIGHASH_FORKID,
+                unlocking[unlocking.length - 1] & 0xFF, "批量签名应写入 ForkID 位");
+    }
+
+    @Test
     void singleInputSigningCreatesAForkIdSignature() {
         Transaction tx = transactionWithPaymentInput();
 
