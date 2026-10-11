@@ -445,4 +445,16 @@ class ScriptExtendContractTest {
                 "公钥数超出 OP_16 时应判否");
     }
 
+
+    @Test
+    void walksTheDataNullLegOfTheStandardPubKeyCheck() {
+        // 覆盖 `:217`（`isStandardPubKey`）的 `data != null` 这一腿的**假侧**。
+        // 经 `isSentToRawPubKey` 触达：它是 `chunks.size() == 2 && isStandardPubKey(chunks.get(0).data) && …`，
+        // 故只要第一段是**无数据的纯操作码**（如 OP_1），就能把 `null` 送进 `isStandardPubKey`。
+        // 注：这与"公钥长度不是 33/65"不同——那里 data 非 null、只是长度不符（§261 已覆盖）。
+        byte[] noDataThenChecksig = {0x51, (byte) 0xac};   // OP_1 OP_CHECKSIG
+        assertFalse(ScriptExtend.isSentToRawPubKey(Script.fromBinary(noDataThenChecksig)),
+                "首段无数据（data 为 null）时不应判为 P2PK");
+    }
+
 }
