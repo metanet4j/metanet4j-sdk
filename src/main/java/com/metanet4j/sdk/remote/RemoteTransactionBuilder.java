@@ -124,10 +124,9 @@ public class RemoteTransactionBuilder extends TransactionBuilder implements Tran
     }
 
     private static TransactionOutput sourceOutputOf(TransactionInput input) {
-        if (input.sourceTransaction instanceof Transaction source && source.outputs != null
-                && !source.outputs.isEmpty()) {
-            return source.outputs.get(0);
-        }
-        return null;
+        // 【§87 收敛】原为四处各一份的私有副本，现委托全项目唯一实现（TxHelperExtend）。
+        // 注意：委托后，本类的 §216／§219／§230 三个用例实际覆盖的是**公共实现**的那三个条件，
+        // 这正是收敛的目的——同一批条件只需覆盖一次。
+        return com.metanet4j.sdk.utils.TxHelperExtend.sourceOutputOf(input);
     }
 }
