@@ -486,7 +486,13 @@ class TransactionBuilderContractTest {
         for (var input : tx.inputs) {
             if (input.sourceTransaction instanceof Transaction source && source.outputs != null
                     && !source.outputs.isEmpty()) {
-                sum = sum.add(BsvAmount.fromSdkValue(source.outputs.get(0).satoshis));
+                // 【R6 修正】原实现固定读 source.outputs.get(0)，与生产代码里已被修正的同一处缺陷一致
+                //（TxHelperExtend.sourceOutputOf 曾硬编码 get(0)、attachSourceOutput 曾把输出固定放在 0 号，
+                //  两者"互相掩盖"）。现按 input.sourceOutputIndex 取，以匹配修正后的真实契约。
+                int index = input.sourceOutputIndex;
+                if (index >= 0 && index < source.outputs.size()) {
+                    sum = sum.add(BsvAmount.fromSdkValue(source.outputs.get(index).satoshis));
+                }
             }
         }
         return sum;
