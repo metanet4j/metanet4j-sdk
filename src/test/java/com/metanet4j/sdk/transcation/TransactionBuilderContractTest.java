@@ -196,6 +196,12 @@ class TransactionBuilderContractTest {
                                 .writeOpCode(com.metanet4j.bsv.script.OP.OP_1)) > 0,
                 "锁定脚本不可识别时应走保守估算");
 
+        // ②′ **第一腿为假**：`keyProvider == null`（§280 只覆盖了第二腿为假的情形——
+        //     这正是"不仅每个操作数要两侧、**每个调用点的组合**也要走"的体现，§282 的观察）。
+        TransactionBuilder noProvider = new TransactionBuilder(bap, null);
+        assertTrue(noProvider.getUnLockScriptSize(input, p2pkh) > 0,
+                "无提供者时应直接走保守估算（第一腿短路），而非抛 NPE");
+
         // ③ **提供者抛错** → 转 key = null → 仍走保守估算（`:180—181` 的 catch）
         TransactionBuilder throwing = new TransactionBuilder(bap, pubKeyHash -> {
             throw new IllegalStateException("模拟提供者找不到密钥");
