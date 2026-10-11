@@ -161,6 +161,9 @@ class BapPathTest {
                 "空路径取末段硬化态应抛错");
 
         // :182 equals 的假侧——与不同类型的对象比较应为 false（而非抛 ClassCastException）
+        // :182 的 (instanceof 真, equals 假) 组合——同为 BapPath 但索引不同
+        assertNotEquals(hardened, BapPath.parse("m/1'"), "同类型但索引不同应不相等");
+        assertNotEquals(BapPath.parse("m/0"), BapPath.parse("m/0'"), "硬化位不同应不相等");
         assertNotEquals(hardened, "m/0'", "与字符串比较应返回 false");
         assertNotEquals(hardened, null, "与 null 比较应返回 false");
     }

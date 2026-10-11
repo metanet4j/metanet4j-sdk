@@ -91,6 +91,12 @@ class EcKeyLiteExtendTest {
         // :100—101 的 null 侧——Base64 签名为 null 时短路返回 false（不做解码）
         assertFalse(withPriv.verify(digest, (String) null), "null 的 Base64 签名应返回 false");
 
+        // :101 的**右侧**——非 null 的 Base64 串应真正解码并交给字节版校验（而非被短路）
+        // 用一个长度合法（65 字节）但内容非法的签名，断言解码后被判为不通过
+        String base64Of65Bytes = java.util.Base64.getEncoder().encodeToString(new byte[65]);
+        assertFalse(withPriv.verify(digest, base64Of65Bytes),
+                "非 null 的 Base64 签名应解码后校验并返回 false");
+
         // :163—164 仅公钥实例不可签名
         assertThrows(IllegalStateException.class, () -> pubOnly.signHash(new byte[32]),
                 "仅含公钥的实例签名时应报错而非静默产出无效签名");
