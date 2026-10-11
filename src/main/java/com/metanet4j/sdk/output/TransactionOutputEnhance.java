@@ -1,34 +1,38 @@
 package com.metanet4j.sdk.output;
 
-import io.bitcoinsv.bitcoinjsv.core.Address;
-import io.bitcoinsv.bitcoinjsv.core.Coin;
-import io.bitcoinsv.bitcoinjsv.msg.protocol.Transaction;
-import io.bitcoinsv.bitcoinjsv.msg.protocol.TransactionOutput;
-import io.bitcoinsv.bitcoinjsv.params.Net;
+import com.metanet4j.bsv.script.Script;
 
-import org.jspecify.annotations.Nullable;
+/**
+ * 输出持有者（**不继承**，按计划 §13.1 改写）。
+ *
+ * <p>新 SDK 的 {@code TransactionOutput} **没有 {@code index} 字段**（下标即其在
+ * {@code transaction.outputs} 列表中的位置），故本类改为纯持有者，承载
+ * 「锁定脚本 + 金额 + 下标」三项；下标由调用方在构造时按下标取值给出。
+ *
+ * <p>金额用 {@code double} 与 SDK 的 {@code TransactionOutput.satoshis} 保持同一表示，
+ * 避免无谓换算。
+ */
+public class TransactionOutputEnhance {
 
-public class TransactionOutputEnhance extends TransactionOutput {
+    private final Script lockingScript;
+    private final double satoshis;
+    private final int index;
 
-    private int index;
-
-    public TransactionOutputEnhance(Net net,
-                                    @Nullable Transaction parent,
-                                    Coin value, Address to, int index) {
-        super(net, parent, value, to);
+    public TransactionOutputEnhance(Script lockingScript, double satoshis, int index) {
+        this.lockingScript = lockingScript;
+        this.satoshis = satoshis;
         this.index = index;
-
     }
 
-    public TransactionOutputEnhance(Net net, @Nullable Transaction parent, Coin value, byte[] scriptBytes, int index) {
-        super(net, parent, value, scriptBytes);
-        this.index = index;
+    public Script getLockingScript() {
+        return lockingScript;
     }
 
-    @Override
+    public double getSatoshis() {
+        return satoshis;
+    }
+
     public int getIndex() {
-        return this.index;
+        return index;
     }
-
-
 }
