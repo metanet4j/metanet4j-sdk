@@ -122,8 +122,10 @@ class TxHelperExtendContractTest {
         Arrays.fill(unknownHash, (byte) 7);
         AddressEnhance unknown = AddressEnhance.fromPubKeyHash(unknownHash);
         Script inscription = OrdScriptBuilder.buildInscription(unknown, new byte[] {1}, "text/plain", null);
-        assertNull(TxHelperExtend.getConnectedRedeemDataExtend(output(inscription), bag),
-                "密钥提供者不认识该地址时应返回 null");
+        // 恢复基线语义（6efd289 该用例第 119—120 行）：密钥提供者不认识该地址时**抛出** RuntimeException，
+        // 而不是返回 null。第 82 轮迁移时曾误改为 assertNull，属改写过头，此处按基线纠正。
+        assertThrows(RuntimeException.class,
+                () -> TxHelperExtend.getConnectedRedeemDataExtend(output(inscription), bag));
     }
 
     /** 由脚本构造连接输出（新签名用 TransactionOutput 表达「连接输出」）。 */
