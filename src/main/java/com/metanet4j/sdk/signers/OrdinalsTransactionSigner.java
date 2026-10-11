@@ -55,9 +55,15 @@ public class OrdinalsTransactionSigner {
                     "when signInput,Missing connected output, assuming input {} is already signed.", inputIndex));
         }
         Script scriptPubKey = sourceOutput.lockingScript == null ? new Script() : sourceOutput.lockingScript;
+        // 兼容 Ordinals 铭文输入：铭文脚本以 P2PKH 前缀开头后接铭文包络（13 chunk），
+        // pubKeyHashOf 只认 5 chunk 的纯 P2PKH，会返回空并把铭文输入整体跳过
+        // （同一缺陷在 RemoteTransactionSigner 与 TransactionBuilder 各出现过一次，见 §96/§124）。
         byte[] pubKeyHash = pubKeyHashOf(scriptPubKey);
         if (pubKeyHash.length == 0) {
-            log.warn("when signInput,script is not P2PKH, skip input {}", inputIndex);
+            pubKeyHash = com.metanet4j.sdk.utils.TxHelperExtend.getPubKeyHashByOrdinalScript(scriptPubKey);
+        }
+        if (pubKeyHash.length == 0) {
+            log.warn("when signInput,script is neither P2PKH nor ordinal inscription, skip input {}", inputIndex);
             return false;
         }
         com.metanet4j.sdk.PrivateKey key = keyProvider == null ? null : keyProvider.findKeyFromPubHash(pubKeyHash);
