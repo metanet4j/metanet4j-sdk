@@ -220,8 +220,14 @@ public class BapBase extends MasterKeyBapBase {
 
     public String encryptSelf() {
         try {
-            HD encryptionKey = getEncryptDeterministicKey(
-                    BapPath.parse(this.bapBaseConfig.getDefaultEncryptPath()));
+            // 显式校验加密路径：BapPath.parse(null) 会把 null 当根路径而**静默成功**，
+            // 于是「配置缺失加密路径」被掩盖（BapBaseLifecycleTest
+            // #selfExportReportsMissingEncryptionPathWithItsCause 要求的正是把它暴露出来）。
+            String encryptPath = this.bapBaseConfig.getDefaultEncryptPath();
+            if (encryptPath == null || encryptPath.isBlank()) {
+                throw new IllegalStateException("配置缺少默认加密路径（getDefaultEncryptPath 为空）");
+            }
+            HD encryptionKey = getEncryptDeterministicKey(BapPath.parse(encryptPath));
             return Ecies.encrypt(this.identityKey, encryptionKey.pubKey, null);
         } catch (Exception e) {
             throw new IllegalStateException("BAP 身份加密失败", e);
