@@ -30,7 +30,7 @@ public class OrdScriptBuilder {
             ORDMap metaData) {
 
         Script inscriptionAsm = new Script();
-        for (var chunk : new P2PKH().lock(destinationAddress.getHash160()).getChunks()) {
+        for (var chunk : new P2PKH().lock(destinationAddress.toBase58()).getChunks()) {
             inscriptionAsm.writeOpCode(chunk.op);
             if (chunk.data != null) {
                 inscriptionAsm.writeBin(chunk.data);

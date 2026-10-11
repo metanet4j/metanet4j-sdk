@@ -89,7 +89,7 @@ public class TransactionBuilder {
         if (utxo.getAddress() != null) {
             try {
                 AddressEnhance address = AddressEnhance.fromBase58(utxo.getAddress());
-                lockingScript = new P2PKH().lock(address.getHash160());
+                lockingScript = new P2PKH().lock(address.toBase58());
             } catch (RuntimeException e) {
                 log.warn("UTXO 地址无法解析，输入锁定脚本留空：{}", utxo.getAddress());
             }
@@ -114,7 +114,7 @@ public class TransactionBuilder {
     }
 
     public TransactionBuilder addOutput(BsvAmount value, AddressEnhance address) {
-        targetTransaction.addOutput(new TransactionOutput(new P2PKH().lock(address.getHash160()),
+        targetTransaction.addOutput(new TransactionOutput(new P2PKH().lock(address.toBase58()),
                 value.toSdkValue()));
         return this;
     }
@@ -139,7 +139,7 @@ public class TransactionBuilder {
     public void addChangeOutput(AddressEnhance address) {
         this.changeAddress = address;
         BsvAmount change = calculateChangeAmount(targetTransaction, address, this.feePerKb);
-        targetTransaction.addOutput(new TransactionOutput(new P2PKH().lock(address.getHash160()),
+        targetTransaction.addOutput(new TransactionOutput(new P2PKH().lock(address.toBase58()),
                 change.toSdkValue()));
     }
 
@@ -150,7 +150,7 @@ public class TransactionBuilder {
     public BsvAmount calculateChangeAmount(Transaction transaction, AddressEnhance address,
                                            BsvAmount feePerKb) {
         long size = 0;
-        size += outputSize(new TransactionOutput(new P2PKH().lock(address.getHash160()), 0d));
+        size += outputSize(new TransactionOutput(new P2PKH().lock(address.toBase58()), 0d));
         size += Writer.varIntNum(transaction.outputs.size() + 1).size();
         size += transaction.toBinary().size();
         for (TransactionInput transactionInput : transaction.inputs) {
