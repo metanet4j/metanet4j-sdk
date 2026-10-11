@@ -143,7 +143,33 @@ public final class TxHelperExtend {
     }
 
     /** P2PKH 锁定脚本的公钥哈希；非 P2PKH 返回空数组。 */
-    private static byte[] pubKeyHashOfP2pkh(Script script) {
+    /**
+     * 取输入的「连接输出」（来源交易的第 0 个输出）；无法取得时返回 {@code null}。
+     *
+     * <p><b>§87 收敛</b>：同一逻辑原在 `RemoteTransactionBuilder`／`RemoteTransactionSigner`／
+     * `OrdinalsTransactionSigner`／`TransactionBuilder` **四处各有一份私有副本**。
+     * 收敛为本处唯一实现后，四个类共用同一判定，**其条件组合只需覆盖一次**；
+     * 亦消除了「改一处、漏三处」的结构性风险（§96／§124／§163 等缺陷皆源于此）。
+     *
+     * <p>三个条件缺一不可：来源交易须是 {@code Transaction}、其 {@code outputs} 非 null、且非空。
+     */
+    public static com.metanet4j.bsv.transaction.TransactionOutput sourceOutputOf(
+            com.metanet4j.bsv.transaction.TransactionInput input) {
+        if (input.sourceTransaction instanceof com.metanet4j.bsv.transaction.Transaction source
+                && source.outputs != null && !source.outputs.isEmpty()) {
+            return source.outputs.get(0);
+        }
+        return null;
+    }
+
+    /**
+     * P2PKH 锁定脚本的公钥哈希；非 P2PKH 返回空数组。
+     *
+     * <p><b>§87 收敛</b>：同一逻辑原在 `RemoteTransactionSigner`／`OrdinalsTransactionSigner`／
+     * `TransactionBuilder` **各有一份私有副本**（且其中有的用的是上游截断版 `Script.getChunks()`）。
+     * 现收敛为本处唯一实现（内部用 {@code ScriptHelper.chunksOf}），三个类改为委托。
+     */
+    public static byte[] pubKeyHashOfP2pkh(Script script) {
         List<ScriptChunk> chunks = com.metanet4j.sdk.utils.ScriptHelper.chunksOf(script);
         if (chunks.size() == 5
                 && chunks.get(0).op == OP.OP_DUP
