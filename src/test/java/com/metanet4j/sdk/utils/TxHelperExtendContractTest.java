@@ -15,6 +15,7 @@ import com.metanet4j.bsv.script.Script;
 import com.metanet4j.bsv.script.ScriptChunk;
 import com.metanet4j.bsv.script.templates.P2PKH;
 import com.metanet4j.bsv.transaction.Transaction;
+import com.metanet4j.bsv.transaction.TransactionInput;
 import com.metanet4j.bsv.transaction.TransactionOutput;
 import com.metanet4j.sdk.TestData;
 import com.metanet4j.sdk.address.AddressEnhance;
@@ -541,4 +542,45 @@ class TxHelperExtendContractTest {
                 "第 2 段长度为 19 时不应判为 P2PKH");
     }
 
+    // ==== sourceOutputOf：按 sourceOutputIndex 取连接输出（R6 修正后的边界用例）====
+    // 背景：该实现曾硬编码 outputs.get(0)，与 attachSourceOutput 把输出固定放 0 号两处"互相掩盖"；
+    // R6 修正为按索引取，**索引边界成为新增的可执行逻辑 ⇒ 按计划第 192 行必须补测试**。
+
+    private static TransactionInput inputWithSource(int sourceOutputIndex, int outputCount) {
+        Transaction source = new Transaction();
+        for (int i = 0; i < outputCount; i++) {
+            source.outputs.add(new TransactionOutput(new Script(), (i + 1) * 1_000d));
+        }
+        TransactionInput input = new TransactionInput("00".repeat(32), sourceOutputIndex, new Script());
+        input.sourceTransaction = source;
+        return input;
+    }
+
+    @Test
+    void sourceOutputOfTakesTheOutputAtTheGivenIndex() {
+        TransactionInput input = inputWithSource(2, 3);
+        assertNotNull(TxHelperExtend.sourceOutputOf(input), "索引有效时应返回对应输出");
+        assertEquals(3_000d, ((Number) TxHelperExtend.sourceOutputOf(input).satoshis).doubleValue(),
+                "应返回**第 2 号**输出的金额（而非 0 号）");
+    }
+
+    @Test
+    void sourceOutputOfReturnsNullWhenIndexIsOutOfBounds() {
+        assertNull(TxHelperExtend.sourceOutputOf(inputWithSource(3, 3)),
+                "索引等于输出个数时应返回 null");
+        assertNull(TxHelperExtend.sourceOutputOf(inputWithSource(99, 3)),
+                "索引远大于输出个数时应返回 null");
+    }
+
+    @Test
+    void sourceOutputOfReturnsNullWhenIndexIsNegative() {
+        assertNull(TxHelperExtend.sourceOutputOf(inputWithSource(-1, 3)),
+                "索引为负时应返回 null");
+    }
+
+    @Test
+    void sourceOutputOfReturnsNullWithoutSourceTransaction() {
+        TransactionInput input = new TransactionInput("00".repeat(32), 0, new Script());
+        assertNull(TxHelperExtend.sourceOutputOf(input), "无 sourceTransaction 时应返回 null");
+    }
 }
