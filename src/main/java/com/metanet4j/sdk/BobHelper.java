@@ -63,7 +63,10 @@ public class BobHelper {
                     }else{
                         //script hash
 
-                        this.put("a", BsvHashBytes.of(script.toUint8Array()).toString());
+                        // BOB 的 e.a 取「脚本身份哈希」的自基线路由约定：旧库 Sha256Hash.toString() 即摘要原样，
+                        // 而 BsvHashBytes.toString() 会再反转一次，故此处必须用 getBytes()（见 §34 的对照实验）。
+                        this.put("a", cn.hutool.core.util.HexUtil.encodeHexStr(
+                                BsvHashBytes.of(script.toUint8Array()).getBytes()));
                     }
                 }
 
