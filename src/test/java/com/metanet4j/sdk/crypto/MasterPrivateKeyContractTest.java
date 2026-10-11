@@ -45,4 +45,26 @@ class MasterPrivateKeyContractTest {
         assertFalse(MasterPrivateKey.fromSeed().toXprv().isEmpty());
         assertFalse(MasterPrivateKey.fromSeed(List.of(), "").toXprv().isEmpty());
     }
+
+    @Test
+    void exposesTheMasterPrivateKeyAndItsSerialisedHex() {
+        // 覆盖 §81 清单 A 中 MasterPrivateKey 的 getMasterPrivateKey 与 toPrivKeyHex。
+        // 入口为 fromSeed(words, passphrase)。这里用 **BIP39 标准测试向量**
+        // （abandon ×11 + about），而非 generateLongWordList()——后者产出的词表**未通过 BIP39 校验**
+        // （实测报 "Mnemonic does not pass the check"），不宜用于需要真实派生的用例。
+        List<String> words = List.of(("abandon abandon abandon abandon abandon abandon "
+                + "abandon abandon abandon abandon abandon about").split(" "));
+        MasterPrivateKey master = MasterPrivateKey.fromSeed(words, "TREZOR");
+
+        assertNotNull(master.getMasterPrivateKey(), "应能取回主私钥");
+        String hex = master.toPrivKeyHex();
+        assertNotNull(hex, "toPrivKeyHex 不应为 null");
+        assertEquals(64, hex.length(), "主私钥应为 32 字节、即 64 位 hex");
+        assertTrue(hex.matches("[0-9a-f]+"), "应为小写 hex");
+
+        // 同一助记词派生的两个实例应给出相同的主私钥与 hex（确定性）
+        MasterPrivateKey again = MasterPrivateKey.fromSeed(words, "TREZOR");
+        assertEquals(hex, again.toPrivKeyHex(), "派生应具确定性");
+    }
+
 }

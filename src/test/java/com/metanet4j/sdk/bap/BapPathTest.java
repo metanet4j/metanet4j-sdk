@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.metanet4j.bsv.compat.HD;
 import com.metanet4j.sdk.crypto.MasterPrivateKey;
 import java.util.List;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -105,4 +106,27 @@ class BapPathTest {
         assertEquals(master.getMasterDeterministicKey().derive("m/0").toPublic().toString(),
                 BapPath.parse("m/0").derive(pub).toString());
     }
+
+    @Test
+    void appendsIndicesAndPathsAndKeepsHashCodeConsistentWithEquals() {
+        // 覆盖 §81 清单 A 中 BapPath 的 append(long)、append(BapPath)、hashCode。
+        BapPath base = BapPath.of(List.of(0L, 1L));
+
+        // append(long)：末段追加一个索引
+        BapPath oneMore = base.append(2L);
+        assertEquals(3, oneMore.size(), "append(long) 应使路径长度加一");
+        assertEquals(2L, oneMore.lastIndex(), "追加的索引应成为末段");
+
+        // append(BapPath)：整段拼接
+        BapPath other = BapPath.of(List.of(3L, 4L));
+        BapPath joined = base.append(other);
+        assertEquals(base.size() + other.size(), joined.size(), "append(BapPath) 应拼接两段长度");
+        assertEquals(other.lastIndex(), joined.lastIndex(), "拼接后末段应来自后者");
+
+        // hashCode 与 equals 一致：等值对象哈希相同，不同对象（通常）不同
+        assertEquals(BapPath.of(List.of(0L, 1L)), base, "同索引列表应相等");
+        assertEquals(BapPath.of(List.of(0L, 1L)).hashCode(), base.hashCode(), "等值对象 hashCode 应相同");
+        assertNotEquals(oneMore.hashCode(), base.hashCode(), "追加后的路径 hashCode 应不同");
+    }
+
 }
