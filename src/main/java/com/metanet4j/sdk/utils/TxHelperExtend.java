@@ -127,10 +127,10 @@ public final class TxHelperExtend {
         if (pubKeyHash.length == 0) {
             return null;
         }
+        // 注意：此处**不设** key == null 分支——提供者（BapProviderKeyBag）在解析不到密钥时
+        // **抛 RuntimeException 而非返回 null**（§132 已确认，BapProviderKeyBagTest 要求该行为），
+        // 故该分支永不成立、属不可达代码，按 §62.4 方案 C 消除。
         PrivateKey key = keyProvider.findKeyFromPubHash(pubKeyHash);
-        if (key == null) {
-            return null;
-        }
         // 把连接输出的锁定脚本作为赎回脚本一并返回：调用方据此重建输入脚本
         // 或校验地址；P2SH 场景下即为赎回脚本本身。
         return RedeemDataExtend.of(key, lockingScript);
