@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.metanet4j.bsv.primitives.Hash;
 import com.metanet4j.bsv.script.OP;
+import com.metanet4j.bsv.primitives.TransactionSignature;
 import com.metanet4j.bsv.script.Script;
 import com.metanet4j.bsv.script.templates.P2PKH;
 import com.metanet4j.sdk.PrivateKey;
@@ -29,6 +30,21 @@ class ScriptExtendContractTest {
     private static final PrivateKey KEY = PrivateKey.of(BigInteger.TWO);
     private static final AddressEnhance KEY_ADDRESS = AddressEnhance.fromPrivateKey(KEY);
     private static final byte[] SIGNATURE = {1, 2, 3};
+
+    @Test
+    void mapsEveryBaseSignatureScopeIncludingNone() {
+        // §91 把 SIGHASH 映射集中到 signOutputsOf；其中 case 2（SIGHASH_NONE）此前从未被任何用例覆盖，
+        // 属正常业务路径上的功能分支缺失（非防御冗余），故此处逐一断言三种基础范围。
+        assertEquals("all", ScriptExtend.signOutputsOf(TransactionSignature.SIGHASH_ALL));
+        assertEquals("none", ScriptExtend.signOutputsOf(TransactionSignature.SIGHASH_NONE));
+        assertEquals("single", ScriptExtend.signOutputsOf(TransactionSignature.SIGHASH_SINGLE));
+
+        // 基础范围须与 ANYONECANPAY／FORKID 位解耦：低位才是基础类型
+        assertEquals("single", ScriptExtend.signOutputsOf(TransactionSignature.SIGHASH_SINGLE
+                | TransactionSignature.SIGHASH_ANYONECANPAY | TransactionSignature.SIGHASH_FORKID));
+        assertEquals("none", ScriptExtend.signOutputsOf(TransactionSignature.SIGHASH_NONE
+                | TransactionSignature.SIGHASH_ANYONECANPAY));
+    }
 
     @Test
     void estimatesSpendSizeForCommonAndOrdinalScripts() {
