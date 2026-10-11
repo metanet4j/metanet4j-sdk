@@ -214,10 +214,6 @@ public class BapBase extends MasterKeyBapBase {
         return childNumbers.derive(masterPrivateKey.getMasterDeterministicKey());
     }
 
-    private HD getDeterministicKey(BapPath childNumbers) {
-        return deriveBapId(childNumbers);
-    }
-
     public String encryptSelf() {
         try {
             // 显式校验加密路径：BapPath.parse(null) 会把 null 当根路径而**静默成功**，
