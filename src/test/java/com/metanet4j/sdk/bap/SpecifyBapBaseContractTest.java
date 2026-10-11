@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.metanet4j.sdk.PrivateKey;
 import com.metanet4j.sdk.PublicKey;
-import io.bitcoinsv.bitcoinjsv.core.ECKeyLite;
 import java.math.BigInteger;
 import org.junit.jupiter.api.Test;
 
@@ -14,13 +13,13 @@ class SpecifyBapBaseContractTest {
 
     @Test
     void constructorOverloadsKeepTheSelectedKeysAndIdentity() {
-        ECKeyLite sign = key(2);
-        ECKeyLite root = key(3);
-        ECKeyLite previous = key(4);
-        ECKeyLite encryption = key(5);
-        ECKeyLite payment = key(6);
-        ECKeyLite ord = key(7);
-        PublicKey friend = new PrivateKey(key(8)).getPublicKey();
+        PrivateKey sign = key(2);
+        PrivateKey root = key(3);
+        PrivateKey previous = key(4);
+        PrivateKey encryption = key(5);
+        PrivateKey payment = key(6);
+        PrivateKey ord = key(7);
+        PublicKey friend = key(8).getPublicKey();
 
         SpecifyBapBase basic = new SpecifyBapBase(sign, root, "identity", "app");
         assertEquals(sign, basic.getCurrentPrivateKey());
@@ -48,8 +47,8 @@ class SpecifyBapBaseContractTest {
 
     @Test
     void keyBagFindsPaymentAndOrdByHashOrPublicKey() {
-        ECKeyLite payment = key(6);
-        ECKeyLite ord = key(7);
+        PrivateKey payment = key(6);
+        PrivateKey ord = key(7);
         SpecifyBapBase identity = new SpecifyBapBase(key(2), payment, key(5), key(3),
                 "identity", ord, "app");
         SpecifyBapBase.SpecifyProviderKeyBag bag = new SpecifyBapBase.SpecifyProviderKeyBag(identity);
@@ -61,7 +60,8 @@ class SpecifyBapBaseContractTest {
         assertNull(bag.findRedeemDataFromScriptHash(new byte[20]));
     }
 
-    private static ECKeyLite key(long value) {
-        return ECKeyLite.fromPrivate(BigInteger.valueOf(value));
+    /** 由标量构造新 SDK 私钥（旧 ECKeyLite.fromPrivate 的等价入口）。 */
+    private static PrivateKey key(long value) {
+        return PrivateKey.of(BigInteger.valueOf(value));
     }
 }
