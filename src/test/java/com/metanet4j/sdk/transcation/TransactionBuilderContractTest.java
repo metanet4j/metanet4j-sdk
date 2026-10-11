@@ -144,6 +144,35 @@ class TransactionBuilderContractTest {
     }
 
     @Test
+    void amountAndSizeHelpersTolerateMissingOrNonNumericFields() {
+        // 覆盖 §95 所列 TransactionBuilder 的若干 null／类型兜底（套路①：传坏输入）：
+        //   :289 outputSize —— 输出锁定脚本为 null 时按 0 字节脚本计；
+        //   :303 lockingScriptOf —— 无连接输出、或连接输出无锁定脚本时返回空脚本；
+        //   :309—312 satoshisOf —— 无连接输出、或 satoshis 非 Number 时返回 null；
+        //   :333 inputSum —— 上面返回 null 时按 0 计；
+        //   :342 outputSum —— 输出 satoshis 非 Number 时按 0 计。
+        // 这几处**互为上下游**，故用一笔"字段残缺"的交易一次走通：金额合计与体积估算的入口是 getFee()。
+        TransactionBuilder builder = new TransactionBuilder(bap, keyProvider);
+
+        // 输入：无来源交易（既无连接输出、也无锁定脚本可解析）
+        builder.getTargetTransaction().inputs.add(new TransactionInput(
+                new BsvHashBytes(new byte[32]).toString(), 0, new Script()));
+
+        // 输出①：锁定脚本为 null（走 outputSize 的空脚本兜底）
+        builder.getTargetTransaction().outputs.add(
+                new com.metanet4j.bsv.transaction.TransactionOutput(null, 0d));
+
+        // 输出②：satoshis 不是 Number（走 outputSum 的非数字兜底）
+        com.metanet4j.bsv.transaction.TransactionOutput nonNumeric =
+                new com.metanet4j.bsv.transaction.TransactionOutput(new Script(), 0d);
+        nonNumeric.satoshis = com.metanet4j.bsv.primitives.Undefined.INSTANCE;
+        builder.getTargetTransaction().outputs.add(nonNumeric);
+
+        BsvAmount fee = builder.getFee();
+        assertNotNull(fee, "字段残缺时费用估算应给出结果（各兜底生效），而非抛错");
+    }
+
+    @Test
     void prepareInputsRejectsNullProviderAndToleratesUnusableInputs() {
         // 覆盖 §95 所列 TransactionBuilder 的三处（:`246—247`、`:253—254`、`:174—181`）。
         // prepareInputsForSigning 是 protected，而本测试类与之**同包**，故可直接调用。
