@@ -328,4 +328,55 @@ class ScriptExtendContractTest {
                 "公钥长度既非 33 也非 65 时不应判为 P2PK");
     }
 
+
+    @Test
+    void walksEveryConditionOfEachPredicateIndividually() {
+        // §98 的方法：对多条件合取，**每个 `&&` 都要有"前面条件为真、本条为假"的样本**，
+        // 否则该条的短路右侧永不被求值。上一批覆盖了"长度／尾段不符"，本批覆盖**首段、次段与末段**。
+        byte[] h20 = new byte[20];
+        java.util.Arrays.fill(h20, (byte) 7);
+
+        // ① isSentToAddress：段数 5、其余皆对，但**第 0 段不是 OP_DUP**
+        byte[] bad0 = p2pkhBytes(); bad0[0] = 0x51;                 // OP_1
+        assertFalse(ScriptExtend.isSentToAddress(Script.fromBinary(bad0)), "第 0 段不符应判否");
+
+        // ② 同前，但**第 1 段不是 OP_HASH160**
+        byte[] bad1 = p2pkhBytes(); bad1[1] = 0x51;
+        assertFalse(ScriptExtend.isSentToAddress(Script.fromBinary(bad1)), "第 1 段不符应判否");
+
+        // ③ 同前，但**第 4 段不是 OP_CHECKSIG**（前四条皆真、仅末条假）
+        byte[] bad4 = p2pkhBytes(); bad4[24] = 0x51;
+        assertFalse(ScriptExtend.isSentToAddress(Script.fromBinary(bad4)), "第 4 段不符应判否");
+
+        // ④ isPayToScriptHash：段数 3、第 1 段长度对，但**第 0 段不是 OP_HASH160**
+        byte[] badHash = p2shBytes(); badHash[0] = 0x51;
+        assertFalse(ScriptExtend.isPayToScriptHash(Script.fromBinary(badHash)), "第 0 段不符应判否");
+
+        // ⑤ isSentToRawPubKey：段数 2、长度合规，但**第 1 段不是 OP_CHECKSIG**
+        byte[] pk33 = new byte[33]; pk33[0] = 0x02; java.util.Arrays.fill(pk33, 1, 33, (byte) 3);
+        byte[] badTail = new byte[1 + 33 + 1];
+        badTail[0] = 0x21; System.arraycopy(pk33, 0, badTail, 1, 33); badTail[34] = 0x51;
+        assertFalse(ScriptExtend.isSentToRawPubKey(Script.fromBinary(badTail)), "第 1 段不符应判否");
+
+        // ⑥ isStandardPubKey 的两侧：33 与 65 字节**各自为真**（经 P2PK 判定间接走到）
+        byte[] pk65 = new byte[65]; pk65[0] = 0x04;
+        java.util.Arrays.fill(pk65, 1, 65, (byte) 4);
+        byte[] ok33 = new byte[1 + 33 + 1];
+        ok33[0] = 0x21; System.arraycopy(pk33, 0, ok33, 1, 33); ok33[34] = (byte) 0xac;
+        byte[] ok65 = new byte[1 + 65 + 1];
+        ok65[0] = 0x41; System.arraycopy(pk65, 0, ok65, 1, 65); ok65[66] = (byte) 0xac;
+        assertTrue(ScriptExtend.isSentToRawPubKey(Script.fromBinary(ok33)), "33 字节公钥应被接受");
+        assertTrue(ScriptExtend.isSentToRawPubKey(Script.fromBinary(ok65)), "65 字节公钥应被接受");
+
+        // ⑦ isSentToMultiSig：首段越**上界**（> OP_16）——与 §255 的 OP_0（越下界）合成 `||` 的两侧
+        byte[] overMax = new byte[1 + 34 + 34 + 1 + 1];
+        int i = 0;
+        overMax[i++] = 0x61;                                        // OP_17（超出 OP_16）
+        overMax[i++] = 0x21; System.arraycopy(pk33, 0, overMax, i, 33); i += 33;
+        overMax[i++] = 0x21; System.arraycopy(pk33, 0, overMax, i, 33); i += 33;
+        overMax[i++] = 0x52; overMax[i] = (byte) 0xae;
+        assertFalse(ScriptExtend.isSentToMultiSig(Script.fromBinary(overMax)),
+                "应签名数超出 OP_16 时应判否");
+    }
+
 }
