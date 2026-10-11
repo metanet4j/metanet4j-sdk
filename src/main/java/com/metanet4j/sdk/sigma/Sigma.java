@@ -410,7 +410,17 @@ public class Sigma implements PreSignHash {
             return bytes.length == 32 ? bytes : new BsvHashBytes(bytes).getBytes();
         }
         if (sourceTXID instanceof String text) {
-            return BsvHashBytes.fromDisplayHex(text).getBytes();
+            // 【基线直跑取证】基线 Sigma.getInputHashByVin 用的是
+            //     input.getOutpoint().getHash().getBytes()
+            // 而旧库中该 getBytes() 与 toString() 输出**相同**（即**显示序**，不反转）。
+            // 实测（670ee3d 直跑）：基线 outpoint 首 32 字节 = 5322ddd0…e0e1（显示序原样）。
+            // 故此处必须按显示序**原样**解码，不能经 fromDisplayHex 再取 getBytes()（那会反转成内部序），
+            // 否则整个 inputHash 不同、历史签名校验必然失败（SIGMA-VERIFY-001）。
+            byte[] out = new byte[text.length() / 2];
+            for (int i = 0; i < out.length; i++) {
+                out[i] = (byte) Integer.parseInt(text.substring(i * 2, i * 2 + 2), 16);
+            }
+            return out;
         }
         if (sourceTXID instanceof List<?> list) {
             byte[] bytes = new byte[list.size()];
