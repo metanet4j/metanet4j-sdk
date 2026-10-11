@@ -194,6 +194,11 @@ class TxHelperExtendContractTest {
         assertNull(TxHelperExtend.getConnectedRedeemDataExtend(
                         null, new BapBase.BapProviderKeyBag(bap)),
                 "连接输出为空时应返回 null 而非抛错");
+        // 输出非空但其锁定脚本为 null → 覆盖 || 右侧为真的分支
+        assertNull(TxHelperExtend.getConnectedRedeemDataExtend(
+                        new com.metanet4j.bsv.transaction.TransactionOutput(null, 1d),
+                        new BapBase.BapProviderKeyBag(bap)),
+                "锁定脚本为空时应返回 null 而非抛错");
     }
 
     @Test
@@ -263,6 +268,41 @@ class TxHelperExtendContractTest {
             }
             assertFalse(TxHelperExtend.isSentToOrdinals(script), "第 " + slot + " 段被破坏后不应判为铭文");
         }
+
+        // 第 2 段改为纯操作码（dataOf 为 null）→ 覆盖 dataOf(...) != null 为假的一侧
+        Script noHashSlot = new Script();
+        for (int i = 0; i < 13; i++) {
+            switch (i) {
+                case 0 -> noHashSlot.writeOpCode(OP.OP_DUP);
+                case 1 -> noHashSlot.writeOpCode(OP.OP_HASH160);
+                case 2 -> noHashSlot.writeOpCode(OP.OP_1);
+                case 3 -> noHashSlot.writeOpCode(OP.OP_EQUALVERIFY);
+                case 4 -> noHashSlot.writeOpCode(OP.OP_CHECKSIG);
+                case 5 -> noHashSlot.writeOpCode(OP.OP_0);
+                case 6 -> noHashSlot.writeOpCode(OP.OP_IF);
+                case 7 -> noHashSlot.writeBin(ord);
+                case 8 -> noHashSlot.writeOpCode(OP.OP_1);
+                case 9 -> noHashSlot.writeBin(payload);
+                case 10 -> noHashSlot.writeOpCode(OP.OP_0);
+                case 11 -> noHashSlot.writeBin(payload);
+                default -> noHashSlot.writeOpCode(OP.OP_ENDIF);
+            }
+        }
+        assertFalse(TxHelperExtend.isSentToOrdinals(noHashSlot), "第 2 段无数据时不应判为铭文");
+
+        // 第 2 段数据长度为 19（≠20）→ 覆盖 length == ADDRESS_LENGTH 为假的一侧
+        List<Integer> hash19 = new ArrayList<>();
+        for (int i = 0; i < 19; i++) {
+            hash19.add(9);
+        }
+        Script shortHash = new Script();
+        shortHash.writeOpCode(OP.OP_DUP).writeOpCode(OP.OP_HASH160).writeBin(hash19)
+                .writeOpCode(OP.OP_EQUALVERIFY).writeOpCode(OP.OP_CHECKSIG)
+                .writeOpCode(OP.OP_0).writeOpCode(OP.OP_IF).writeBin(ord)
+                .writeOpCode(OP.OP_1).writeBin(payload)
+                .writeOpCode(OP.OP_0).writeBin(payload)
+                .writeOpCode(OP.OP_ENDIF);
+        assertFalse(TxHelperExtend.isSentToOrdinals(shortHash), "公钥哈希长度为 19 时不应判为铭文");
 
         // 第 7 段数据不是 "ord" → 覆盖 Arrays.equals 为假的一侧
         Script wrongTag = new Script();
