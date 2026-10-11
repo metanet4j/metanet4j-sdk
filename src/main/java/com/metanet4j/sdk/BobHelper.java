@@ -132,7 +132,9 @@ public class BobHelper {
         int preCellLastItemIndex = 0;
         // Record the index of the current cell item in the same cell, starting from 0
         int currentCellItemIndex = 0;
+        boolean cellAdded = false;
         for (int j = 0; j < chunks.size(); j++) {
+            cellAdded = false;
 
 
             Map<String, Object> cellItem = new LinkedHashMap<>();
@@ -144,6 +146,7 @@ public class BobHelper {
                 cellItem.put("i", currentCellItemIndex);
                 cellItem.put("ii", globalCellItemIndex);
                 globalCellItems.add(cellItem);
+                cellAdded = true;
             }
 
             // 注意：此处**不得**再加 `|| op == OP_0`——OP_0(OP_FALSE) 已由上一个 if 分支处理，
@@ -154,6 +157,7 @@ public class BobHelper {
                 cellItem.put("i", currentCellItemIndex);
                 cellItem.put("ii", globalCellItemIndex);
                 globalCellItems.add(cellItem);
+                cellAdded = true;
 
                 // begin with op_return or op_false op_return
                 if (scriptChunk.op == OP.OP_RETURN && globalCellItemIndex<=1) {
@@ -205,6 +209,7 @@ public class BobHelper {
                 cellItem.put("i", currentCellItemIndex);
                 cellItem.put("ii", globalCellItemIndex);
                 globalCellItems.add(cellItem);
+                cellAdded = true;
 
                 if (data.equals(spilter)) {
                     Map<String, Object> tapeItem = new LinkedHashMap<>();
@@ -218,13 +223,13 @@ public class BobHelper {
                     currentCellItemIndex = -1;
                     tapeItems.add(tapeItem);
                 }
-                // 只在真正加入 cell 后自增：globalCellItemIndex 是 globalCellItems 的
-                // 0 基下标（切片处用 +1），必须与列表同步；旧实现按 chunk 自增，
-                // 遇到非推送 chunk（如纯操作码输入）会令索引超过列表长度而越界。
-                globalCellItemIndex++;
             }
 
             currentCellItemIndex++;
+            if (cellAdded) {
+                globalCellItemIndex++;
+            }
+            cellAdded = false;
 
         }
         // Process the last tape
