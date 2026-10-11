@@ -98,6 +98,22 @@ class RemoteTransactionContractTest {
     }
 
     @Test
+    void remoteBuilderSkipsLocalSigningPreparation() {
+        // 覆盖 RemoteTransactionBuilder 对两参 prepareInputsForSigning 的 **no-op 覆盖**（§76）：
+        // 该覆盖用空实现表达「远程签名由 RemoteTransactionSigner 回填」的设计意图，
+        // 故其契约是「可被调用、且不触碰交易」。本测试类与本类同包，可直接访问 protected 成员。
+        RemoteTransactionBuilder builder = new RemoteTransactionBuilder(remoteBap, keyProvider);
+        builder.addInput(paymentUtxo(1));
+        Transaction target = builder.getTargetTransaction();
+        List<Integer> before = target.toBinary();
+
+        assertDoesNotThrow(() -> builder.prepareInputsForSigning(target, keyProvider),
+                "远程构建器的准备步骤应为 no-op，不得抛错");
+
+        assertEquals(before, target.toBinary(), "no-op 覆盖不应改动交易");
+    }
+
+    @Test
     void treatsAnOutputWithoutLockingScriptAsAnEmptyScript() {
         // 覆盖 RemoteTransactionBuilder 中 `sourceOutput.lockingScript == null ? new Script() : ...`
         // 的空值兜底侧（与 §148 处理 OrdTransactionBuilder 的同名模式一致）。
