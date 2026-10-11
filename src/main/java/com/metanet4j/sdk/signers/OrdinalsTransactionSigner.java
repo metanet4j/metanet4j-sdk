@@ -66,7 +66,14 @@ public class OrdinalsTransactionSigner {
             log.warn("when signInput,script is neither P2PKH nor ordinal inscription, skip input {}", inputIndex);
             return false;
         }
-        com.metanet4j.sdk.PrivateKey key = keyProvider == null ? null : keyProvider.findKeyFromPubHash(pubKeyHash);
+        // 提供者可能以抛错表示「找不到」（见 BapProviderKeyBag）；与 key == null 同样处理
+        // （本地密钥缺失即该输入签名失败），避免把原始 RuntimeException 抛给调用方。
+        com.metanet4j.sdk.PrivateKey key;
+        try {
+            key = keyProvider == null ? null : keyProvider.findKeyFromPubHash(pubKeyHash);
+        } catch (RuntimeException e) {
+            key = null;
+        }
         if (key == null) {
             log.warn("No local key found for input {}", inputIndex);
             return false;

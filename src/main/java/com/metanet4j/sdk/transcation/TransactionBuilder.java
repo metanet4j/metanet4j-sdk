@@ -172,7 +172,14 @@ public class TransactionBuilder {
         byte[] pubKeyHash = pubKeyHashWithOrdinalsFallback(script);
         int pubKeyLen = -1;
         if (keyProvider != null && pubKeyHash.length > 0) {
-            com.metanet4j.sdk.PrivateKey key = keyProvider.findKeyFromPubHash(pubKeyHash);
+            // 提供者可能以抛错表示「找不到」（见 BapProviderKeyBag）；费用估算不应因此中断，
+            // 视同「取不到密钥」走保守估算（与 pubKeyLen<=0 的既有口径一致）。
+            com.metanet4j.sdk.PrivateKey key;
+            try {
+                key = keyProvider.findKeyFromPubHash(pubKeyHash);
+            } catch (RuntimeException e) {
+                key = null;
+            }
             if (key != null) {
                 pubKeyLen = key.getPubKey().length;
             }
