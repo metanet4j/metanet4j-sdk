@@ -139,4 +139,22 @@ class BapBaseLifecycleTest {
         assertEquals("BAP 身份加密失败", error.getMessage());
         assertNotNull(error.getCause());
     }
+
+    @Test
+    void selfExportAlsoRejectsABlankEncryptionPath() {
+        // 同一处判断的另一侧：`encryptPath == null || encryptPath.isBlank()`——
+        // 上一个用例用 null 覆盖了左侧，本用例用**纯空白串**覆盖右侧（真实可达：
+        // 配置里写了空格与没写，对调用方是同一种"没配"）。
+        DefaultBapBaseConfig config = new DefaultBapBaseConfig() {
+            @Override
+            public String getDefaultEncryptPath() {
+                return "   ";
+            }
+        };
+        BapBase bap = BapBase.fromOnlyMasterPrivateKey(TestData.masterPrivateKey, config);
+
+        IllegalStateException error = assertThrows(IllegalStateException.class, bap::encryptSelf);
+        assertEquals("BAP 身份加密失败", error.getMessage());
+        assertNotNull(error.getCause());
+    }
 }
