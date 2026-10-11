@@ -89,6 +89,24 @@ class SignerTransactionContractTest {
     }
 
     @Test
+    void singleInputSigningSkipsUnrecognizableScripts() {
+        // 覆盖 §90.2 列的 OrdinalsTransactionSigner 两处（套路①/③）：
+        //   :57 连接输出**无锁定脚本** → 按空脚本处理；
+        //   :62—67 空脚本既非 P2PKH 也非 Ordinals 铭文 → **返回 false**（跳过该输入，而非抛错）。
+        Transaction tx = new Transaction();
+        TransactionInput input = new TransactionInput(
+                new BsvHashBytes(new byte[32]).toString(), 0, new Script());
+        Transaction source = new Transaction();
+        source.outputs.add(new com.metanet4j.bsv.transaction.TransactionOutput(null, 1d));
+        input.sourceTransaction = source;
+        tx.inputs.add(input);
+
+        assertFalse(OrdinalsTransactionSigner.signInput(tx, 0, keyProvider,
+                        TransactionSignature.SIGHASH_ALL, false),
+                "既非 P2PKH 也非铭文的脚本应返回 false 而非抛错");
+    }
+
+    @Test
     void singleInputSigningRejectsNullTransactionAndOutOfRangeIndex() {
         // 覆盖 §82 清单收口后仍余的三条件守卫（§240 查明剩余缺口以健壮性分支为主）：
         //     if (tx == null || inputIndex < 0 || inputIndex >= tx.inputs.size()) throw new SignErrorException(…)
