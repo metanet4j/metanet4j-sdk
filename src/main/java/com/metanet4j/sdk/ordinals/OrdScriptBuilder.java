@@ -30,10 +30,13 @@ public class OrdScriptBuilder {
             ORDMap metaData) {
 
         Script inscriptionAsm = new Script();
+        // 复制 P2PKH 前缀：推送 chunk 必须整体写入（writeBin 自带长度前缀），
+        // 若先 writeOpCode(chunk.op) 再 writeBin(data) 会多出一个长度前缀与一个 chunk。
         for (var chunk : new P2PKH().lock(destinationAddress.toBase58()).getChunks()) {
-            inscriptionAsm.writeOpCode(chunk.op);
-            if (chunk.data != null) {
+            if (chunk.data != null && !chunk.data.isEmpty()) {
                 inscriptionAsm.writeBin(chunk.data);
+            } else {
+                inscriptionAsm.writeOpCode(chunk.op);
             }
         }
 
