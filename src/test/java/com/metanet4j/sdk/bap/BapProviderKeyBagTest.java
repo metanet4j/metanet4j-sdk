@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.metanet4j.sdk.TestData;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import org.junit.jupiter.api.Test;
 
 class BapProviderKeyBagTest {
@@ -44,4 +45,14 @@ class BapProviderKeyBagTest {
         assertEquals(bap.getCurrentPrivateKey().getKey().toHex(),
                 bag.findKeyFromPubKey(bap.getCurrentPrivateKey().getPubKey()).getKey().toHex(), "新 SDK 私钥类型无 equals，比对 32 字节 hex");
     }
+
+    @Test
+    void exposesTheWrappedBapBase() {
+        // 覆盖 §82 清单中的 BapProviderKeyBag.getBapBase（简单访问器：回传被包装的 BapBase）。
+        BapBase owner = BapBase.fromOnlyMasterPrivateKey(TestData.masterPrivateKey);
+        BapBase.BapProviderKeyBag bag = new BapBase.BapProviderKeyBag(owner);
+
+        assertSame(owner, bag.getBapBase(), "getBapBase 应原样回传被包装的 BapBase");
+    }
+
 }
