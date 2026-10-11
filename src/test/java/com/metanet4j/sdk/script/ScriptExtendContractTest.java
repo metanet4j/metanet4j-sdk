@@ -223,10 +223,16 @@ class ScriptExtendContractTest {
         assertFalse(ScriptExtend.isSentToMultiSig(Script.fromBinary(badRequired)),
                 "应签名数不在 OP_1..OP_16 内时应判否");
 
-        // ② 倒数第二段（公钥数）越出 OP_1..OP_16
+        // ② 倒数第二段（公钥数）越出 OP_1..OP_16 —— **越下界**（OP_0）
+        // 【索引修正 §286】原写作 `badTotal[2 + 34 + 34]` = 下标 **70**，而脚本布局是
+        //   0:OP_m | 1..34:push33 | 35..68:push33 | 69:OP_n | 70:OP_CHECKMULTISIG
+        // 故下标 70 其实是**末段的 OP_CHECKMULTISIG**——那样脚本会先被"末段必须是 CHECKMULTISIG"
+        // 挡下，**根本走不到本处要测的范围检查**（这正是"写了样本≠样本走到了目标"）。
+        // 公钥数在下标 **1 + 34 + 34 = 69**。
         byte[] badTotal = badRequired.clone();
         badTotal[0] = 0x52;                                        // 首段改回合法
-        badTotal[2 + 34 + 34] = 0x00;                              // ← 公钥数位置改 OP_0
+        badTotal[1 + 34 + 34] = 0x00;                              // ← 公钥数位置改 OP_0
+        assertEquals((byte) 0xae, badTotal[70], "末段应仍为 OP_CHECKMULTISIG（否则样本走不到范围检查）");
         assertFalse(ScriptExtend.isSentToMultiSig(Script.fromBinary(badTotal)),
                 "公钥数不在 OP_1..OP_16 内时应判否");
 
