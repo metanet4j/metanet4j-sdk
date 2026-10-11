@@ -19,8 +19,9 @@ import com.metanet4j.sdk.context.PreSignHashContext;
 import com.metanet4j.sdk.crypto.Ecies;
 import com.metanet4j.sdk.remote.PreSignHashUtils;
 import com.metanet4j.sdk.remote.RemoteSignType;
-import io.bitcoinsv.bitcoinjsv.core.ECKeyLite;
-import io.bitcoinsv.bitcoinjsv.script.ScriptChunk;
+import com.metanet4j.bsv.script.ScriptChunk;
+import com.metanet4j.sdk.utils.ScriptHelper;
+import com.metanet4j.sdk.PrivateKey;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -37,8 +38,8 @@ class BsocialDataLockBuilderContractTest {
     private static final String MAP_PROTOCOL = "1PuQa7K62MiKCtssSLKy1kh56WWU7MtUR5";
 
     private final SpecifyBapBase bap = new SpecifyBapBase(
-            ECKeyLite.fromPrivate(BigInteger.TWO), ECKeyLite.fromPrivate(BigInteger.valueOf(3)),
-            ECKeyLite.fromPrivate(BigInteger.valueOf(4)), "identity", "unit-app");
+            PrivateKey.of(BigInteger.TWO), PrivateKey.of(BigInteger.valueOf(3)),
+            PrivateKey.of(BigInteger.valueOf(4)), "identity", "unit-app");
 
     @AfterEach
     void clearRemoteSignatures() {
@@ -53,17 +54,17 @@ class BsocialDataLockBuilderContractTest {
 
         BsocialDataLockBuilder first = new BsocialDataLockBuilder(bap).buildPost(List.of(content));
         assertArrayEquals(plainText,
-                Ecies.decrypt(first.getLockingScript().getChunks().get(3).data(), bap.getEncryptKey(), null));
+                Ecies.decrypt(ScriptHelper.getPushData(first.getLockingScript().getChunks().get(3)), bap.getEncryptKey().getKey(), null));
         assertEquals("application/bitcoin-ecies; content-type=text/plain",
-                new String(first.getLockingScript().getChunks().get(4).data(), StandardCharsets.UTF_8));
+                new String(ScriptHelper.getPushData(first.getLockingScript().getChunks().get(4)), StandardCharsets.UTF_8));
         assertEquals("text/plain", content.getContentType());
         assertArrayEquals(plainText, content.getByteBuffer().array());
 
         BsocialDataLockBuilder second = new BsocialDataLockBuilder(bap).buildPost(List.of(content));
         assertEquals("application/bitcoin-ecies; content-type=text/plain",
-                new String(second.getLockingScript().getChunks().get(4).data(), StandardCharsets.UTF_8));
+                new String(ScriptHelper.getPushData(second.getLockingScript().getChunks().get(4)), StandardCharsets.UTF_8));
         assertArrayEquals(plainText,
-                Ecies.decrypt(second.getLockingScript().getChunks().get(3).data(), bap.getEncryptKey(), null));
+                Ecies.decrypt(ScriptHelper.getPushData(second.getLockingScript().getChunks().get(3)), bap.getEncryptKey().getKey(), null));
     }
 
     @Test
@@ -147,10 +148,10 @@ class BsocialDataLockBuilderContractTest {
         BsocialDataLockBuilder builder = new BsocialDataLockBuilder(bap).buildPost(List.of(binary));
         List<ScriptChunk> chunks = builder.getLockingScript().getChunks();
         assertEquals(12, chunks.size());
-        assertArrayEquals(payload, chunks.get(3).data());
-        assertEquals("application/octet-stream", new String(chunks.get(4).data(), StandardCharsets.UTF_8));
-        assertEquals("|", new String(chunks.get(5).data(), StandardCharsets.UTF_8));
-        assertEquals(MAP_PROTOCOL, new String(chunks.get(6).data(), StandardCharsets.UTF_8));
+        assertArrayEquals(payload, ScriptHelper.getPushData(chunks.get(3)));
+        assertEquals("application/octet-stream", new String(ScriptHelper.getPushData(chunks.get(4)), StandardCharsets.UTF_8));
+        assertEquals("|", new String(ScriptHelper.getPushData(chunks.get(5)), StandardCharsets.UTF_8));
+        assertEquals(MAP_PROTOCOL, new String(ScriptHelper.getPushData(chunks.get(6)), StandardCharsets.UTF_8));
     }
 
     @Test
@@ -180,11 +181,11 @@ class BsocialDataLockBuilderContractTest {
         content.setEncrypted(true);
         content.setByteBuffer(ByteBuffer.wrap(ciphertext));
         BsocialDataLockBuilder builder = new BsocialDataLockBuilder(external).buildPost(List.of(content));
-        assertArrayEquals(ciphertext, builder.getLockingScript().getChunks().get(3).data());
+        assertArrayEquals(ciphertext, ScriptHelper.getPushData(builder.getLockingScript().getChunks().get(3)));
         assertArrayEquals(plaintext,
-                Ecies.decrypt(builder.getLockingScript().getChunks().get(3).data(), bap.getEncryptKey(), null));
+                Ecies.decrypt(ScriptHelper.getPushData(builder.getLockingScript().getChunks().get(3)), bap.getEncryptKey().getKey(), null));
         assertEquals("application/bitcoin-ecies; content-type=text/plain",
-                new String(builder.getLockingScript().getChunks().get(4).data(), StandardCharsets.UTF_8));
+                new String(ScriptHelper.getPushData(builder.getLockingScript().getChunks().get(4)), StandardCharsets.UTF_8));
     }
 
     @Test
@@ -206,7 +207,7 @@ class BsocialDataLockBuilderContractTest {
         PreSignHashUtils.setPreSignHashContext(request);
         remote.sign();
         List<ScriptChunk> chunks = remote.getLockingScript().getChunks();
-        String signature = Base64.getEncoder().encodeToString(chunks.getLast().data());
+        String signature = Base64.getEncoder().encodeToString(ScriptHelper.getPushData(chunks.getLast()));
         byte[] message = ("j" + B_PROTOCOL + "正文text/plain|" + MAP_PROTOCOL
                 + "SETappunit-apptypepost|").getBytes(StandardCharsets.UTF_8);
         assertTrue(AipHelper.verifySign(bap.getCurrentAddress().toBase58(), signature, message));
@@ -249,13 +250,13 @@ class BsocialDataLockBuilderContractTest {
         List<String> expected = new ArrayList<>(List.of(MAP_PROTOCOL, "SET", "app", "unit-app", "type", type));
         expected.addAll(Arrays.asList(extension));
         assertEquals(expected, fields(builder));
-        assertEquals(0, builder.getLockingScript().getChunks().get(0).opcode);
-        assertEquals(0x6a, builder.getLockingScript().getChunks().get(1).opcode);
+        assertEquals(0, builder.getLockingScript().getChunks().get(0).op);
+        assertEquals(0x6a, builder.getLockingScript().getChunks().get(1).op);
     }
 
     private static List<String> fields(BsocialDataLockBuilder builder) {
         return builder.getLockingScript().getChunks().stream().skip(2)
-                .map(chunk -> new String(chunk.data(), StandardCharsets.UTF_8)).toList();
+                .map(chunk -> new String(ScriptHelper.getPushData(chunk), StandardCharsets.UTF_8)).toList();
     }
 
     private static Bsocial social(MAP... maps) {
