@@ -388,16 +388,6 @@ public class Sigma implements PreSignHash {
     }
 
     /** 金额字段可能是 {@code Undefined}、数字或字符串。 */
-    private static long satoshisOf(Object satoshis) {
-        if (satoshis instanceof Number number) {
-            return number.longValue();
-        }
-        if (satoshis instanceof String text && !text.isEmpty()) {
-            return Long.parseLong(text);
-        }
-        return 0L;
-    }
-
     /** {@code sourceTXID} 可能是 hex 串、字节数组或字节列表；统一取内部字节序（与旧 getHash().getBytes() 一致）。 */
     private static byte[] sourceTxidBytes(Object sourceTXID) {
         if (sourceTXID == null) {
