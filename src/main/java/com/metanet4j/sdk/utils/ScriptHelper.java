@@ -89,7 +89,9 @@ public class ScriptHelper {
             if (op == 0) {
                 out.add(new ScriptChunk(OP.OP_0));
                 continue;
-            } else if (op >= 1 && op <= 75) {
+            // op == 0 已被上面的分支捕获，故此处 op 必 >= 1（op 为无符号字节）——
+            // 原条件中的 op >= 1 冗余且其假侧不可达（§62.4 方案 C 消除）。
+            } else if (op <= 75) {
                 len = op;
             } else if (op == 76) {
                 if (i >= raw.length) break;
