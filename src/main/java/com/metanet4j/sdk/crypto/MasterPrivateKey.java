@@ -55,7 +55,10 @@ public class MasterPrivateKey {
     }
 
     public static MasterPrivateKey fromSeed() {
-        return fromSeed(generateWordList(), "");
+        // 无参入口即「生成随机钱包」：必须用能产出**合法** BIP39 助记词（含校验和）的
+        // Mnemonic.fromRandom()，而不是 generateWordList()（后者只随机抽词、无校验和，
+        // 交给 Mnemonic.fromString 必然抛 "does not pass the check"）。
+        return new MasterPrivateKey(HD.fromSeed(Mnemonic.fromRandom().toSeed("")));
     }
 
     public static MasterPrivateKey fromSeed(String seed) {
@@ -64,7 +67,8 @@ public class MasterPrivateKey {
 
     public static MasterPrivateKey fromSeed(List<String> wordList, String salt) {
         if (CollectionUtil.isEmpty(wordList)) {
-            wordList = generateWordList();
+            // 空列表按约定「生成随机钱包」，同样需要合法助记词（见 fromSeed() 的说明）。
+            return new MasterPrivateKey(HD.fromSeed(Mnemonic.fromRandom().toSeed(salt)));
         }
         List<Integer> seed = Mnemonic.fromString(String.join(Bip39WordlistEn.SPACE, wordList))
                 .toSeed(salt);

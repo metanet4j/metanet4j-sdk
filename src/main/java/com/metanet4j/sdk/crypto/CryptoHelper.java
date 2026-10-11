@@ -35,11 +35,13 @@ public final class CryptoHelper {
 
     public static CryptoBase generateRootCryptoBase(List<String> wordList, String salt,
                                                     BsvNetwork parameters) throws InvalidKeyException {
-        if (CollectionUtil.isEmpty(wordList)) {
-            wordList = generateWordList();
-        }
-        HD master = HD.fromSeed(Mnemonic.fromString(
-                String.join(Bip39WordlistEn.SPACE, wordList)).toSeed(salt));
+        // 空列表按约定生成随机钱包：必须用能产出**合法** BIP39 助记词（含校验和）的
+        // Mnemonic.fromRandom()，而非 generateWordList()（只随机抽词、无校验和，
+        // 交给 Mnemonic.fromString 必然抛 "does not pass the check"）。
+        HD master = CollectionUtil.isEmpty(wordList)
+                ? HD.fromSeed(Mnemonic.fromRandom().toSeed(salt))
+                : HD.fromSeed(Mnemonic.fromString(
+                        String.join(Bip39WordlistEn.SPACE, wordList)).toSeed(salt));
         HD deterministicKey = BapPath.parse(ROOT_DERIVATION_PATH).derive(master);
         return getCryptoBase(parameters, deterministicKey);
     }
@@ -50,7 +52,8 @@ public final class CryptoHelper {
     }
 
     public static CryptoBase generateRootCryptoBase() throws InvalidKeyException {
-        return generateRootCryptoBase(generateWordList(), "", BsvNetwork.MAINNET);
+        // 传空列表以走「生成随机钱包」分支（generateWordList() 无校验和，不可用于种子派生）。
+        return generateRootCryptoBase(List.of(), "", BsvNetwork.MAINNET);
     }
 
     public static CryptoBase generateChlidCryptoBase(HD parentDeterministicKey, long childIndex,
