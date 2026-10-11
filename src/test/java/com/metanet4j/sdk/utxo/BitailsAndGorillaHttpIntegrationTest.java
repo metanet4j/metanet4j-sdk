@@ -10,8 +10,6 @@ import com.metanet4j.sdk.utxo.impl.bitails.BitailsUtxoProvider;
 import com.metanet4j.sdk.utxo.impl.gorillapool.GorillaClient;
 import com.metanet4j.sdk.utxo.impl.gorillapool.OrdinalsOriginGorillaUtxoProvider;
 import com.metanet4j.sdk.address.AddressEnhance;
-import io.bitcoinsv.bitcoinjsv.core.AddressLite;
-import io.bitcoinsv.bitcoinjsv.params.MainNetParams;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
@@ -108,8 +106,7 @@ class BitailsAndGorillaHttpIntegrationTest {
 
     @Test
     void providersMapLocalHttpResponsesAndPropagateServerFailures() throws IOException {
-        AddressLite address = AddressEnhance.fromBase58(MainNetParams.get(),
-                "1WffojxvgpQBmUTigoss7VUdfN45JiiRK");
+        AddressEnhance address = AddressEnhance.fromBase58("1WffojxvgpQBmUTigoss7VUdfN45JiiRK");
         List<String> requests = new CopyOnWriteArrayList<>();
         AtomicBoolean failBitails = new AtomicBoolean();
         HttpServer server = server(exchange -> {
@@ -127,9 +124,9 @@ class BitailsAndGorillaHttpIntegrationTest {
         });
         try {
             String endpoint = endpoint(server);
-            assertEquals(42, new BitailsUtxoProvider(endpoint).listUxtos(List.of(address))
+            assertEquals(42L, new BitailsUtxoProvider(endpoint).listUxtos(List.of(address))
                     .getFirst().getValue().getValue());
-            assertEquals(7, new OrdinalsOriginGorillaUtxoProvider(endpoint)
+            assertEquals(7L, new OrdinalsOriginGorillaUtxoProvider(endpoint)
                     .listUxtos(List.of("origin-local")).getFirst().getValue().getValue());
             assertEquals(List.of("/address/" + address.toBase58() + "/unspent?from=0&limit=100",
                     "/api/txos/origin-local?script=true"), requests);
