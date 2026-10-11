@@ -47,7 +47,7 @@ public class BobHelper {
 
             TransactionInput txInput = inputs.get(i);
             Script script = asScript(txInput.unlockingScript);
-            List<ScriptChunk> chunks = script.getChunks();
+            List<ScriptChunk> chunks = chunksOf(script);
 
             inputItem.put("i", i);
             inputItem.put("seq", txInput.sequence);
@@ -92,7 +92,7 @@ public class BobHelper {
             Map<String, Object> outItem = new LinkedHashMap<>();
             TransactionOutput txOutput = outputs.get(i);
             Script script = txOutput.lockingScript;
-            List<ScriptChunk> chunks = script.getChunks();
+            List<ScriptChunk> chunks = chunksOf(script);
             outItem.put("i", i);
 
             JSONObject e = new JSONObject();
@@ -260,7 +260,7 @@ public class BobHelper {
 
     /** 是否 OP_RETURN 输出（首个操作码为 OP_RETURN）。 */
     private static boolean isOpReturn(Script script) {
-        List<ScriptChunk> chunks = script.getChunks();
+        List<ScriptChunk> chunks = chunksOf(script);
         return !chunks.isEmpty() && chunks.get(0).op == OP.OP_RETURN;
     }
 
@@ -273,7 +273,7 @@ public class BobHelper {
 
     /** 由锁定脚本推导地址：P2PKH / P2SH；其他脚本抛异常由调用方回退。 */
     private static String addressOfScript(Script script) {
-        List<ScriptChunk> chunks = script.getChunks();
+        List<ScriptChunk> chunks = chunksOf(script);
         if (chunks.size() == 5
                 && chunks.get(0).op == OP.OP_DUP
                 && chunks.get(1).op == OP.OP_HASH160
@@ -338,4 +338,58 @@ public class BobHelper {
         }
         return 0L;
     }
+
+    /**
+     * 按脚本字节自行切分 chunk。
+     *
+     * <p><b>为何不用 {@code Script.getChunks()}</b>：R1 接入的 bsv-sdk 0.2.0 的
+     * {@code Script.parseChunks} 会在遇到 {@code OP_RETURN} 后**停止切分**，
+     * 导致其后的 push 全部丢失；而本项目的 BOB tape 与 Ordinals 铭文恰好都是
+     * 「OP_RETURN 之后才是载荷」的形态。已登记为上游缺陷（migration-rules §40），
+     * 这里做等价规避：按 BIP 脚本编码自行解析，行为对正常脚本与上游一致。
+     * 上游修复后可回退为 {@code script.getChunks()}。
+     */
+    private static List<ScriptChunk> chunksOf(Script script) {
+        byte[] raw = script.toUint8Array();
+        List<ScriptChunk> out = new java.util.ArrayList<>();
+        int i = 0;
+        while (i < raw.length) {
+            int op = raw[i] & 0xFF;
+            i++;
+            int len;
+            if (op == 0) {
+                out.add(new ScriptChunk(OP.OP_0));
+                continue;
+            } else if (op >= 1 && op <= 75) {
+                len = op;
+            } else if (op == 76) {
+                if (i >= raw.length) break;
+                len = raw[i] & 0xFF;
+                i++;
+            } else if (op == 77) {
+                if (i + 1 >= raw.length) break;
+                len = (raw[i] & 0xFF) | ((raw[i + 1] & 0xFF) << 8);
+                i += 2;
+            } else if (op == 78) {
+                if (i + 3 >= raw.length) break;
+                len = (raw[i] & 0xFF) | ((raw[i + 1] & 0xFF) << 8)
+                        | ((raw[i + 2] & 0xFF) << 16) | ((raw[i + 3] & 0xFF) << 24);
+                i += 4;
+            } else {
+                out.add(new ScriptChunk(op));
+                continue;
+            }
+            if (i + len > raw.length) {
+                len = raw.length - i;
+            }
+            List<Integer> data = new java.util.ArrayList<>(len);
+            for (int k = 0; k < len; k++) {
+                data.add(raw[i + k] & 0xFF);
+            }
+            i += len;
+            out.add(new ScriptChunk(op, data));
+        }
+        return out;
+    }
+
 }
