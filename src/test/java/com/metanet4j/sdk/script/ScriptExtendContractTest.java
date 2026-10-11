@@ -379,4 +379,35 @@ class ScriptExtendContractTest {
                 "应签名数超出 OP_16 时应判否");
     }
 
+
+    @Test
+    void replacesASignatureThatIsNotTheFirstAvailableSlot() {
+        // 覆盖 updateScriptWithSignature 插入循环的**假侧**（:152）与随之的 else 分支（:155）：
+        // 上一批用的 index=0 使 `i == prefix+index` **首次迭代即成立**，
+        // 故"**先原样拷贝若干段、再在目标位替换**"这条路径从未走到。
+        // 本批用 index=1（可用位有 2 个），迫使循环先在 i=1 走 else、再到 i=2 才替换。
+        byte[] redeem = p2shBytes();
+        // 原始脚本：OP_0 | 占位签名A | 占位签名B | redeemScript
+        byte[] raw = new byte[1 + 2 + 2 + 1 + redeem.length];
+        int i = 0;
+        raw[i++] = 0x00;
+        raw[i++] = 0x01; raw[i++] = (byte) 0xAA;
+        raw[i++] = 0x01; raw[i++] = (byte) 0xBB;
+        raw[i++] = (byte) redeem.length;
+        System.arraycopy(redeem, 0, raw, i, redeem.length);
+        Script scriptSig = Script.fromBinary(raw);
+        assertEquals(4, scriptSig.getChunks().size(), "构造的脚本应为 4 段");
+
+        byte[] newSig = new byte[71];
+        java.util.Arrays.fill(newSig, (byte) 0x5A);
+        Script updated = ScriptExtend.updateScriptWithSignature(scriptSig, newSig, 1, 1, 1);
+
+        // 前置与后缀原样保留；**第 1 个可用位（下标 1）保持原样**，第 2 个（下标 2）被替换
+        assertEquals(0x00, updated.getChunks().get(0).op, "前置 OP_0 应原样保留");
+        assertEquals(0xAA, updated.getChunks().get(1).data.get(0).intValue(), "非目标的占位签名应原样保留");
+        assertEquals(0x5A, updated.getChunks().get(2).data.get(0).intValue(), "目标位应被写入新签名");
+        assertEquals(newSig.length, updated.getChunks().get(2).data.size(), "写入长度应与新签名一致");
+        assertEquals(redeem.length, updated.getChunks().get(3).data.size(), "后缀 redeemScript 应原样保留");
+    }
+
 }
