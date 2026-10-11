@@ -126,6 +126,13 @@ class SignerTransactionContractTest {
         assertFalse(OrdinalsTransactionSigner.signInput(tx, 0, throwing,
                         TransactionSignature.SIGHASH_ALL, false),
                 "提供者抛错时应视同取不到密钥并返回 false，而非把原始异常外泄给调用方");
+
+        // 同一处的**另一侧**：`keyProvider == null`（§98 的方法——三元的两侧都要走）。
+        // 某些调用方（如只做验签或离线组装的场景）本就可能不提供密钥提供者，
+        // 此时应**视同取不到密钥**，而不是在调用 `keyProvider.findKeyFromPubHash` 时抛 NPE。
+        assertFalse(OrdinalsTransactionSigner.signInput(tx, 0, null,
+                        TransactionSignature.SIGHASH_ALL, false),
+                "提供者为 null 时应视同取不到密钥并返回 false，而非抛 NPE");
     }
 
     @Test
