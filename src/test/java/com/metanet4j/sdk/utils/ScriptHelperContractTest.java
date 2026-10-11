@@ -2,6 +2,7 @@ package com.metanet4j.sdk.utils;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.metanet4j.bsv.script.OP;
@@ -38,6 +39,23 @@ class ScriptHelperContractTest {
     @Test
     void rejectsNullChunk() {
         assertFalse(ScriptHelper.hasPushData(null));
+    }
+
+    @Test
+    void rejectsOrdinalScriptsWithoutAPubKeyHashChunk() {
+        // 覆盖 getAddressByOrdinalScript 缺少公钥哈希 chunk 时的抛错分支：
+        // 单 chunk 脚本（chunk 数 < 3）与第 3 个 chunk 无数据两种形态。
+        String tooShort = java.util.Base64.getEncoder().encodeToString(
+                new byte[] {(byte) 0x51});
+        assertThrows(IllegalArgumentException.class,
+                () -> ScriptHelper.getAddressByOrdinalScript(tooShort),
+                "chunk 数不足时应拒绝");
+
+        String thirdChunkWithoutData = java.util.Base64.getEncoder().encodeToString(
+                new byte[] {(byte) 0x51, (byte) 0x51, (byte) 0x4c, 0x00});
+        assertThrows(IllegalArgumentException.class,
+                () -> ScriptHelper.getAddressByOrdinalScript(thirdChunkWithoutData),
+                "第 3 个 chunk 无数据时应拒绝");
     }
 
     @Test

@@ -26,7 +26,10 @@ public class ScriptHelper {
         if (scriptChunk == null || scriptChunk.data == null || scriptChunk.data.isEmpty()) {
             return false;
         }
-        return isPushDataOpCode(scriptChunk.op) && scriptChunk.op != OP_ZERO;
+        // 注意：此处**无需**再判 op != OP_ZERO——isPushDataOpCode 已含 (op > OP_ZERO && op < OP_PUSHDATA1)
+        // 与三个 PUSHDATA 常量的等值判断，op == 0 必为 false。原条件冗余且其右侧分支不可达（§53），
+        // 按 §62.4 方案 C 消除。
+        return isPushDataOpCode(scriptChunk.op);
     }
 
     /**
