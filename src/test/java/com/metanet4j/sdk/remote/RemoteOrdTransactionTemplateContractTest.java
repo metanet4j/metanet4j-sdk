@@ -114,10 +114,16 @@ class RemoteOrdTransactionTemplateContractTest {
         assertTrue(template.isDoInputSign());
         assertFalse(template.isDoBsmSign());
 
-        assertThrows(SignErrorException.class, () -> template.createOrdinal(
+        // 覆盖迁移（migration-rules §23）：旧用例注入 mock 的 RemoteTransactionSigner 并期望
+        // SignErrorException；新架构按 §3 取消了可注入的签名器抽象（远程签名器是普通业务组件，
+        // 且远程流程不本地签名），故该路径不存在。改为断言开关对产物的**实际影响**：
+        // 未注册预签名上下文时，开启输入签名也不会产出解锁脚本（远程流程依赖外部回填）。
+        RemoteOrdTransactionBuilder builder = template.createOrdinal(
                 List.of(bap.getPayAccountAddress()), provider, destination, paymentAddress,
                 500, inscription("switch"), null, remoteBap,
-                mock(RemoteTransactionSigner.class), RemoteSignType.CURRENT));
+                new RemoteTransactionSigner(), RemoteSignType.CURRENT);
+        assertEquals(0, unlockingScriptBytes(builder.build(), 0).length,
+                "无预签名上下文时远程流程不产出解锁脚本");
     }
 
     @Test
@@ -129,9 +135,16 @@ class RemoteOrdTransactionTemplateContractTest {
 
     @Test
     void sendsAnExistingOrdinalWithTwoSpendableInputs() {
-        Transaction sent = new RemoteOrdTransactionTemplate(false, false).sendOrdinal(
-                bap, ordinalUtxo(), paymentUtxo(), destination, paymentAddress,
-                500, null, null, keyBag);
+        // migration-rules §29：本用例名要求「两个**可花费**输入」，基线却配 `(false, false)`
+        // （不签名），与断言矛盾（同一配置另有用例断言未签名）。按本意走既有 staged 模式：
+        // 先准备预签名哈希 → 外部签名并注册上下文 → 开启输入签名 → 重新构建。
+        RemoteOrdTransactionTemplate template = new RemoteOrdTransactionTemplate(false, false);
+        RemoteOrdTransactionBuilder unsigned = template.prepareSendOrdinal(remoteBap, ordinalUtxo(),
+                paymentUtxo(), destination, paymentAddress, 500, null, null, RemoteSignType.CURRENT);
+        signRemoteInputs(unsigned.getTxInputSignHash(false, remoteBap));
+        template.setDoInputSign(true);
+        Transaction sent = template.prepareSendOrdinal(remoteBap, ordinalUtxo(), paymentUtxo(),
+                destination, paymentAddress, 500, null, null, RemoteSignType.CURRENT).build();
 
         assertEquals(2, sent.inputs.size());
         assertEquals(BsvAmount.SATOSHI, BsvAmount.fromSdkValue(sent.outputs.get(0).satoshis));
