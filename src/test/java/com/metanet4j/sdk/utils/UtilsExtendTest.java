@@ -46,4 +46,15 @@ public class UtilsExtendTest {
                 Arrays.copyOfRange(formatted, 25, 28));
         Assertions.assertArrayEquals(message, Arrays.copyOfRange(formatted, 28, formatted.length));
     }
+
+    @Test
+    void convertsBetweenBytesHexAndBoxedLists() {
+        // 覆盖 toHex／fromHex 的方法体（fromHex 内部会调用私有 toBytes，故一并覆盖）——
+        // 这三个方法此前无任何用例调用，属「有实现无调用」而非防御分支。
+        byte[] raw = {1, 2, 3, (byte) 0xFF};
+        Assertions.assertEquals("010203ff", UtilsExtend.toHex(raw));
+        Assertions.assertArrayEquals(raw, UtilsExtend.fromHex("010203ff"));
+        Assertions.assertArrayEquals(new byte[0], UtilsExtend.fromHex(""));
+    }
+
 }
