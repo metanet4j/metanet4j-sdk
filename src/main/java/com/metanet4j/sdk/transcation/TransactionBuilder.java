@@ -246,7 +246,16 @@ public class TransactionBuilder {
             if (pubKeyHash.length == 0) {
                 continue;
             }
-            com.metanet4j.sdk.PrivateKey key = provider.findKeyFromPubHash(pubKeyHash);
+            // 注意：部分提供者（如 BapProviderKeyBag）在解析不到密钥时**抛 RuntimeException**
+            // 而不是返回 null（BapProviderKeyBagTest 明确要求该行为）。
+            // 但本层的契约是「签名失败以 SignErrorException 上报」，故此处需把两种表现统一转换，
+            // 否则调用方拿到的是原始 RuntimeException，与契约不符。
+            com.metanet4j.sdk.PrivateKey key;
+            try {
+                key = provider.findKeyFromPubHash(pubKeyHash);
+            } catch (RuntimeException e) {
+                throw new SignErrorException("交易输入 " + i + " 找不到可签名密钥", e);
+            }
             if (key == null) {
                 throw new SignErrorException("交易输入 " + i + " 找不到可签名密钥");
             }
