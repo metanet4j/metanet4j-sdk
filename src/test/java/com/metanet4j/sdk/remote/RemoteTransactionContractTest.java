@@ -127,6 +127,36 @@ class RemoteTransactionContractTest {
     }
 
     @Test
+    void remoteSignerWritesTheAnyoneCanPayFlagIntoTheUnlockingScript() {
+        // 覆盖 RemoteTransactionSigner 的 `:108`／`:110`——`anyoneCanPay ? SIGHASH_ANYONECANPAY : 0` 的**两侧**。
+        // **必须用 3 参重载**：2 参重载 `completeAndSignTx(provider, useForkId)` 把 anyoneCanPay **硬编码为 false**
+        //（§96／§97 的教训——我曾把旗标传进 `useForkId`，导致两次结果相同、误以为功能失效）。
+        byte[][] written = new byte[2][];
+
+        for (int k = 0; k < 2; k++) {
+            boolean anyoneCanPay = k == 1;
+            RemoteTransactionBuilder builder = new RemoteTransactionBuilder(remoteBap, keyProvider);
+            builder.addInput(paymentUtxo(1))
+                    .addOutput(BsvAmount.valueOf(777), paymentAddress)
+                    .changeAddress(paymentAddress);
+            PreSignHashContext request = builder.getTxInputSignHash(false, remoteBap).get(0);
+            sign(request, paymentKey);
+
+            Transaction signed = builder.completeAndSignTx(keyProvider,
+                    TransactionSignature.SIGHASH_ALL, anyoneCanPay);
+            byte[] unlocking = unlockingScriptBytes(signed, 0);
+            // **防混淆断言**：若某次因上下文查不到而被"跳过"，脚本会是空的——
+            // 那样"两次不同"就会因错误的原因成立（§253 的教训：要证明走的是哪条路径）。
+            assertTrue(unlocking.length > 0,
+                    "anyoneCanPay=" + anyoneCanPay + " 时应确实写回解锁脚本，而非被跳过");
+            written[k] = unlocking;
+        }
+
+        assertFalse(java.util.Arrays.equals(written[0], written[1]),
+                "两种旗标写出的解锁脚本必须不同——否则说明 SIGHASH_ANYONECANPAY 位未被写入");
+    }
+
+    @Test
     void remoteSignerPrefersContextPublicKeyThenFallsBackToLocalKey() {
         // 覆盖 RemoteTransactionSigner 中 `pubKeyBytes` 的**嵌套三元**（:83—85）与随之的跳过（:86—88）：
         //   ① context 有公钥 → 用它（既有用例的正常路径已覆盖）；
