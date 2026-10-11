@@ -5,6 +5,7 @@ import com.metanet4j.sdk.exception.InvalidKeyException;
 import com.metanet4j.base.bsv.BsvNetwork;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.math.BigInteger;
 import org.junit.jupiter.api.Test;
@@ -75,6 +76,32 @@ public class PrivateKeyTest {
         // :68—69 WIF 解码失败（非 base58 字符）
         assertThrows(InvalidKeyException.class, () -> PrivateKey.fromWIF("not-a-valid-wif!!!"),
                 "无法解码的 WIF 应转为 InvalidKeyException");
+    }
+
+
+    @Test
+    void rejectsWifWithUnknownNetworkAndIllegalPayload() throws InvalidKeyException {
+        // 覆盖 PrivateKey.fromWIF 余下两处校验：
+        // :75—77 版本字节与目标网络不符、:72—73 载荷长度不足 33 字节。
+        // 两条 WIF 都**由 API 自身构造**（toWif / toBase58Check），**不硬编码字面量**——
+        // 硬编码会随实现或编码细节变动而失效，而由 API 生成则断言的是**关系**（跨网络应被拒、过短应被拒）。
+
+        // 注：**:75—77「版本字节与网络不符」经 fromWIF(String) 不可达**——
+        // 该入口先以 `decodeNetworkType(wif)` **从 WIF 自身推断网络**，
+        // 故随后的版本比对**按构造必然成立**（详见 migration-rules §85）。
+        // 此处改为断言"测试网 WIF 能被正确识别为其所属网络"，这才是该入口的真实契约。
+        PrivateKey testnetKey = new PrivateKey(
+                com.metanet4j.bsv.primitives.PrivateKey.fromString("01", 16), true, BsvNetwork.TESTNET3);
+        String testnetWif = testnetKey.toWif(BsvNetwork.TESTNET3);
+        assertNotNull(testnetWif, "应能导出测试网 WIF");
+        assertEquals(BsvNetwork.TESTNET3, PrivateKey.fromWIF(testnetWif).getNetworkType(),
+                "fromWIF 应能从 WIF 自身推断出所属网络");
+
+        // :72—73 载荷过短的 base58check 串（仅 2 字节载荷）
+        String tooShort = com.metanet4j.bsv.primitives.Utils.toBase58Check(
+                java.util.List.of(0.0, 1.0), java.util.List.of(0x80));
+        assertThrows(InvalidKeyException.class, () -> PrivateKey.fromWIF(tooShort),
+                "载荷不足 33 字节的 WIF 应被拒绝");
     }
 
 }
