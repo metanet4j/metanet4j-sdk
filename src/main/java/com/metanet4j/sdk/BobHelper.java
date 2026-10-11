@@ -151,9 +151,12 @@ public class BobHelper {
                 cellAdded = true;
             }
 
+            // 与基线一致：基线用的是 scriptChunk.isOpCode()，其定义为 **opcode > OP_PUSHDATA4(78)**，
+            // 即「凡不是推送操作码者」都算操作码 cell——含 OP_1NEGATE(0x4f)、OP_1..OP_16(0x51..0x60) 等。
+            // 早期迁移误写成 op > OP_16(96)，使 OP_1..OP_16 整段不产出 cell（见 migration-rules §42.2）。
             // 注意：此处**不得**再加 `|| op == OP_0`——OP_0(OP_FALSE) 已由上一个 if 分支处理，
-            // 加上会造成同一 cell 被加入两次（基线此条件仅为 op > OP_16）。
-            if (scriptChunk.op > OP.OP_16) {
+            // 加上会造成同一 cell 被加入两次。
+            if (scriptChunk.op > OP.OP_PUSHDATA4) {
                 cellItem.put("op", scriptChunk.op);
                 cellItem.put("ops", OP.name(scriptChunk.op));
                 cellItem.put("i", currentCellItemIndex);
