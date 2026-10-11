@@ -25,6 +25,7 @@ import com.metanet4j.base.bsv.BsvAmount;
 import com.metanet4j.base.bsv.BsvHashBytes;
 import com.metanet4j.base.bsv.BsvUtxo;
 import com.metanet4j.bsv.transaction.Transaction;
+import com.metanet4j.bsv.transaction.TransactionInput;
 import com.metanet4j.bsv.transaction.TransactionOutput;
 
 import com.metanet4j.bsv.script.OP;
@@ -139,6 +140,27 @@ class TransactionBuilderContractTest {
                 .addOutput(BsvAmount.valueOf(777), paymentAddress);
 
         assertThrows(SignErrorException.class, () -> builder.completeAndSignTx(noKeys, true));
+    }
+
+    @Test
+    void feeEstimationFallsBackForUnrecognizableScripts() {
+        // 覆盖 §90.3 列的 getUnLockScriptSize 两处（套路①/②）：
+        //   :174—181 提供者抛错时 `key = null`（费用估算不因取不到密钥而中断）；
+        //   :189—193 锁定脚本不可识别时退回**保守估算**（`SIG_SIZE + 65`）。
+        // 用一个既非 P2PKH 也非铭文的锁定脚本（纯操作码）同时触发这两条降级路径。
+        TransactionBuilder builder = new TransactionBuilder(bap, keyProvider);
+        // 用 BsvUtxo 加入（它携带金额；TransactionInput 本身不带 satoshi，会让费用估算失去输入值）。
+        // 该 UTXO **无地址、只有一段不可识别的脚本**（纯操作码 OP_1），
+        // 因而既走"无地址但有脚本"的分支，又让脚本类型判定失败、触发保守估算。
+        builder.addInput(new BsvUtxo(new BsvHashBytes(new byte[32]), 0, 20_000L, 0, false, null,
+                new com.metanet4j.bsv.script.Script()
+                        .writeOpCode(com.metanet4j.bsv.script.OP.OP_1).toUint8Array()));
+        builder.addOutput(BsvAmount.valueOf(777), paymentAddress);
+        builder.changeAddress(paymentAddress);
+
+        BsvAmount fee = builder.getFee();   // 注意：getFee() 返回 BsvAmount，而非 long
+        assertTrue(fee.getValue() > 0,
+                "锁定脚本不可识别时应按保守值估算费用，而非中断（实际：" + fee + "）");
     }
 
     @Test
