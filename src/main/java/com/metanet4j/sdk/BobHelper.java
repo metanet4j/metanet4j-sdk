@@ -213,10 +213,13 @@ public class BobHelper {
                     currentCellItemIndex = -1;
                     tapeItems.add(tapeItem);
                 }
+                // 只在真正加入 cell 后自增：globalCellItemIndex 是 globalCellItems 的
+                // 0 基下标（切片处用 +1），必须与列表同步；旧实现按 chunk 自增，
+                // 遇到非推送 chunk（如纯操作码输入）会令索引超过列表长度而越界。
+                globalCellItemIndex++;
             }
 
             currentCellItemIndex++;
-            globalCellItemIndex++;
 
         }
         // Process the last tape
