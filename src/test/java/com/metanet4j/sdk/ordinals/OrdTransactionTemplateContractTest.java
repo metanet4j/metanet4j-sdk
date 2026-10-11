@@ -73,11 +73,16 @@ class OrdTransactionTemplateContractTest {
 
     @Test
     void sendOrdinalPropagatesSignerFailure() {
+        // 覆盖迁移（migration-rules §23）：旧用例依赖「可注入且会报失败的签名器」，
+        // 该抽象已按计划 §3 取消。新架构下等价的「签名失败」路径是：
+        // 密钥提供者解析不到密钥 → TransactionBuilder.prepareInputsForSigning 抛 SignErrorException。
+        // 故改用「无密钥提供者」，断言的仍是「签名失败会向上传播」这一契约本身。
         OrdTransactionTemplate template = new OrdTransactionTemplate();
+        SigningKeyProvider noKeys = pubkeyHash -> null;
 
         assertThrows(SignErrorException.class, () -> template.sendOrdinal(bap,
                 ordinalUtxo(4), paymentUtxo(5), destination, payment, 500,
-                null, null, keyBag));
+                null, null, noKeys));
     }
 
     @Test
