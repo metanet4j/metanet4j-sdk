@@ -2,6 +2,7 @@ package com.metanet4j.sdk.remote;
 
 import cn.hutool.core.codec.Base64;
 import com.metanet4j.bsv.primitives.Signature;
+import com.metanet4j.bsv.primitives.TransactionSignature;
 import com.metanet4j.bsv.script.OP;
 import com.metanet4j.bsv.script.Script;
 import com.metanet4j.bsv.script.ScriptChunk;
@@ -76,26 +77,40 @@ public class RemoteTransactionSigner {
                 log.warn("输入 {} 缺少预签名上下文：{}", i, e.getMessage());
                 continue;
             }
+            // 远程流程**不依赖本地私钥**：预签名上下文里已带远程服务返回的公钥，
+            // 用它拼装解锁脚本即可（keyProvider 为空或解析不到密钥时不应跳过该输入）。
             PrivateKey key = keyProvider == null ? null : keyProvider.findKeyFromPubHash(pubKeyHash);
-            if (key == null) {
-                log.warn("输入 {} 找不到可签名密钥。", i);
+            byte[] pubKeyBytes = context.getPublicKey() != null
+                    ? context.getPublicKey().getPubKeyBytes()
+                    : key == null ? null : key.getPubKey();
+            if (pubKeyBytes == null) {
+                log.warn("输入 {} 既无预签名上下文公钥、也无本地密钥，跳过远程签名回填。", i);
                 continue;
             }
             // 远程返回的是 DER（含 sighash 尾字节）的 Base64
             Signature signature = Signature.fromDER(Base64.decode(context.getSigB64()));
-            txIn.unlockingScriptTemplate = new P2PKH().unlock(key.getKey(), ScriptExtend.signOutputsOf(hashFlags), anyoneCanPay,
-                    satoshisOf(sourceOutput));
+            if (key != null) {
+                txIn.unlockingScriptTemplate = new P2PKH().unlock(key.getKey(),
+                        ScriptExtend.signOutputsOf(hashFlags), anyoneCanPay, satoshisOf(sourceOutput));
+            }
             // toChecksigFormat 是子类 TransactionSignature 的能力：签名器产出即该类型
             List<Integer> checksig = new java.util.ArrayList<>();
             if (signature instanceof com.metanet4j.bsv.primitives.TransactionSignature ts) {
                 checksig.addAll(ts.toChecksigFormat());
             } else {
+                // 上下文中存的是**纯 DER**（远程服务返回），解锁脚本需要 DER + SIGHASH 尾字节；
+                // 缺少尾字节会让脚本无法通过校验（且尾字节本身就是范围声明）。
                 for (Double b : signature.toDER()) {
                     checksig.add(b.intValue());
                 }
+                checksig.add(ScriptExtend.signOutputsOf(hashFlags).equals("single")
+                        ? (TransactionSignature.SIGHASH_SINGLE | TransactionSignature.SIGHASH_FORKID
+                           | (anyoneCanPay ? TransactionSignature.SIGHASH_ANYONECANPAY : 0))
+                        : (TransactionSignature.SIGHASH_ALL | TransactionSignature.SIGHASH_FORKID
+                           | (anyoneCanPay ? TransactionSignature.SIGHASH_ANYONECANPAY : 0)));
             }
             txIn.unlockingScript = new Script().writeBin(checksig)
-                    .writeBin(toBoxed(key.getPubKey()));
+                    .writeBin(toBoxed(pubKeyBytes));
         }
         return true;
     }
