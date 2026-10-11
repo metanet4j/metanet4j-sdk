@@ -127,6 +127,27 @@ class RemoteTransactionContractTest {
     }
 
     @Test
+    void probeNonNumericSourceAmountForms() {
+        // **探查用例（§296）**：为覆盖 `RemoteTransactionSigner:124` 的 `: null` 兜底，穷尽 `satoshis` 的非数字形态。
+        // §103 已试 `Undefined.INSTANCE`（被 SDK 的"不支持的金额类型"更早拒绝）；
+        // 本批试 **`String`** 与 **`null`** 两种，观察能否走到该三元。
+        for (Object form : new Object[] {"1000", null}) {
+            RemoteTransactionBuilder builder = new RemoteTransactionBuilder(remoteBap, keyProvider);
+            builder.addInput(paymentUtxo(1))
+                    .addOutput(BsvAmount.valueOf(777), paymentAddress)
+                    .changeAddress(paymentAddress);
+            ((Transaction) builder.getTargetTransaction().inputs.get(0).sourceTransaction)
+                    .outputs.get(0).satoshis = form;
+            // **实测所得的契约**：非数字金额一律被**更早的校验**拒绝（且该校验是**类型通用**的：
+            // 对 String 报"不支持的金额类型"、对 null 报"金额不能为空"）——
+            // 这同时是一条负向证据：`satoshisOf` 的 `: null` 兜底（`:124`／`:116`）**不可达**。
+            assertThrows(IllegalArgumentException.class,
+                    () -> builder.getTxInputSignHash(false, remoteBap),
+                    "非数字金额（" + form + "）应被更早的校验拒绝，而非走到 satoshisOf 的 null 兜底");
+        }
+    }
+
+    @Test
     void remoteSignerHonoursTheSingleOutputSignatureFlavour() {
         // 覆盖 RemoteTransactionSigner:108 —— `signOutputsOf(hashFlags).equals("single")` 的**真侧**
         //（即 `SIGHASH_SINGLE | SIGHASH_FORKID | …`）。§271 全程用 `SIGHASH_ALL`，**只走了 :110 那一侧**，
