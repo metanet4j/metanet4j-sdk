@@ -210,11 +210,11 @@ public class Sigma implements PreSignHash {
             }
             if (HexUtil.encodeHexStr(ScriptHelper.getPushData(chunks.get(i))).equalsIgnoreCase(SIGMA_PREFIX)) {
                 //TODO
-                String algorithm = new String(ScriptHelper.getPushData(chunks.get(i + 1)), StandardCharsets.UTF_8);
-                String address = new String(ScriptHelper.getPushData(chunks.get(i + 2)), StandardCharsets.UTF_8);
+                String algorithm = ScriptHelper.getPushDataAsString(chunks.get(i + 1));
+                String address = ScriptHelper.getPushDataAsString(chunks.get(i + 2));
                 String signature = Base64.encode(ScriptHelper.getPushData(chunks.get(i + 3)));
 
-                int vin = Integer.parseInt(new String(ScriptHelper.getPushData(chunks.get(i + 4)), StandardCharsets.UTF_8));
+                int vin = Integer.parseInt(ScriptHelper.getPushDataAsString(chunks.get(i + 4)));
                 instances.add(new Sig(address, signature, algorithm, vin, targetVout));
                 // fast forward to the next possible instance position
                 // 3 fields + 1 extra for the "|" separator
