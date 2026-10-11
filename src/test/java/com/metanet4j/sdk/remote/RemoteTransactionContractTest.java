@@ -145,6 +145,20 @@ class RemoteTransactionContractTest {
         // 那时本断言会失败，而失败本身即是"该路径未走通"的证据（§253 的教训：别让断言因错误的原因通过）。
         assertTrue(unlockingScriptBytes(signed, 0).length > 0,
                 "SIGHASH_SINGLE 下也应完成解锁脚本回填（若为空，说明上下文未命中、该输入被跳过）");
+
+        // **第三层组合**（§289 的线索）：`:108` 这一侧内部还有一个 `anyoneCanPay` 三元，
+        // 而上面只走了 `anyoneCanPay = false` 一侧 ⇒ 再走 `true` 一侧，把该组合补齐。
+        RemoteTransactionBuilder withFlag = new RemoteTransactionBuilder(remoteBap, keyProvider);
+        withFlag.addInput(paymentUtxo(1))
+                .addOutput(BsvAmount.valueOf(777), paymentAddress)
+                .changeAddress(paymentAddress);
+        PreSignHashContext flagged = withFlag.getTxInputSignHash(false, remoteBap).get(0);
+        sign(flagged, paymentKey);
+
+        Transaction signedWithFlag = withFlag.completeAndSignTx(keyProvider,
+                TransactionSignature.SIGHASH_SINGLE, true);
+        assertTrue(unlockingScriptBytes(signedWithFlag, 0).length > 0,
+                "SIGHASH_SINGLE 且 anyoneCanPay=true 时也应完成解锁脚本回填");
     }
 
     @Test
