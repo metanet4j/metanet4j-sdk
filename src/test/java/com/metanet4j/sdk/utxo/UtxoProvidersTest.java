@@ -11,10 +11,8 @@ import com.metanet4j.sdk.utxo.impl.bitails.dto.res.AddressUnspentResDto;
 import com.metanet4j.sdk.utxo.impl.gorillapool.GorillaClient;
 import com.metanet4j.sdk.utxo.impl.gorillapool.OrdinalsOriginGorillaUtxoProvider;
 import com.metanet4j.sdk.utxo.impl.gorillapool.dto.res.Txo;
-import io.bitcoinsv.bitcoinjsv.core.AddressLite;
-import io.bitcoinsv.bitcoinjsv.core.Coin;
-import io.bitcoinsv.bitcoinjsv.core.UTXO;
-import io.bitcoinsv.bitcoinjsv.params.MainNetParams;
+import com.metanet4j.base.bsv.BsvAmount;
+import com.metanet4j.base.bsv.BsvUtxo;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
@@ -23,8 +21,7 @@ class UtxoProvidersTest {
 
     @Test
     void bitailsMapsUnspentOutputsAndHandlesEmptyResults() {
-        AddressLite address = AddressEnhance.fromBase58(MainNetParams.get(),
-                "1WffojxvgpQBmUTigoss7VUdfN45JiiRK");
+        AddressEnhance address = AddressEnhance.fromBase58("1WffojxvgpQBmUTigoss7VUdfN45JiiRK");
         AddressUnspentResDto.Unspent output = new AddressUnspentResDto.Unspent();
         output.setTxid("1".repeat(64));
         output.setVout(2);
@@ -38,11 +35,11 @@ class UtxoProvidersTest {
         try (MockedStatic<BitailsClient> client = mockStatic(BitailsClient.class)) {
             client.when(() -> BitailsClient.getAddressUnspentResDto(BitailsClient.BASE_URL, address.toBase58(), 0, 100))
                     .thenReturn(response);
-            List<UTXO> mapped = provider.listUxtos(List.of(address));
+            List<BsvUtxo> mapped = provider.listUxtos(List.of(address));
             assertEquals(1, mapped.size());
             assertEquals("1".repeat(64), mapped.getFirst().getHash().toString());
             assertEquals(2, mapped.getFirst().getIndex());
-            assertEquals(Coin.valueOf(42), mapped.getFirst().getValue());
+            assertEquals(BsvAmount.valueOf(42), mapped.getFirst().getValue());
             assertEquals(address.toBase58(), mapped.getFirst().getAddress());
 
             response.setUnspent(null);
@@ -60,13 +57,13 @@ class UtxoProvidersTest {
         OrdinalsOriginGorillaUtxoProvider provider = new OrdinalsOriginGorillaUtxoProvider();
         try (MockedStatic<GorillaClient> client = mockStatic(GorillaClient.class)) {
             client.when(() -> GorillaClient.GetTxoByOrigin(GorillaClient.BASE_URL, "origin")).thenReturn(txo);
-            UTXO unspent = provider.listUxtos(List.of("origin")).getFirst();
+            BsvUtxo unspent = provider.listUxtos(List.of("origin")).getFirst();
             assertEquals("2".repeat(64), unspent.getHash().toString());
             assertEquals(3, unspent.getIndex());
-            assertEquals(Coin.valueOf(51), unspent.getValue());
+            assertEquals(BsvAmount.valueOf(51), unspent.getValue());
 
             txo.setSpend("3".repeat(64));
-            UTXO spent = provider.listUxtos(List.of("origin")).getFirst();
+            BsvUtxo spent = provider.listUxtos(List.of("origin")).getFirst();
             assertEquals("3".repeat(64), spent.getHash().toString());
         }
     }
