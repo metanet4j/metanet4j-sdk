@@ -59,7 +59,7 @@ public class TxoHelper {
             TransactionInput txInput = inputs.get(i);
             Script script = toScript(txInput.unlockingScript);
 
-            List<ScriptChunk> chunks = script.getChunks();
+            List<ScriptChunk> chunks = chunksOf(script);
             inputItem.put("i", i);
             inputItem.put("seq", txInput.sequence);
 
@@ -109,8 +109,8 @@ public class TxoHelper {
             e.put("a", scriptAddress);
             e.put("i", i);
             outItem.put("e", e);
-            outItem.put("len", script.getChunks().size());
-            appendChunkFields(outItem, script.getChunks());
+            outItem.put("len", chunksOf(script).size());
+            appendChunkFields(outItem, chunksOf(script));
             outArray.add(outItem);
         }
 
@@ -190,7 +190,7 @@ target.put("o" + j, OP.name(scriptChunk.op));
 
     /** 是否 OP_RETURN 输出（首个操作码为 OP_RETURN）。 */
     private static boolean isOpReturn(Script script) {
-        List<ScriptChunk> chunks = script.getChunks();
+        List<ScriptChunk> chunks = chunksOf(script);
         return !chunks.isEmpty() && chunks.get(0).op == OP.OP_RETURN;
     }
 
@@ -207,7 +207,7 @@ target.put("o" + j, OP.name(scriptChunk.op));
 
     /** 由锁定脚本推导地址：P2PKH / P2SH；其他脚本抛异常（与旧实现 getToAddress 行为一致）。 */
     private static String addressOfScript(Script script) {
-        List<ScriptChunk> chunks = script.getChunks();
+        List<ScriptChunk> chunks = chunksOf(script);
         if (chunks.size() == P2PKH_CHUNK_COUNT
                 && chunks.get(0).op == OP.OP_DUP
                 && chunks.get(1).op == OP.OP_HASH160
@@ -244,7 +244,7 @@ target.put("o" + j, OP.name(scriptChunk.op));
     /** 把脚本渲染为可读操作码名（去掉新 SDK 的 "OP_" 前缀），与旧库 Script.toString() 对齐。 */
     private static String opcodeNames(Script script) {
         StringBuilder sb = new StringBuilder();
-        for (var chunk : script.getChunks()) {
+        for (var chunk : chunksOf(script)) {
             if (sb.length() > 0) {
                 sb.append(' ');
             }
@@ -260,9 +260,53 @@ target.put("o" + j, OP.name(scriptChunk.op));
 
     /** 是否为「OP_FALSE + OP_RETURN」形态（旧库 isOpReturnAfterGenesis）。 */
     private static boolean isOpReturnAfterGenesis(Script script) {
-        List<com.metanet4j.bsv.script.ScriptChunk> cs = script.getChunks();
+        List<com.metanet4j.bsv.script.ScriptChunk> cs = chunksOf(script);
         return cs.size() >= 2 && cs.get(0).op == com.metanet4j.bsv.script.OP.OP_0
                 && cs.get(1).op == com.metanet4j.bsv.script.OP.OP_RETURN;
+    }
+
+
+    private static List<ScriptChunk> chunksOf(Script script) {
+        byte[] raw = script.toUint8Array();
+        List<ScriptChunk> out = new java.util.ArrayList<>();
+        int i = 0;
+        while (i < raw.length) {
+            int op = raw[i] & 0xFF;
+            i++;
+            int len;
+            if (op == 0) {
+                out.add(new ScriptChunk(OP.OP_0));
+                continue;
+            } else if (op >= 1 && op <= 75) {
+                len = op;
+            } else if (op == 76) {
+                if (i >= raw.length) break;
+                len = raw[i] & 0xFF;
+                i++;
+            } else if (op == 77) {
+                if (i + 1 >= raw.length) break;
+                len = (raw[i] & 0xFF) | ((raw[i + 1] & 0xFF) << 8);
+                i += 2;
+            } else if (op == 78) {
+                if (i + 3 >= raw.length) break;
+                len = (raw[i] & 0xFF) | ((raw[i + 1] & 0xFF) << 8)
+                        | ((raw[i + 2] & 0xFF) << 16) | ((raw[i + 3] & 0xFF) << 24);
+                i += 4;
+            } else {
+                out.add(new ScriptChunk(op));
+                continue;
+            }
+            if (i + len > raw.length) {
+                len = raw.length - i;
+            }
+            List<Integer> data = new java.util.ArrayList<>(len);
+            for (int k = 0; k < len; k++) {
+                data.add(raw[i + k] & 0xFF);
+            }
+            i += len;
+            out.add(new ScriptChunk(op, data));
+        }
+        return out;
     }
 
 }
