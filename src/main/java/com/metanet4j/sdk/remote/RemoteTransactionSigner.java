@@ -58,8 +58,14 @@ public class RemoteTransactionSigner {
             }
             PreSignHashContext context;
             try {
-                context = PreSignHashUtils.getSignedHashContext(
-                        com.metanet4j.base.bsv.BsvHashBytes.ZERO_HASH);
+                // 按与 RemoteTransactionBuilder.getTxInputSignHash 相同的口径重算该输入的前像哈希，
+                // 再查预签名上下文；此前用 ZERO_HASH 查询，永远匹配不到任何上下文。
+                com.metanet4j.base.bsv.BsvHashBytes preSignHash =
+                        com.metanet4j.sdk.script.SigHashExtend.hashForForkIdSignature(tx, i,
+                                scriptPubKey.toUint8Array(),
+                                com.metanet4j.base.bsv.BsvAmount.fromSdkValue(sourceOutput.satoshis),
+                                hashFlags, anyoneCanPay);
+                context = PreSignHashUtils.getSignedHashContext(preSignHash);
             } catch (RuntimeException e) {
                 log.warn("输入 {} 缺少预签名上下文：{}", i, e.getMessage());
                 continue;

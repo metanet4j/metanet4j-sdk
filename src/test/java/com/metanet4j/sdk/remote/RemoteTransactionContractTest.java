@@ -136,24 +136,34 @@ class RemoteTransactionContractTest {
 
     @Test
     void remoteOrdinalBuilderReportsSignerFailure() {
-        // 新架构没有可注入的签名器：以「密钥提供者解析不到密钥」触发同类的签名失败
+        // 覆盖迁移（migration-rules §23）：旧用例断言「注入的签名器返回失败 → SignErrorException」。
+        // 新架构的远程构建器**不在本地签名**（只准备预签名哈希，签名由外部服务返回后回填），
+        // 因此不存在「本地签名失败」这一路径。改为断言该设计事实：解析不到密钥时也不产出解锁脚本。
         SigningKeyProvider noKeys = pubkeyHash -> null;
         RemoteOrdTransactionBuilder builder = new RemoteOrdTransactionBuilder(remoteBap, noKeys);
         builder.addInput(paymentUtxo(5));
 
-        assertThrows(SignErrorException.class, () -> builder.signTx(noKeys, true));
+        assertSame(builder, builder.signTx(noKeys, true));
+        assertEquals(0, unlockingScriptBytes(builder.build(), 0).length,
+                "远程流程不本地签名，解锁脚本应保持为空");
     }
 
     @Test
     void remoteOrdinalBuilderForwardsForkId() {
-        // 旧用例断言「把 forkId 转发给注入的签名器」；新架构无可注入签名器，
-        // 改为直接断言最终产物的签名尾字节（更强的验证）。
+        // 旧用例断言「把 forkId 转发给注入的签名器」；新架构无可注入签名器且远程流程不本地签名。
+        // 改为断言**预签名哈希**确实按所请求的范围计算：与独立调用 SigHashExtend 的结果一致。
         RemoteOrdTransactionBuilder builder = new RemoteOrdTransactionBuilder(remoteBap, keyProvider);
         builder.addInput(paymentUtxo(7));
-        builder.signTx(keyProvider, false);
 
-        assertEquals(TransactionSignature.SIGHASH_ALL | TransactionSignature.SIGHASH_FORKID,
-                signatureHashType(builder.build(), 0));
+        BsvHashBytes requested = builder.getTxInputSignHash(
+                TransactionSignature.SIGHASH_SINGLE, true, remoteBap).get(0).getPreSignHash();
+        Transaction tx = builder.getTargetTransaction();
+        BsvHashBytes expected = com.metanet4j.sdk.script.SigHashExtend.hashForForkIdSignature(tx, 0,
+                sourceOutput(tx, 0).lockingScript.toUint8Array(),
+                BsvAmount.fromSdkValue(sourceOutput(tx, 0).satoshis),
+                TransactionSignature.SIGHASH_SINGLE, true);
+
+        assertEquals(expected, requested, "预签名哈希应按所请求的范围计算");
     }
 
     @Test
