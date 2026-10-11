@@ -173,6 +173,38 @@ class TransactionBuilderContractTest {
     }
 
     @Test
+    void feeEstimationResolvesTheKeyLengthOnlyWhenBothPreconditionsHold() {
+        // 覆盖 §95 所列 `TransactionBuilder:174`／`:180—181`：
+        //     if (keyProvider != null && pubKeyHash.length > 0) {
+        //         try { key = keyProvider.findKeyFromPubHash(pubKeyHash); }
+        //         catch (RuntimeException e) { key = null; }      // ← :180—181
+        //     }
+        // `getUnLockScriptSize` 是 protected，而本测试类与之**同包**，故可直接调用。
+        Script p2pkh = new P2PKH().lock(paymentAddress.toBase58());
+        TransactionInput input = new TransactionInput(
+                new BsvHashBytes(new byte[32]).toString(), 0, new Script());
+
+        // ① 两条件皆真 → 查密钥、按**实际公钥长度**计费
+        TransactionBuilder withKeys = new TransactionBuilder(bap, keyProvider);
+        assertTrue(withKeys.getUnLockScriptSize(input, p2pkh) > 0,
+                "有提供者且公钥哈希非空时应按实际公钥长度计费");
+
+        // ② **第二腿为假**：脚本不可识别 → 公钥哈希为空 → 走保守估算（`&&` 短路）
+        TransactionBuilder builder = new TransactionBuilder(bap, keyProvider);
+        assertTrue(builder.getUnLockScriptSize(input,
+                        new com.metanet4j.bsv.script.Script()
+                                .writeOpCode(com.metanet4j.bsv.script.OP.OP_1)) > 0,
+                "锁定脚本不可识别时应走保守估算");
+
+        // ③ **提供者抛错** → 转 key = null → 仍走保守估算（`:180—181` 的 catch）
+        TransactionBuilder throwing = new TransactionBuilder(bap, pubKeyHash -> {
+            throw new IllegalStateException("模拟提供者找不到密钥");
+        });
+        assertTrue(throwing.getUnLockScriptSize(input, p2pkh) > 0,
+                "提供者抛错时费用估算不应中断，应退回保守估算");
+    }
+
+    @Test
     void changeAmountToleratesMissingOrNonNumericFields() {
         // 覆盖 §95 所列若干兜底（套路①：传坏输入）——**入口按 §99 的结论改为 `calculateChangeAmount`**：
         //   :157 lockingScriptOf —— 输入无连接输出、或其无锁定脚本时返回空脚本；
