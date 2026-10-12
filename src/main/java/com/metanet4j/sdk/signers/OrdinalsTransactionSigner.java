@@ -105,6 +105,10 @@ public class OrdinalsTransactionSigner {
         }
         boolean signedAny = false;
         for (int i = 0; i < tx.inputs.size(); i++) {
+            if (sourceOutputOf(tx.inputs.get(i)) == null) {
+                log.warn("Skip disconnected input {} during batch signing", i);
+                continue;
+            }
             if (!signInput(tx, i, keyProvider, hashFlags, useForkId, anyoneCanPay)) {
                 log.warn("Skip input {} during batch signing", i);
             } else {
