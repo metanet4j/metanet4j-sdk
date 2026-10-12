@@ -1,6 +1,5 @@
 package com.metanet4j.sdk.ordinals;
 
-import com.google.common.collect.Lists;
 import com.metanet4j.base.bsv.BsvAmount;
 import com.metanet4j.base.bsv.BsvUtxo;
 import com.metanet4j.bsv.primitives.TransactionSignature;
@@ -42,11 +41,11 @@ public class OrdTransactionBuilder extends TransactionBuilder {
     public OrdTransactionBuilder addOrdInput(BsvUtxo utxo) {
         Script lockingScript = utxo.getScript() == null
                 ? new Script() : Script.fromBinary(utxo.getScript());
-        TransactionOutput sourceOutput = new TransactionOutput(lockingScript, utxo.getSatoshis());
+        TransactionOutput sourceOutput = new TransactionOutput(lockingScript, utxo.getValue().toSdkValue());
         TransactionInput input = new TransactionInput(utxo.getHash().toString(), (int) utxo.getIndex(),
                 new Script());
         input.sequence = 0xffff_ffffL;
-        announceSourceOutput(input, sourceOutput);
+        attachSourceOutput(input, sourceOutput);
         targetTransaction.addInput(input);
         return this;
     }
@@ -87,10 +86,4 @@ public class OrdTransactionBuilder extends TransactionBuilder {
         prepareInputsForSigning(outputTransaction, provider);
     }
 
-    /** 把来源输出挂到输入上（新 SDK 以 sourceTransaction 携带连接输出）。 */
-    private static void announceSourceOutput(TransactionInput input, TransactionOutput output) {
-        Transaction source = new Transaction();
-        source.outputs = Lists.newArrayList(output);
-        input.sourceTransaction = source;
-    }
 }

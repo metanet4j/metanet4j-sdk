@@ -32,7 +32,7 @@ public class RemoteOrdTransactionBuilder extends RemoteTransactionBuilder {
     public RemoteOrdTransactionBuilder addOrdInput(BsvUtxo utxo) {
         Script lockingScript = utxo.getScript() == null
                 ? new Script() : Script.fromBinary(utxo.getScript());
-        TransactionOutput sourceOutput = new TransactionOutput(lockingScript, utxo.getSatoshis());
+        TransactionOutput sourceOutput = new TransactionOutput(lockingScript, utxo.getValue().toSdkValue());
         TransactionInput input = new TransactionInput(utxo.getHash().toString(), (int) utxo.getIndex(),
                 new Script());
         input.sequence = 0xffff_ffffL;

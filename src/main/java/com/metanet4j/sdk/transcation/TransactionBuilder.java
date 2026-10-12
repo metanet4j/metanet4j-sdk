@@ -99,13 +99,14 @@ public class TransactionBuilder {
         TransactionInput input = new TransactionInput(utxo.getHash().toString(), (int) utxo.getIndex(),
                 new Script());
         input.sequence = 0xffff_ffffL;
-        attachSourceOutput(input, new TransactionOutput(lockingScript, utxo.getSatoshis()));
+        attachSourceOutput(input, new TransactionOutput(lockingScript, utxo.getValue().toSdkValue()));
         targetTransaction.addInput(input);
         return this;
     }
 
     /** 追加一个已有输出作为花费来源。 */
     public TransactionBuilder addInput(TransactionOutput output) {
+        BsvAmount.fromSdkValue(output.satoshis);
         TransactionInput input = new TransactionInput(null, 0, new Script());
         input.sequence = 0xffff_ffffL;
         attachSourceOutput(input, output);
@@ -149,6 +150,8 @@ public class TransactionBuilder {
      */
     public BsvAmount calculateChangeAmount(Transaction transaction, AddressEnhance address,
                                            BsvAmount feePerKb) {
+        feePerKb.toSdkValue();
+        BsvAmount available = inputSum(transaction).subtract(outputSum(transaction));
         long size = 0;
         size += outputSize(new TransactionOutput(new P2PKH().lock(address.toBase58()), 0d));
         size += Writer.varIntNum(transaction.outputs.size() + 1).size();
@@ -156,9 +159,15 @@ public class TransactionBuilder {
         for (TransactionInput transactionInput : transaction.inputs) {
             size += getUnLockScriptSize(transactionInput, lockingScriptOf(transactionInput));
         }
-        BsvAmount localFee = BsvAmount.valueOf((long) Math.ceil(size * feePerKb.getValue() / 1000.0));
+        BsvAmount localFee = BsvAmount.valueOf(java.math.BigDecimal.valueOf(size)
+                .multiply(java.math.BigDecimal.valueOf(feePerKb.getValue()))
+                .divide(java.math.BigDecimal.valueOf(1000), 0, java.math.RoundingMode.CEILING)
+                .longValueExact());
         this.fee = localFee;
-        this.changeAmount = inputSum(transaction).subtract(outputSum(transaction)).subtract(localFee);
+        this.changeAmount = available.subtract(localFee);
+        if (this.changeAmount.isNegative()) {
+            throw new IllegalArgumentException("输入余额不足以支付输出和手续费");
+        }
         return this.changeAmount;
     }
 
@@ -199,6 +208,7 @@ public class TransactionBuilder {
     }
 
     public TransactionBuilder withFeeKb(BsvAmount feePerKb) {
+        feePerKb.toSdkValue();
         this.feePerKb = feePerKb;
         return this;
     }
@@ -221,6 +231,9 @@ public class TransactionBuilder {
      */
     public Transaction completeAndSignTx(SigningKeyProvider provider, int hashFlags,
                                          boolean anyoneCanPay) throws SignErrorException {
+        for (TransactionOutput output : targetTransaction.outputs) {
+            BsvAmount.fromSdkValue(output.satoshis);
+        }
         prepareInputsForSigning(targetTransaction, provider, hashFlags, anyoneCanPay);
         try {
             targetTransaction.sign().toCompletableFuture().join();
@@ -256,6 +269,7 @@ public class TransactionBuilder {
             if (pubKeyHash.length == 0) {
                 continue;
             }
+            double sourceSatoshis = BsvAmount.fromSdkValue(sourceOutputOf(input).satoshis).toSdkValue();
             // 注意：部分提供者（如 BapProviderKeyBag）在解析不到密钥时**抛 RuntimeException**
             // 而不是返回 null（BapProviderKeyBagTest 明确要求该行为）。
             // 但本层的契约是「签名失败以 SignErrorException 上报」，故此处需把两种表现统一转换，
@@ -270,7 +284,7 @@ public class TransactionBuilder {
                 throw new SignErrorException("交易输入 " + i + " 找不到可签名密钥");
             }
             input.unlockingScriptTemplate = new P2PKH().unlock(key.getKey(), signOutputs,
-                    anyoneCanPay, satoshisOf(input));
+                    anyoneCanPay, sourceSatoshis);
         }
     }
 
@@ -316,15 +330,6 @@ public class TransactionBuilder {
         return output == null || output.lockingScript == null ? new Script() : output.lockingScript;
     }
 
-    /** 输入的连接输出金额；未知返回 {@code null}。 */
-    private static Double satoshisOf(TransactionInput input) {
-        TransactionOutput output = sourceOutputOf(input);
-        if (output != null && output.satoshis instanceof Number number) {
-            return number.doubleValue();
-        }
-        return null;
-    }
-
     private static TransactionOutput sourceOutputOf(TransactionInput input) {
         // 【§87 收敛】原为四处各一份的私有副本，现委托全项目唯一实现（TxHelperExtend）。
         return com.metanet4j.sdk.utils.TxHelperExtend.sourceOutputOf(input);
@@ -342,8 +347,11 @@ public class TransactionBuilder {
     private static BsvAmount inputSum(Transaction transaction) {
         BsvAmount sum = BsvAmount.ZERO;
         for (TransactionInput input : transaction.inputs) {
-            Double satoshis = satoshisOf(input);
-            sum = sum.add(BsvAmount.valueOf(satoshis == null ? 0L : satoshis.longValue()));
+            TransactionOutput source = sourceOutputOf(input);
+            if (source == null) {
+                throw new IllegalArgumentException("输入缺少连接输出，无法计算金额");
+            }
+            sum = sum.add(BsvAmount.fromSdkValue(source.satoshis));
         }
         return sum;
     }
@@ -352,8 +360,7 @@ public class TransactionBuilder {
     private static BsvAmount outputSum(Transaction transaction) {
         BsvAmount sum = BsvAmount.ZERO;
         for (TransactionOutput output : transaction.outputs) {
-            long satoshis = output.satoshis instanceof Number number ? number.longValue() : 0L;
-            sum = sum.add(BsvAmount.valueOf(satoshis));
+            sum = sum.add(BsvAmount.fromSdkValue(output.satoshis));
         }
         return sum;
     }

@@ -248,34 +248,59 @@ class TransactionBuilderContractTest {
     }
 
     @Test
-    void changeAmountToleratesMissingOrNonNumericFields() {
-        // 覆盖 §95 所列若干兜底（套路①：传坏输入）——**入口按 §99 的结论改为 `calculateChangeAmount`**：
-        //   :157 lockingScriptOf —— 输入无连接输出、或其无锁定脚本时返回空脚本；
-        //   :309—312 satoshisOf —— 无连接输出、或 satoshis 非 Number 时返回 null；
-        //   :333 inputSum —— 上游为 null 时按 0 计；
-        //   :342 outputSum —— 输出 satoshis 非 Number 时按 0 计。
-        // （:289 outputSize 的 null 侧已由 §99 判定不可达——其唯一调用点传入的是硬编码的非 null P2PKH 输出。）
-        TransactionBuilder builder = new TransactionBuilder(bap, keyProvider);
-        builder.addInput(utxo(9, 0, 20_000))                    // 对照：正常输入
-                .addOutput(BsvAmount.valueOf(777), paymentAddress);
+    void changeAmountRejectsMissingOrNonNumericFields() {
+        for (Object value : new Object[] {null, "1000", 1.5d, -1d,
+                9_007_199_254_740_992d, Double.NaN, Double.POSITIVE_INFINITY}) {
+            TransactionBuilder input = new TransactionBuilder(bap, keyProvider);
+            input.addInput(utxo(9, 0, 20_000)).addOutput(BsvAmount.valueOf(777), paymentAddress);
+            sourceOutput(input.getTargetTransaction(), 0).satoshis = value;
+            assertThrows(IllegalArgumentException.class, () -> input.calculateChangeAmount(
+                    input.getTargetTransaction(), paymentAddress, BsvAmount.ZERO));
+            assertThrows(IllegalArgumentException.class, () -> input.completeAndSignTx(keyProvider, true));
 
-        // 追加"无来源交易"的输入 → satoshisOf 返回 null → inputSum 按 0 计
-        builder.getTargetTransaction().inputs.add(new TransactionInput(
-                new BsvHashBytes(new byte[32]).toString(), 0, new Script()));
+            TransactionBuilder output = new TransactionBuilder(bap, keyProvider);
+            output.addInput(utxo(9, 0, 20_000)).addOutput(BsvAmount.valueOf(777), paymentAddress);
+            output.getTargetTransaction().outputs.get(0).satoshis = value;
+            assertThrows(IllegalArgumentException.class, () -> output.calculateChangeAmount(
+                    output.getTargetTransaction(), paymentAddress, BsvAmount.ZERO));
+            assertThrows(IllegalArgumentException.class, () -> output.completeAndSignTx(keyProvider, true));
+        }
+        TransactionBuilder disconnected = new TransactionBuilder(bap, keyProvider);
+        disconnected.getTargetTransaction().inputs.add(new TransactionInput("00".repeat(32), 0, new Script()));
+        assertThrows(IllegalArgumentException.class, () -> disconnected.calculateChangeAmount(
+                disconnected.getTargetTransaction(), paymentAddress, BsvAmount.ZERO));
+    }
 
-        // 注：**"锁定脚本为 null 的输出"暂不放入**——实测它会让 calculateChangeAmount 抛 NPE
-        //（见 migration-rules §100：某条路径未对 lockingScript 判空）。该现象已单独记录，
-        // 待定性后再决定是补测还是登记；本用例先覆盖其余可达的兜底。
+    @Test
+    void transactionAmountEntrypointsRejectNegativeAndUnsafeIntegers() {
+        for (long value : new long[] {-1L, 9_007_199_254_740_992L, Long.MAX_VALUE}) {
+            TransactionBuilder builder = new TransactionBuilder(bap, keyProvider);
+            assertThrows(IllegalArgumentException.class, () -> builder.addInput(utxo(9, 0, value)));
+            assertThrows(IllegalArgumentException.class, () -> builder.addOutput(BsvAmount.valueOf(value), paymentAddress));
+            assertThrows(IllegalArgumentException.class, () -> builder.withFeeKb(BsvAmount.valueOf(value)));
+        }
+        TransactionBuilder insufficient = new TransactionBuilder(bap, keyProvider);
+        insufficient.addInput(utxo(9, 0, 1)).addOutput(BsvAmount.valueOf(2), paymentAddress);
+        assertThrows(IllegalArgumentException.class, () -> insufficient.changeAddress(paymentAddress));
+        assertThrows(IllegalArgumentException.class, () -> insufficient.calculateChangeAmount(
+                insufficient.getTargetTransaction(), paymentAddress, BsvAmount.valueOf(-1)));
+    }
 
-        // 追加"satoshis 非 Number"的输出 → outputSum 按 0 计（新 SDK 的类型宽松使这是真实可能状态）
-        com.metanet4j.bsv.transaction.TransactionOutput nonNumeric =
-                new com.metanet4j.bsv.transaction.TransactionOutput(new Script(), 0d);
-        nonNumeric.satoshis = com.metanet4j.bsv.primitives.Undefined.INSTANCE;
-        builder.getTargetTransaction().outputs.add(nonNumeric);
+    @Test
+    void feeAndInputTotalsRejectLongOverflow() {
+        TransactionBuilder overflowingInputs = new TransactionBuilder(bap, null);
+        for (int i = 0; i < 1025; i++) {
+            overflowingInputs.addInput(utxo(i % 127, 0, 9_007_199_254_740_991L));
+        }
+        assertThrows(ArithmeticException.class, () -> overflowingInputs.calculateChangeAmount(
+                overflowingInputs.getTargetTransaction(), paymentAddress, BsvAmount.ZERO));
 
-        BsvAmount change = builder.calculateChangeAmount(
-                builder.getTargetTransaction(), paymentAddress, BsvAmount.valueOf(0));
-        assertNotNull(change, "字段残缺时仍应算出找零（各兜底生效），而非抛错");
+        TransactionBuilder overflowingFee = new TransactionBuilder(bap, null);
+        overflowingFee.getTargetTransaction().outputs.add(new TransactionOutput(
+                new Script().writeBin(java.util.Collections.nCopies(1_100_000, 0)), 0d));
+        assertThrows(ArithmeticException.class, () -> overflowingFee.calculateChangeAmount(
+                overflowingFee.getTargetTransaction(), paymentAddress,
+                BsvAmount.valueOf(9_007_199_254_740_991L)));
     }
 
     @Test
