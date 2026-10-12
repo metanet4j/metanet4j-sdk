@@ -22,7 +22,7 @@ import org.slf4j.LoggerFactory;
  * Ordinals 输入签名器（业务组件）。
  *
  * <p>旧实现实现 bitcoinj 的 {@code TransactionSigner}；按迁移计划 §3 该抽象已取消，
- * 改为「按公钥哈希取私钥 → 注入解锁模板 → 交给交易签名」，本类只保留单输入签名入口。
+ * 改为「按公钥哈希取私钥 → 注入解锁模板 → 交给交易签名」，保留单输入与批量签名入口。
  */
 public class OrdinalsTransactionSigner {
     private static final Logger log = LoggerFactory.getLogger(OrdinalsTransactionSigner.class);
@@ -86,16 +86,19 @@ public class OrdinalsTransactionSigner {
     /**
      * 批量签名：对每个可签名输入注入解锁模板，再交给交易签名。
      *
-     * @return 是否全部输入都已具备签名
+     * @return 是否有输入签成；零输入返回 true，部分成功不代表整个交易已有效
      */
     public boolean signInputs(Transaction tx, SigningKeyProvider keyProvider, int hashFlags,
                               boolean anyoneCanPay) {
         if (tx == null) {
             return false;
         }
+        boolean signedAny = false;
         for (int i = 0; i < tx.inputs.size(); i++) {
             if (!signInput(tx, i, keyProvider, hashFlags, anyoneCanPay)) {
                 log.warn("Skip input {} during batch signing", i);
+            } else {
+                signedAny = true;
             }
         }
         try {
@@ -104,7 +107,7 @@ public class OrdinalsTransactionSigner {
             log.warn("交易签名失败：{}", e.getMessage());
             return false;
         }
-        return true;
+        return tx.inputs.isEmpty() || signedAny;
     }
 
     private static TransactionOutput sourceOutputOf(TransactionInput input) {

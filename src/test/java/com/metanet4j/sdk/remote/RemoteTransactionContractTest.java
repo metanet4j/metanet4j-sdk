@@ -237,7 +237,7 @@ class RemoteTransactionContractTest {
         assertTrue(signer.signInputs(tx, keyProvider, TransactionSignature.SIGHASH_ALL, false),
                 "无上下文公钥但有本地密钥时，应改用本地公钥完成回填");
 
-        // ③ 提供者解析不到密钥 → 无上下文公钥、也无本地密钥 → 跳过该输入（返回 true，不失败）
+        // ③ 无上下文公钥、也无本地密钥：唯一输入不能完成回填，返回 false。
         RemoteTransactionBuilder builder2 = new RemoteTransactionBuilder(remoteBap, keyProvider);
         builder2.addInput(paymentUtxo(1))
                 .addOutput(BsvAmount.valueOf(777), paymentAddress)
@@ -247,8 +247,8 @@ class RemoteTransactionContractTest {
         request2.setSigB64(Base64.encode(toBytes(paymentKey.sign(request2.getPreSignHash()).toDER())));
         PreSignHashUtils.setPreSignHashContext(request2);
 
-        assertTrue(signer.signInputs(tx2, pubkeyHash -> null, TransactionSignature.SIGHASH_ALL, false),
-                "两者皆无时应跳过该输入、而非让整批失败");
+        assertFalse(signer.signInputs(tx2, pubkeyHash -> null, TransactionSignature.SIGHASH_ALL, false),
+                "唯一输入缺少签名材料时应报告失败");
     }
 
     @Test
@@ -270,8 +270,8 @@ class RemoteTransactionContractTest {
         input.sourceTransaction = source;
         tx.inputs.add(input);
 
-        assertTrue(signer.signInputs(tx, keyProvider, TransactionSignature.SIGHASH_ALL, false),
-                "无法识别的脚本应被跳过、而非让整批签名失败");
+        assertFalse(signer.signInputs(tx, keyProvider, TransactionSignature.SIGHASH_ALL, false),
+                "全部输入脚本无法识别时应报告失败");
         // 该输入未被回填（unlockingScript 仍是构造时的值）
         assertSame(Script.class, asScript(input.unlockingScript).getClass(),
                 "被跳过的输入不应被改写为新的解锁脚本");
@@ -397,14 +397,12 @@ class RemoteTransactionContractTest {
 
     @Test
     void remoteOrdinalBuilderReportsSignerFailure() {
-        // 覆盖迁移（migration-rules §23）：旧用例断言「注入的签名器返回失败 → SignErrorException」。
-        // 新架构的远程构建器**不在本地签名**（只准备预签名哈希，签名由外部服务返回后回填），
-        // 因此不存在「本地签名失败」这一路径。改为断言该设计事实：解析不到密钥时也不产出解锁脚本。
+        // 没有远程签名材料时，构建器必须向调用方报告签名失败。
         SigningKeyProvider noKeys = pubkeyHash -> null;
         RemoteOrdTransactionBuilder builder = new RemoteOrdTransactionBuilder(remoteBap, noKeys);
         builder.addInput(paymentUtxo(5));
 
-        assertSame(builder, builder.signTx(noKeys, true));
+        assertThrows(SignErrorException.class, () -> builder.signTx(noKeys, true));
         assertEquals(0, unlockingScriptBytes(builder.build(), 0).length,
                 "远程流程不本地签名，解锁脚本应保持为空");
     }
@@ -456,9 +454,24 @@ class RemoteTransactionContractTest {
         ExtendForSignTransaction proposed = new ExtendForSignTransaction(
                 tx, TransactionSignature.SIGHASH_ALL, true, false);
 
-        assertTrue(new RemoteTransactionSigner().signInputs(proposed.partialTx, keyProvider,
+        assertFalse(new RemoteTransactionSigner().signInputs(proposed.partialTx, keyProvider,
                 TransactionSignature.SIGHASH_ALL, false));
         assertEquals(0, unlockingScriptBytes(proposed.partialTx, 0).length);
+    }
+
+    @Test
+    void partialRemoteBatchKeepsTheSignatureItCanFill() {
+        RemoteTransactionBuilder builder = new RemoteTransactionBuilder(remoteBap, keyProvider);
+        builder.addInput(paymentUtxo(1)).addOutput(BsvAmount.valueOf(777), paymentAddress);
+        builder.getTargetTransaction().inputs.add(
+                new TransactionInput(new BsvHashBytes(new byte[32]).toString(), 0, new Script()));
+        PreSignHashContext request = builder.getTxInputSignHash(false, remoteBap).get(0);
+        sign(request, paymentKey);
+
+        assertTrue(new RemoteTransactionSigner().signInputs(builder.getTargetTransaction(), keyProvider,
+                TransactionSignature.SIGHASH_ALL, false));
+        assertTrue(unlockingScriptBytes(builder.getTargetTransaction(), 0).length > 0);
+        assertEquals(0, unlockingScriptBytes(builder.getTargetTransaction(), 1).length);
     }
 
     @Test

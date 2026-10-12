@@ -83,9 +83,9 @@ class SignerTransactionContractTest {
                 () -> OrdinalsTransactionSigner.signInput(orphan, 0, keyProvider,
                         TransactionSignature.SIGHASH_ALL, false),
                 "单输入签名遇到缺失连接输出应显式报错");
-        assertTrue(new RemoteTransactionSigner().signInputs(orphan, keyProvider,
+        assertFalse(new RemoteTransactionSigner().signInputs(orphan, keyProvider,
                         TransactionSignature.SIGHASH_ALL, true),
-                "批量签名遇到缺失连接输出应跳过该输入而非整体失败");
+                "全部输入都被跳过时不能报告签名成功");
     }
 
     @Test
@@ -106,9 +106,31 @@ class SignerTransactionContractTest {
         // 关键：**不应抛错**——批量的契约是"跳过签不了的、继续处理其余"
         boolean allSigned = new OrdinalsTransactionSigner().signInputs(tx, noKeys,
                 TransactionSignature.SIGHASH_ALL, false);
-        // allSigned 的真假取决于 `tx.sign()` 是否容忍"无模板的输入"（§93 已实测其**容忍**）——
-        // 两种取值都合法，故此处只断言"调用正常返回"，并把它记入日志便于观察实际取值
-        System.out.println("[§272 观察] signInputs 返回：" + allSigned);
+        assertFalse(allSigned, "没有任何输入签成时应报告失败");
+    }
+
+    @Test
+    void partialBatchSigningKeepsTheSignableInput() {
+        Transaction tx = transactionWithPaymentInput();
+        Transaction unsupported = new Transaction();
+        unsupported.outputs.add(new TransactionOutput(null, 1d));
+        TransactionInput input = new TransactionInput(new BsvHashBytes(new byte[32]).toString(), 0,
+                new Script());
+        input.sourceTransaction = unsupported;
+        tx.inputs.add(input);
+
+        assertTrue(new OrdinalsTransactionSigner().signInputs(tx, keyProvider,
+                TransactionSignature.SIGHASH_ALL, false), "保留已有部分成功语义");
+        assertEquals(TransactionSignature.SIGHASH_ALL | TransactionSignature.SIGHASH_FORKID,
+                signatureHashType(tx, 0));
+    }
+
+    @Test
+    void emptyBatchesNeedNoSignatures() {
+        assertTrue(new OrdinalsTransactionSigner().signInputs(new Transaction(), null,
+                TransactionSignature.SIGHASH_ALL, false));
+        assertTrue(new RemoteTransactionSigner().signInputs(new Transaction(), null,
+                TransactionSignature.SIGHASH_ALL, false));
     }
 
     @Test
@@ -218,8 +240,8 @@ class SignerTransactionContractTest {
 
         assertFalse(OrdinalsTransactionSigner.signInput(tx, 0, noKeys,
                 TransactionSignature.SIGHASH_ALL, false), "单输入遇到无法解析的密钥应返回 false");
-        assertTrue(new RemoteTransactionSigner().signInputs(tx, noKeys,
-                TransactionSignature.SIGHASH_ALL, true), "批量签名应跳过无法解析的输入");
+        assertFalse(new RemoteTransactionSigner().signInputs(tx, noKeys,
+                TransactionSignature.SIGHASH_ALL, true), "全部输入都无法解析时应报告失败");
     }
 
     /** 单输入交易：连接输出为标准 P2PKH，供签名使用。 */

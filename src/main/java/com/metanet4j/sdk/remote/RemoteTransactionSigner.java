@@ -36,13 +36,14 @@ public class RemoteTransactionSigner {
      * @param tx          待签名交易（新 SDK 模型）
      * @param hashFlags   SIGHASH 基础类型（{@code TransactionSignature.SIGHASH_*}）
      * @param anyoneCanPay 是否 ANYONECANPAY
-     * @return 是否全部输入都已具备签名
+     * @return 是否有输入完成回填；零输入返回 true，部分成功不代表整个交易已有效
      */
     public boolean signInputs(Transaction tx, SigningKeyProvider keyProvider, int hashFlags,
                               boolean anyoneCanPay) {
         if (tx == null) {
             return false;
         }
+        boolean signedAny = false;
         for (int i = 0; i < tx.inputs.size(); i++) {
             TransactionInput txIn = tx.inputs.get(i);
             TransactionOutput sourceOutput = sourceOutputOf(txIn);
@@ -111,8 +112,9 @@ public class RemoteTransactionSigner {
             }
             txIn.unlockingScript = new Script().writeBin(checksig)
                     .writeBin(toBoxed(pubKeyBytes));
+            signedAny = true;
         }
-        return true;
+        return tx.inputs.isEmpty() || signedAny;
     }
 
     private static TransactionOutput sourceOutputOf(TransactionInput input) {
