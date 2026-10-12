@@ -1,20 +1,13 @@
 package com.metanet4j.sdk.crypto;
 
-import cn.hutool.core.collection.CollectionUtil;
-import cn.hutool.core.util.RandomUtil;
 import com.metanet4j.base.bsv.BsvNetwork;
-import com.metanet4j.bsv.compat.Bip39WordlistEn;
 import com.metanet4j.bsv.compat.HD;
-import com.metanet4j.bsv.compat.Mnemonic;
 import com.metanet4j.sdk.PrivateKey;
 import com.metanet4j.sdk.PublicKey;
 import com.metanet4j.sdk.address.AddressEnhance;
 import com.metanet4j.sdk.bap.BapPath;
 import com.metanet4j.sdk.exception.InvalidKeyException;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 import lombok.Data;
 
 /**
@@ -35,13 +28,7 @@ public final class CryptoHelper {
 
     public static CryptoBase generateRootCryptoBase(List<String> wordList, String salt,
                                                     BsvNetwork parameters) throws InvalidKeyException {
-        // 空列表按约定生成随机钱包：必须用能产出**合法** BIP39 助记词（含校验和）的
-        // Mnemonic.fromRandom()，而非 generateWordList()（只随机抽词、无校验和，
-        // 交给 Mnemonic.fromString 必然抛 "does not pass the check"）。
-        HD master = CollectionUtil.isEmpty(wordList)
-                ? HD.fromSeed(Mnemonic.fromRandom().toSeed(salt))
-                : HD.fromSeed(Mnemonic.fromString(
-                        String.join(Bip39WordlistEn.SPACE, wordList)).toSeed(salt));
+        HD master = MasterPrivateKey.fromSeed(wordList, salt).getMasterDeterministicKey();
         HD deterministicKey = BapPath.parse(ROOT_DERIVATION_PATH).derive(master);
         return getCryptoBase(parameters, deterministicKey);
     }
