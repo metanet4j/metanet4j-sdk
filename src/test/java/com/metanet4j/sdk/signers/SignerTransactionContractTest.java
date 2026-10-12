@@ -2,6 +2,8 @@ package com.metanet4j.sdk.signers;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -116,6 +118,27 @@ class SignerTransactionContractTest {
                 TransactionSignature.SIGHASH_ALL, false));
         assertEquals(0, ((Script) tx.inputs.get(1).unlockingScript).toUint8Array().length);
         com.metanet4j.sdk.TransactionScriptAssertions.assertInputScriptValid(tx, 0);
+    }
+
+    @Test
+    void directSigningRejectsInvalidAmountsBeforeInstallingATemplate() {
+        for (Object amount : new Object[] {null, "1", -1, 0.5, Double.NaN, Double.POSITIVE_INFINITY,
+                9_007_199_254_740_992d}) {
+            for (boolean useForkId : new boolean[] {false, true}) {
+                Transaction tx = transactionWithPaymentInput();
+                com.metanet4j.sdk.utils.TxHelperExtend.sourceOutputOf(tx.inputs.get(0)).satoshis = amount;
+                assertThrows(IllegalArgumentException.class, () -> OrdinalsTransactionSigner.signInput(
+                        tx, 0, keyProvider, TransactionSignature.SIGHASH_ALL, useForkId, false));
+                assertNull(tx.inputs.get(0).unlockingScriptTemplate);
+            }
+        }
+        for (double amount : new double[] {0, 9_007_199_254_740_991d}) {
+            Transaction tx = transactionWithPaymentInput();
+            com.metanet4j.sdk.utils.TxHelperExtend.sourceOutputOf(tx.inputs.get(0)).satoshis = amount;
+            assertTrue(OrdinalsTransactionSigner.signInput(tx, 0, keyProvider,
+                    TransactionSignature.SIGHASH_ALL, false));
+            assertNotNull(tx.inputs.get(0).unlockingScriptTemplate);
+        }
     }
 
     @Test

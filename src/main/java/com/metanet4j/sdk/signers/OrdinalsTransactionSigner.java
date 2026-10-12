@@ -84,7 +84,7 @@ public class OrdinalsTransactionSigner {
             return false;
         }
         txIn.unlockingScriptTemplate = ScriptExtend.unlockingTemplate(key, hashFlags, useForkId,
-                anyoneCanPay, satoshisOf(sourceOutput));
+                anyoneCanPay, BsvAmount.fromSdkValue(sourceOutput.satoshis).toSdkValue());
         return true;
     }
 
@@ -127,10 +127,6 @@ public class OrdinalsTransactionSigner {
     private static TransactionOutput sourceOutputOf(TransactionInput input) {
         // 【§87 收敛】原为四处各一份的私有副本，现委托全项目唯一实现（TxHelperExtend）。
         return com.metanet4j.sdk.utils.TxHelperExtend.sourceOutputOf(input);
-    }
-
-    private static Double satoshisOf(TransactionOutput output) {
-        return output.satoshis instanceof Number number ? number.doubleValue() : null;
     }
 
     private static byte[] pubKeyHashOf(Script script) {
