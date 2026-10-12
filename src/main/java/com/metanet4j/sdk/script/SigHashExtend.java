@@ -71,9 +71,8 @@ public class SigHashExtend {
         params.scope = scope;
 
         byte[] preimage = TransactionSignature.formatBip143(params);
-        // 双 SHA-256 的结果是**内部序**字节，必须用 of(byte[]) 直接承载；
-        // 曾误用 fromList(List)（按显示序解释）导致摘要整体反序、与独立计算器不一致。
-        return BsvHashBytes.of(toBytes(Hash.hash256(toBoxed(preimage), null)));
+        // 摘要已执行双 SHA-256；wrap 直接承载内部字节，of 会错误地再哈希一次。
+        return BsvHashBytes.wrap(toBytes(Hash.hash256(toBoxed(preimage), null)));
     }
 
     /** 摘要的 hex 形式（显示序），便于日志与断言。 */

@@ -133,6 +133,25 @@ class RemoteOrdTransactionTemplateContractTest {
     }
 
     @Test
+    void sendsAnOrdinalFromANonzeroSourceOutput() {
+        BsvUtxo original = ordinalUtxo();
+        BsvUtxo indexed = new BsvUtxo(original.getHash(), 2, original.getSatoshis(),
+                0, false, null, original.getScript());
+        RemoteOrdTransactionTemplate template = new RemoteOrdTransactionTemplate(false, false);
+        RemoteOrdTransactionBuilder unsigned = template.prepareSendOrdinal(remoteBap, indexed,
+                paymentUtxo(), destination, paymentAddress, 500, null, null, RemoteSignType.CURRENT);
+        assertEquals(2, unsigned.build().inputs.get(0).sourceOutputIndex);
+        assertNotNull(com.metanet4j.sdk.utils.TxHelperExtend.sourceOutputOf(unsigned.build().inputs.get(0)));
+        signRemoteInputs(unsigned.getTxInputSignHash(false, remoteBap));
+        template.setDoInputSign(true);
+
+        Transaction signed = template.prepareSendOrdinal(remoteBap, indexed, paymentUtxo(),
+                destination, paymentAddress, 500, null, null, RemoteSignType.CURRENT).build();
+        assertUnlockingScriptValid(signed, 0);
+        assertUnlockingScriptValid(signed, 1);
+    }
+
+    @Test
     void sendsAnExistingOrdinalWithTwoSpendableInputs() {
         // migration-rules §29：本用例名要求「两个**可花费**输入」，基线却配 `(false, false)`
         // （不签名），与断言矛盾（同一配置另有用例断言未签名）。按本意走既有 staged 模式：
@@ -424,15 +443,7 @@ class RemoteOrdTransactionTemplateContractTest {
      * R6 的向量验收（V09）承担，此偏差已在 evidence 登记。
      */
     private static void assertUnlockingScriptValid(Transaction tx, int index) {
-        Object unlocking = tx.inputs.get(index).unlockingScript;
-        Script script = unlocking instanceof Script value ? value
-                : Script.fromBinary((byte[]) unlocking);
-        var chunks = script.getChunks();
-        assertTrue(chunks.size() >= 1, "输入 " + index + " 的解锁脚本不应为空");
-        byte[] signature = com.metanet4j.sdk.utils.ScriptHelper.getPushData(chunks.get(0));
-        assertNotNull(signature, "解锁脚本首项应为签名");
-        int scope = signature[signature.length - 1] & 0xFF;
-        assertTrue((scope & 0x40) != 0 || (scope & 0x1F) >= 1, "签名尾字节应含合法 SIGHASH 范围：" + scope);
+        com.metanet4j.sdk.TransactionScriptAssertions.assertInputScriptValid(tx, index);
     }
 
     private static byte[] toBytes(java.util.List<?> values) {

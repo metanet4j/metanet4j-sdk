@@ -454,9 +454,7 @@ class TransactionBuilderContractTest {
     }
 
     private static void assertUnlockingScriptValid(Transaction tx, int index) {
-        byte[] signature = com.metanet4j.sdk.utils.ScriptHelper
-                .getPushData(asScript(tx.inputs.get(index).unlockingScript).getChunks().get(0));
-        assertNotNull(signature, "解锁脚本首项应为签名");
+        com.metanet4j.sdk.TransactionScriptAssertions.assertInputScriptValid(tx, index);
     }
 
     private static Script asScript(Object unlockingScript) {

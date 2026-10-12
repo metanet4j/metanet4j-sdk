@@ -6,7 +6,6 @@ import com.metanet4j.bsv.primitives.TransactionSignature;
 import com.metanet4j.bsv.script.OP;
 import com.metanet4j.bsv.script.Script;
 import com.metanet4j.bsv.script.ScriptChunk;
-import com.metanet4j.bsv.script.templates.P2PKH;
 import com.metanet4j.bsv.transaction.Transaction;
 import com.metanet4j.bsv.transaction.TransactionInput;
 import com.metanet4j.bsv.transaction.TransactionOutput;
@@ -14,7 +13,7 @@ import com.metanet4j.sdk.PrivateKey;
 import com.metanet4j.sdk.address.AddressEnhance;
 import com.metanet4j.sdk.bap.SigningKeyProvider;
 import com.metanet4j.sdk.context.PreSignHashContext;
-import com.metanet4j.sdk.script.ScriptExtend;
+import com.metanet4j.sdk.exception.SignErrorException;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,9 +21,7 @@ import org.slf4j.LoggerFactory;
 /**
  * 远程签名器：按预签名上下文把远程返回的签名回填到输入。
  *
- * <p>旧实现继承 bitcoinj 的 {@code TransactionSigner} 并遍历输入签名；按迁移计划 §3，
- * 该抽象已取消，改为「按输入的公钥哈希取回签名 → 注入解锁模板 → 交给交易签名」，
- * 因此本类改为普通业务组件（不再实现旧接口）。
+ * <p>按输入摘要查询预签名上下文，校验签名者及签名，再直接回填解锁脚本。
  */
 public class RemoteTransactionSigner {
 
@@ -65,10 +62,11 @@ public class RemoteTransactionSigner {
                 continue;
             }
             PreSignHashContext context;
+            com.metanet4j.base.bsv.BsvHashBytes preSignHash;
             try {
                 // 按与 RemoteTransactionBuilder.getTxInputSignHash 相同的口径重算该输入的前像哈希，
                 // 再查预签名上下文；此前用 ZERO_HASH 查询，永远匹配不到任何上下文。
-                com.metanet4j.base.bsv.BsvHashBytes preSignHash =
+                preSignHash =
                         com.metanet4j.sdk.script.SigHashExtend.hashForForkIdSignature(tx, i,
                                 scriptPubKey.toUint8Array(),
                                 com.metanet4j.base.bsv.BsvAmount.fromSdkValue(sourceOutput.satoshis),
@@ -80,36 +78,37 @@ public class RemoteTransactionSigner {
             }
             // 远程流程**不依赖本地私钥**：预签名上下文里已带远程服务返回的公钥，
             // 用它拼装解锁脚本即可（keyProvider 为空或解析不到密钥时不应跳过该输入）。
-            PrivateKey key = keyProvider == null ? null : keyProvider.findKeyFromPubHash(pubKeyHash);
-            byte[] pubKeyBytes = context.getPublicKey() != null
-                    ? context.getPublicKey().getPubKeyBytes()
-                    : key == null ? null : key.getPubKey();
+            byte[] pubKeyBytes;
+            if (context.getPublicKey() != null) {
+                pubKeyBytes = context.getPublicKey().getPubKeyBytes();
+            } else {
+                PrivateKey key;
+                try {
+                    key = keyProvider == null ? null : keyProvider.findKeyFromPubHash(pubKeyHash);
+                } catch (RuntimeException missing) {
+                    key = null;
+                }
+                pubKeyBytes = key == null ? null : key.getPubKey();
+            }
             if (pubKeyBytes == null) {
                 log.warn("输入 {} 既无预签名上下文公钥、也无本地密钥，跳过远程签名回填。", i);
                 continue;
             }
-            // 远程返回的是 DER（含 sighash 尾字节）的 Base64
+            // 远程返回的是纯 DER 签名的 Base64。
             Signature signature = Signature.fromDER(Base64.decode(context.getSigB64()));
-            if (key != null) {
-                txIn.unlockingScriptTemplate = new P2PKH().unlock(key.getKey(),
-                        ScriptExtend.signOutputsOf(hashFlags), anyoneCanPay, satoshisOf(sourceOutput));
+            if (!com.metanet4j.bsv.primitives.Utils.toHex(pubKeyHash).equals(
+                    com.metanet4j.bsv.primitives.Utils.toHex(com.metanet4j.bsv.primitives.Hash.hash160(pubKeyBytes, null)))
+                    || !com.metanet4j.bsv.primitives.ECDSA.verify(
+                            new com.metanet4j.bsv.primitives.BigNumber(toBoxed(preSignHash.getBytes())), signature,
+                            com.metanet4j.bsv.primitives.PublicKey.fromDER(toBoxed(pubKeyBytes)))) {
+                throw new SignErrorException("远程签名与输入摘要或签名者不匹配");
             }
-            // toChecksigFormat 是子类 TransactionSignature 的能力：签名器产出即该类型
             List<Integer> checksig = new java.util.ArrayList<>();
-            if (signature instanceof com.metanet4j.bsv.primitives.TransactionSignature ts) {
-                checksig.addAll(ts.toChecksigFormat());
-            } else {
-                // 上下文中存的是**纯 DER**（远程服务返回），解锁脚本需要 DER + SIGHASH 尾字节；
-                // 缺少尾字节会让脚本无法通过校验（且尾字节本身就是范围声明）。
-                for (Double b : signature.toDER()) {
-                    checksig.add(b.intValue());
-                }
-                checksig.add(ScriptExtend.signOutputsOf(hashFlags).equals("single")
-                        ? (TransactionSignature.SIGHASH_SINGLE | TransactionSignature.SIGHASH_FORKID
-                           | (anyoneCanPay ? TransactionSignature.SIGHASH_ANYONECANPAY : 0))
-                        : (TransactionSignature.SIGHASH_ALL | TransactionSignature.SIGHASH_FORKID
-                           | (anyoneCanPay ? TransactionSignature.SIGHASH_ANYONECANPAY : 0)));
+            for (Double b : signature.toDER()) {
+                checksig.add(b.intValue());
             }
+            checksig.add((hashFlags & 31) | TransactionSignature.SIGHASH_FORKID
+                    | (anyoneCanPay ? TransactionSignature.SIGHASH_ANYONECANPAY : 0));
             txIn.unlockingScript = new Script().writeBin(checksig)
                     .writeBin(toBoxed(pubKeyBytes));
             signedAny = true;
@@ -120,10 +119,6 @@ public class RemoteTransactionSigner {
     private static TransactionOutput sourceOutputOf(TransactionInput input) {
         // 【§87 收敛】原为四处各一份的私有副本，现委托全项目唯一实现（TxHelperExtend）。
         return com.metanet4j.sdk.utils.TxHelperExtend.sourceOutputOf(input);
-    }
-
-    private static Double satoshisOf(TransactionOutput output) {
-        return output.satoshis instanceof Number number ? number.doubleValue() : null;
     }
 
     private static byte[] pubKeyHashOf(Script script) {

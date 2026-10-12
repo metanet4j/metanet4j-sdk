@@ -13,6 +13,7 @@ import com.metanet4j.sdk.bap.BapBaseCore;
 import com.metanet4j.sdk.bap.RemoteBapBase;
 import com.metanet4j.sdk.bap.SigningKeyProvider;
 import com.metanet4j.sdk.context.PreSignHashContext;
+import com.metanet4j.sdk.exception.SignErrorException;
 import com.metanet4j.sdk.script.SigHashExtend;
 import com.metanet4j.sdk.sigma.Sigma;
 import com.metanet4j.sdk.transcation.LockingScriptBuilder;
@@ -66,6 +67,14 @@ public class RemoteTransactionBuilder extends TransactionBuilder implements Tran
     @Override
     protected void prepareInputsForSigning(Transaction transaction, SigningKeyProvider provider) {
         // no-op：远程签名由 RemoteTransactionSigner 回填
+    }
+
+    @Override
+    protected void prepareInputsForSigning(Transaction transaction, SigningKeyProvider provider,
+                                           int hashFlags, boolean anyoneCanPay) {
+        if (!getRemoteTransactionSigner().signInputs(transaction, provider, hashFlags, anyoneCanPay)) {
+            throw new SignErrorException("没有输入完成远程签名回填");
+        }
     }
 
     @Override

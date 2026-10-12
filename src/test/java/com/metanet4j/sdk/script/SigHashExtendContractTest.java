@@ -150,7 +150,7 @@ class SigHashExtendContractTest {
         write32(preimage, (int) tx.lockTime);
         int flag = type | TransactionSignature.SIGHASH_FORKID;
         write32(preimage, anyoneCanPay ? flag | TransactionSignature.SIGHASH_ANYONECANPAY : flag);
-        return BsvHashBytes.of(twice(preimage.toByteArray()));
+        return BsvHashBytes.wrap(twice(preimage.toByteArray()));
     }
 
     /** sourceTXID 为显示序 hex；前像需要内部字节序。 */

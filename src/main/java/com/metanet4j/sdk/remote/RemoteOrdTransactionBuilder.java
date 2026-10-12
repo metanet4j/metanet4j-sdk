@@ -36,9 +36,7 @@ public class RemoteOrdTransactionBuilder extends RemoteTransactionBuilder {
         TransactionInput input = new TransactionInput(utxo.getHash().toString(), (int) utxo.getIndex(),
                 new Script());
         input.sequence = 0xffff_ffffL;
-        Transaction source = new Transaction();
-        source.outputs = com.google.common.collect.Lists.newArrayList(sourceOutput);
-        input.sourceTransaction = source;
+        attachSourceOutput(input, sourceOutput);
         this.getTargetTransaction().addInput(input);
         return this;
     }

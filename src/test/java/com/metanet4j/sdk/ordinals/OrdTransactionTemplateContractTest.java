@@ -160,11 +160,7 @@ class OrdTransactionTemplateContractTest {
      * 脚本级花费校验移至 R6 向量验收 V09 承担，属已登记偏差）。
      */
     private static void assertUnlockingScriptValid(Transaction tx, int index) {
-        byte[] signature = ScriptHelper.getPushData(asScript(tx.inputs.get(index).unlockingScript)
-                .getChunks().get(0));
-        assertNotNull(signature, "解锁脚本首项应为签名");
-        int scope = signature[signature.length - 1] & 0xFF;
-        assertTrue((scope & 0x40) != 0 || (scope & 0x1F) >= 1, "签名尾字节应含合法 SIGHASH 范围：" + scope);
+        com.metanet4j.sdk.TransactionScriptAssertions.assertInputScriptValid(tx, index);
     }
 
     private static Script asScript(Object unlockingScript) {

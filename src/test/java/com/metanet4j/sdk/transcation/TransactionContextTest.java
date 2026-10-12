@@ -125,12 +125,7 @@ public class TransactionContextTest {
     }
 
     protected static void assertUnlockingScriptValid(Transaction transaction, int index) {
-        Script script = asScript(transaction.inputs.get(index).unlockingScript);
-        assertTrue(script.toUint8Array().length > 0, "输入 " + index + " 的解锁脚本不应为空");
-        byte[] signature = ScriptHelper.getPushData(script.getChunks().get(0));
-        assertNotNull(signature, "解锁脚本首项应为签名");
-        int scope = signature[signature.length - 1] & 0xFF;
-        assertTrue((scope & 0x40) != 0 || (scope & 0x1F) >= 1, "签名尾字节应含合法范围：" + scope);
+        com.metanet4j.sdk.TransactionScriptAssertions.assertInputScriptValid(transaction, index);
     }
 
     private static Script asScript(Object unlockingScript) {

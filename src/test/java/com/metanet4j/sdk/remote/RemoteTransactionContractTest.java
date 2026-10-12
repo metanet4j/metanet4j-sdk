@@ -40,6 +40,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 
 class RemoteTransactionContractTest {
@@ -55,6 +57,51 @@ class RemoteTransactionContractTest {
     @AfterEach
     void clearSignedHashes() {
         PreSignHashUtils.clear();
+    }
+
+    @Test
+    void remoteBuilderCompletesUsingOnlyThePublicSignatureContext() {
+        SigningKeyProvider forbidden = hash -> {
+            throw new AssertionError("远程回填不能请求本地私钥");
+        };
+        RemoteTransactionBuilder builder = new RemoteTransactionBuilder(remoteBap, forbidden);
+        builder.addInput(paymentUtxo(1)).addOutput(BsvAmount.valueOf(777), paymentAddress);
+        sign(builder.getTxInputSignHash(false, remoteBap).get(0), paymentKey);
+
+        Transaction signed = builder.completeAndSignTx(forbidden, true);
+        assertUnlockingScriptValid(signed, 0);
+    }
+
+    @Test
+    void remoteBuilderRejectsCompletionWithoutASignedContext() {
+        RemoteTransactionBuilder builder = new RemoteTransactionBuilder(remoteBap, keyProvider);
+        builder.addInput(paymentUtxo(1)).addOutput(BsvAmount.valueOf(777), paymentAddress);
+
+        assertThrows(SignErrorException.class, () -> builder.completeAndSignTx(keyProvider, true));
+        assertEquals(0, unlockingScriptBytes(builder.getTargetTransaction(), 0).length);
+    }
+
+    @Test
+    void rejectsARemoteSignatureFromAnotherOwner() {
+        RemoteTransactionBuilder builder = new RemoteTransactionBuilder(remoteBap, keyProvider);
+        builder.addInput(paymentUtxo(1)).addOutput(BsvAmount.valueOf(777), paymentAddress);
+        sign(builder.getTxInputSignHash(false, remoteBap).get(0), PrivateKey.of(java.math.BigInteger.valueOf(3)));
+
+        assertThrows(SignErrorException.class, () -> new RemoteTransactionSigner().signInputs(
+                builder.getTargetTransaction(), keyProvider, TransactionSignature.SIGHASH_ALL, false));
+    }
+
+    @Test
+    void rejectsAWellFormedSignatureOfAnotherDigest() {
+        RemoteTransactionBuilder builder = new RemoteTransactionBuilder(remoteBap, keyProvider);
+        builder.addInput(paymentUtxo(1)).addOutput(BsvAmount.valueOf(777), paymentAddress);
+        PreSignHashContext request = builder.getTxInputSignHash(false, remoteBap).get(0);
+        request.setSigB64(Base64.encode(toBytes(paymentKey.sign(BsvHashBytes.ZERO_HASH).toDER())));
+        request.setPublicKey(paymentKey.getPublicKey());
+        PreSignHashUtils.setPreSignHashContext(request);
+
+        assertThrows(SignErrorException.class, () -> new RemoteTransactionSigner().signInputs(
+                builder.getTargetTransaction(), keyProvider, TransactionSignature.SIGHASH_ALL, false));
     }
 
     @Test
@@ -156,7 +203,7 @@ class RemoteTransactionContractTest {
         builder.addInput(paymentUtxo(1))
                 .addOutput(BsvAmount.valueOf(777), paymentAddress)
                 .changeAddress(paymentAddress);
-        PreSignHashContext request = builder.getTxInputSignHash(false, remoteBap).get(0);
+        PreSignHashContext request = builder.getTxInputSignHash(TransactionSignature.SIGHASH_SINGLE, false, remoteBap).get(0);
         sign(request, paymentKey);
 
         Transaction signed = builder.completeAndSignTx(keyProvider,
@@ -173,7 +220,8 @@ class RemoteTransactionContractTest {
         withFlag.addInput(paymentUtxo(1))
                 .addOutput(BsvAmount.valueOf(777), paymentAddress)
                 .changeAddress(paymentAddress);
-        PreSignHashContext flagged = withFlag.getTxInputSignHash(false, remoteBap).get(0);
+        PreSignHashContext flagged = withFlag.getTxInputSignHash(
+                TransactionSignature.SIGHASH_SINGLE, true, remoteBap).get(0);
         sign(flagged, paymentKey);
 
         Transaction signedWithFlag = withFlag.completeAndSignTx(keyProvider,
@@ -195,7 +243,7 @@ class RemoteTransactionContractTest {
             builder.addInput(paymentUtxo(1))
                     .addOutput(BsvAmount.valueOf(777), paymentAddress)
                     .changeAddress(paymentAddress);
-            PreSignHashContext request = builder.getTxInputSignHash(false, remoteBap).get(0);
+            PreSignHashContext request = builder.getTxInputSignHash(anyoneCanPay, remoteBap).get(0);
             sign(request, paymentKey);
 
             Transaction signed = builder.completeAndSignTx(keyProvider,
@@ -249,6 +297,10 @@ class RemoteTransactionContractTest {
 
         assertFalse(signer.signInputs(tx2, pubkeyHash -> null, TransactionSignature.SIGHASH_ALL, false),
                 "唯一输入缺少签名材料时应报告失败");
+        assertFalse(signer.signInputs(tx2, null, TransactionSignature.SIGHASH_ALL, false));
+        assertFalse(signer.signInputs(tx2, pubkeyHash -> {
+            throw new IllegalStateException("没有可用的本地密钥");
+        }, TransactionSignature.SIGHASH_ALL, false));
     }
 
     @Test
@@ -380,18 +432,22 @@ class RemoteTransactionContractTest {
         assertTrue(builder.getTxInputSignHash(false, remoteBap).isEmpty());
     }
 
-    @Test
-    void signsTheRequestedSingleAnyoneCanPayHash() {
+    @ParameterizedTest
+    @CsvSource({"1,false", "1,true", "2,false", "2,true", "3,false", "3,true"})
+    void signsEverySupportedScope(int scope, boolean anyoneCanPay) {
         RemoteTransactionBuilder builder = new RemoteTransactionBuilder(remoteBap, keyProvider);
         builder.addInput(paymentUtxo(4)).addOutput(BsvAmount.valueOf(777), paymentAddress);
         PreSignHashContext request = builder.getTxInputSignHash(
-                TransactionSignature.SIGHASH_SINGLE, true, remoteBap).get(0);
+                scope, anyoneCanPay, remoteBap).get(0);
         sign(request, paymentKey);
         ExtendForSignTransaction proposed = new ExtendForSignTransaction(
-                builder.getTargetTransaction(), TransactionSignature.SIGHASH_SINGLE, true, true);
+                builder.getTargetTransaction(), scope, true, anyoneCanPay);
 
         assertTrue(new RemoteTransactionSigner().signInputs(proposed.partialTx, keyProvider,
-                TransactionSignature.SIGHASH_SINGLE, true));
+                scope, anyoneCanPay));
+        assertEquals(scope | TransactionSignature.SIGHASH_FORKID
+                | (anyoneCanPay ? TransactionSignature.SIGHASH_ANYONECANPAY : 0),
+                signatureHashType(proposed.partialTx, 0));
         assertUnlockingScriptValid(proposed.partialTx, 0);
     }
 
@@ -513,9 +569,7 @@ class RemoteTransactionContractTest {
     }
 
     private static void assertUnlockingScriptValid(Transaction tx, int index) {
-        byte[] signature = com.metanet4j.sdk.utils.ScriptHelper
-                .getPushData(asScript(tx.inputs.get(index).unlockingScript).getChunks().get(0));
-        assertNotNull(signature, "解锁脚本首项应为签名");
+        com.metanet4j.sdk.TransactionScriptAssertions.assertInputScriptValid(tx, index);
     }
 
     private static Script asScript(Object unlockingScript) {
@@ -535,11 +589,9 @@ class RemoteTransactionContractTest {
     }
 
     private static TransactionOutput sourceOutput(Transaction tx, int index) {
-        if (tx.inputs.get(index).sourceTransaction instanceof Transaction source
-                && source.outputs != null && !source.outputs.isEmpty()) {
-            return source.outputs.get(0);
-        }
-        throw new IllegalStateException("输入 " + index + " 缺少连接输出");
+        TransactionOutput output = com.metanet4j.sdk.utils.TxHelperExtend.sourceOutputOf(tx.inputs.get(index));
+        assertNotNull(output, "输入 " + index + " 缺少连接输出");
+        return output;
     }
 
     private static byte[] unlockingScriptBytes(Transaction tx, int index) {

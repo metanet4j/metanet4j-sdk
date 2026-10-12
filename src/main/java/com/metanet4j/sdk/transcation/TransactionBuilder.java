@@ -294,7 +294,7 @@ public class TransactionBuilder {
     }
 
     /** 把来源输出挂到输入上（新 SDK 用 sourceTransaction 携带连接输出）。 */
-    private static void attachSourceOutput(TransactionInput input, TransactionOutput output) {
+    protected static void attachSourceOutput(TransactionInput input, TransactionOutput output) {
         // 【R6 修正】合成来源交易时，**必须把输出放在 input.sourceOutputIndex 所指的位置**——
         // 原实现固定放在 0 号，而 UTXO 的 vout 常不为 0（如测试夹具的 "vout": 1），
         // 于是 TxHelperExtend.sourceOutputOf 按索引取值时越界、取不到金额与锁定脚本
