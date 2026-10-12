@@ -22,7 +22,7 @@ import org.slf4j.LoggerFactory;
  * Ordinals 输入签名器（业务组件）。
  *
  * <p>旧实现实现 bitcoinj 的 {@code TransactionSigner}；按迁移计划 §3 该抽象已取消，
- * 改为「按公钥哈希取私钥 → 注入解锁模板 → 交给交易签名」，本类只保留单输入签名入口。
+ * 改为「按公钥哈希取私钥 → 注入解锁模板 → 交给交易签名」，保留单输入与批量签名入口。
  */
 public class OrdinalsTransactionSigner {
     private static final Logger log = LoggerFactory.getLogger(OrdinalsTransactionSigner.class);
@@ -44,6 +44,11 @@ public class OrdinalsTransactionSigner {
             SigningKeyProvider keyProvider,
             int hashFlags,
             boolean anyoneCanPay) {
+        return signInput(tx, inputIndex, keyProvider, hashFlags, true, anyoneCanPay);
+    }
+
+    public static boolean signInput(Transaction tx, int inputIndex, SigningKeyProvider keyProvider,
+                                   int hashFlags, boolean useForkId, boolean anyoneCanPay) {
         if (tx == null || inputIndex < 0 || inputIndex >= tx.inputs.size()) {
             throw new SignErrorException(StrUtil.format("when signInput,invalid input index {}", inputIndex));
         }
@@ -78,24 +83,36 @@ public class OrdinalsTransactionSigner {
             log.warn("No local key found for input {}", inputIndex);
             return false;
         }
-        txIn.unlockingScriptTemplate = new P2PKH().unlock(key.getKey(), ScriptExtend.signOutputsOf(hashFlags), anyoneCanPay,
-                satoshisOf(sourceOutput));
+        txIn.unlockingScriptTemplate = ScriptExtend.unlockingTemplate(key, hashFlags, useForkId,
+                anyoneCanPay, BsvAmount.fromSdkValue(sourceOutput.satoshis).toSdkValue());
         return true;
     }
 
     /**
      * 批量签名：对每个可签名输入注入解锁模板，再交给交易签名。
      *
-     * @return 是否全部输入都已具备签名
+     * @return 是否有输入签成；零输入返回 true，部分成功不代表整个交易已有效
      */
     public boolean signInputs(Transaction tx, SigningKeyProvider keyProvider, int hashFlags,
                               boolean anyoneCanPay) {
+        return signInputs(tx, keyProvider, hashFlags, true, anyoneCanPay);
+    }
+
+    public boolean signInputs(Transaction tx, SigningKeyProvider keyProvider, int hashFlags,
+                              boolean useForkId, boolean anyoneCanPay) {
         if (tx == null) {
             return false;
         }
+        boolean signedAny = false;
         for (int i = 0; i < tx.inputs.size(); i++) {
-            if (!signInput(tx, i, keyProvider, hashFlags, anyoneCanPay)) {
+            if (sourceOutputOf(tx.inputs.get(i)) == null) {
+                log.warn("Skip disconnected input {} during batch signing", i);
+                continue;
+            }
+            if (!signInput(tx, i, keyProvider, hashFlags, useForkId, anyoneCanPay)) {
                 log.warn("Skip input {} during batch signing", i);
+            } else {
+                signedAny = true;
             }
         }
         try {
@@ -104,16 +121,12 @@ public class OrdinalsTransactionSigner {
             log.warn("交易签名失败：{}", e.getMessage());
             return false;
         }
-        return true;
+        return tx.inputs.isEmpty() || signedAny;
     }
 
     private static TransactionOutput sourceOutputOf(TransactionInput input) {
         // 【§87 收敛】原为四处各一份的私有副本，现委托全项目唯一实现（TxHelperExtend）。
         return com.metanet4j.sdk.utils.TxHelperExtend.sourceOutputOf(input);
-    }
-
-    private static Double satoshisOf(TransactionOutput output) {
-        return output.satoshis instanceof Number number ? number.doubleValue() : null;
     }
 
     private static byte[] pubKeyHashOf(Script script) {

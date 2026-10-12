@@ -59,7 +59,7 @@ class OrdTransactionBuilderContractTest {
     @Test
     void signsPaymentAndInscribedInputsInMemory() {
         OrdTransactionBuilder builder = new OrdTransactionBuilder(bap, keyProvider);
-        builder.addOrdInput(ordinalUtxo(1, 0)).addInput(paymentUtxo(2, 0, 20_000));
+        builder.addOrdInput(ordinalUtxo(1, 2)).addInput(paymentUtxo(2, 0, 20_000));
         builder.addOrdOutput(ordAddress, "x".getBytes(StandardCharsets.US_ASCII), "text/plain", null);
         builder.withFeeKb(BsvAmount.valueOf(500)).changeAddress(paymentAddress);
 
@@ -69,8 +69,9 @@ class OrdTransactionBuilderContractTest {
         assertEquals(2, signed.inputs.size());
         assertEquals(inputSum(signed).getValue(),
                 outputSum(signed).add(builder.getFee()).getValue(), "输入金额 = 输出金额 + 手续费");
-        for (TransactionInput input : signed.inputs) {
-            assertTrue(asScript(input.unlockingScript).toUint8Array().length > 0, "解锁脚本不应为空");
+        assertEquals(2, signed.inputs.get(0).sourceOutputIndex);
+        for (int i = 0; i < signed.inputs.size(); i++) {
+            com.metanet4j.sdk.TransactionScriptAssertions.assertInputScriptValid(signed, i);
         }
     }
 
@@ -103,8 +104,9 @@ class OrdTransactionBuilderContractTest {
 
         builder.signTx(keyProvider, false);
 
-        assertEquals(TransactionSignature.SIGHASH_ALL | TransactionSignature.SIGHASH_FORKID,
+        assertEquals(TransactionSignature.SIGHASH_ALL,
                 signatureHashType(builder.build().inputs.get(0)), "便捷重载应使用 SIGHASH_ALL");
+        com.metanet4j.sdk.TransactionScriptAssertions.assertInputScriptValid(builder.build(), 0);
     }
 
     /** 余额支付输入的 UTXO（锁定脚本为标准 P2PKH）。 */
@@ -174,10 +176,9 @@ class OrdTransactionBuilderContractTest {
     private static BsvAmount inputSum(Transaction transaction) {
         BsvAmount sum = BsvAmount.ZERO;
         for (TransactionInput input : transaction.inputs) {
-            if (input.sourceTransaction instanceof Transaction source && source.outputs != null
-                    && !source.outputs.isEmpty()) {
-                sum = sum.add(BsvAmount.valueOf(satoshisOf(source.outputs.get(0))));
-            }
+            TransactionOutput source = com.metanet4j.sdk.utils.TxHelperExtend.sourceOutputOf(input);
+            assertNotNull(source);
+            sum = sum.add(BsvAmount.fromSdkValue(source.satoshis));
         }
         return sum;
     }

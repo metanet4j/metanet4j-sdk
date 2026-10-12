@@ -111,10 +111,12 @@ class RemoteOrdTransactionTemplateContractTest {
         assertTrue(template.isDoInputSign());
         assertFalse(template.isDoBsmSign());
 
-        // 覆盖迁移（migration-rules §23）：旧用例注入 mock 的 RemoteTransactionSigner 并期望
-        // SignErrorException；新架构按 §3 取消了可注入的签名器抽象（远程签名器是普通业务组件，
-        // 且远程流程不本地签名），故该路径不存在。改为断言开关对产物的**实际影响**：
-        // 未注册预签名上下文时，开启输入签名也不会产出解锁脚本（远程流程依赖外部回填）。
+        // 开启签名必须尝试回填；缺少远程材料时应向调用方报错。
+        org.junit.jupiter.api.Assertions.assertThrows(SignErrorException.class, () -> template.createOrdinal(
+                List.of(bap.getPayAccountAddress()), provider, destination, paymentAddress,
+                500, inscription("switch"), null, remoteBap,
+                new RemoteTransactionSigner(), RemoteSignType.CURRENT));
+        template.setDoInputSign(false);
         RemoteOrdTransactionBuilder builder = template.createOrdinal(
                 List.of(bap.getPayAccountAddress()), provider, destination, paymentAddress,
                 500, inscription("switch"), null, remoteBap,
@@ -128,6 +130,25 @@ class RemoteOrdTransactionTemplateContractTest {
         RemoteOrdTransactionTemplate template = new RemoteOrdTransactionTemplate();
         assertTrue(template.isDoBsmSign());
         assertTrue(template.isDoInputSign());
+    }
+
+    @Test
+    void sendsAnOrdinalFromANonzeroSourceOutput() {
+        BsvUtxo original = ordinalUtxo();
+        BsvUtxo indexed = new BsvUtxo(original.getHash(), 2, original.getSatoshis(),
+                0, false, null, original.getScript());
+        RemoteOrdTransactionTemplate template = new RemoteOrdTransactionTemplate(false, false);
+        RemoteOrdTransactionBuilder unsigned = template.prepareSendOrdinal(remoteBap, indexed,
+                paymentUtxo(), destination, paymentAddress, 500, null, null, RemoteSignType.CURRENT);
+        assertEquals(2, unsigned.build().inputs.get(0).sourceOutputIndex);
+        assertNotNull(com.metanet4j.sdk.utils.TxHelperExtend.sourceOutputOf(unsigned.build().inputs.get(0)));
+        signRemoteInputs(unsigned.getTxInputSignHash(false, remoteBap));
+        template.setDoInputSign(true);
+
+        Transaction signed = template.prepareSendOrdinal(remoteBap, indexed, paymentUtxo(),
+                destination, paymentAddress, 500, null, null, RemoteSignType.CURRENT).build();
+        assertUnlockingScriptValid(signed, 0);
+        assertUnlockingScriptValid(signed, 1);
     }
 
     @Test
@@ -422,15 +443,7 @@ class RemoteOrdTransactionTemplateContractTest {
      * R6 的向量验收（V09）承担，此偏差已在 evidence 登记。
      */
     private static void assertUnlockingScriptValid(Transaction tx, int index) {
-        Object unlocking = tx.inputs.get(index).unlockingScript;
-        Script script = unlocking instanceof Script value ? value
-                : Script.fromBinary((byte[]) unlocking);
-        var chunks = script.getChunks();
-        assertTrue(chunks.size() >= 1, "输入 " + index + " 的解锁脚本不应为空");
-        byte[] signature = com.metanet4j.sdk.utils.ScriptHelper.getPushData(chunks.get(0));
-        assertNotNull(signature, "解锁脚本首项应为签名");
-        int scope = signature[signature.length - 1] & 0xFF;
-        assertTrue((scope & 0x40) != 0 || (scope & 0x1F) >= 1, "签名尾字节应含合法 SIGHASH 范围：" + scope);
+        com.metanet4j.sdk.TransactionScriptAssertions.assertInputScriptValid(tx, index);
     }
 
     private static byte[] toBytes(java.util.List<?> values) {

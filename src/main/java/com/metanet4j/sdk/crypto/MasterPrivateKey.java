@@ -7,10 +7,12 @@ import com.metanet4j.bsv.compat.Bip39WordlistEn;
 import com.metanet4j.bsv.compat.HD;
 import com.metanet4j.bsv.compat.Mnemonic;
 import com.metanet4j.bsv.primitives.PrivateKey;
+import com.metanet4j.bsv.primitives.Hash;
 import com.metanet4j.bsv.primitives.Utils;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -70,8 +72,11 @@ public class MasterPrivateKey {
             // 空列表按约定「生成随机钱包」，同样需要合法助记词（见 fromSeed() 的说明）。
             return new MasterPrivateKey(HD.fromSeed(Mnemonic.fromRandom().toSeed(salt)));
         }
-        List<Integer> seed = Mnemonic.fromString(String.join(Bip39WordlistEn.SPACE, wordList))
-                .toSeed(salt);
+        // 历史入口直接以原 UTF-8 词串派生；新增 checksum 或 Unicode 规范化会改变旧钱包。
+        List<Double> seed = Hash.pbkdf2(
+                Utils.toArray(String.join(Bip39WordlistEn.SPACE, wordList), "utf8"),
+                Utils.toArray("mnemonic" + Objects.requireNonNull(salt, "passphrase"), "utf8"),
+                2048, 64, "sha512");
         return new MasterPrivateKey(HD.fromSeed(seed));
     }
 
@@ -84,7 +89,7 @@ public class MasterPrivateKey {
     }
 
     /**
-     * 从 BIP39 英文单词表随机抽取指定数量的不重复单词。
+     * 标准长度生成合法 BIP39 助记词；其他长度保留原有不重复字典采样用途。
      *
      * @throws IllegalArgumentException 数量越界（小于 0 或超过单词表容量）
      */
@@ -92,6 +97,9 @@ public class MasterPrivateKey {
         List<String> dictionary = Bip39WordlistEn.VALUE;
         if (len < 0 || len > dictionary.size()) {
             throw new IllegalArgumentException("word count out of range: " + len);
+        }
+        if (len >= 12 && len <= 24 && len % 3 == 0) {
+            return StrUtil.split(Mnemonic.fromRandom(len * 32 / 3).toString(), " ");
         }
         Set<Integer> indexSet = new HashSet<>();
         while (indexSet.size() != len) {

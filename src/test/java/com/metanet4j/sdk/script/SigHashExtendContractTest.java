@@ -30,6 +30,50 @@ import org.junit.jupiter.api.Test;
 class SigHashExtendContractTest {
 
     @Test
+    void legacyDigestMatchesIndependentPreimageAcrossFlagsAndSingleBug() throws Exception {
+        Transaction tx = transaction(2);
+        byte[] connectedScript = script(new byte[] {7, 8});
+        for (int type : new int[] {1, 2, 3}) {
+            for (boolean anyoneCanPay : new boolean[] {false, true}) {
+                assertEquals(referenceLegacyDigest(tx, 1, connectedScript, type, anyoneCanPay),
+                        SigHashExtend.hashForSignature(tx, 1, connectedScript, BsvAmount.valueOf(900),
+                                type, anyoneCanPay, false));
+            }
+        }
+        byte[] one = new byte[32];
+        one[0] = 1;
+        assertEquals(BsvHashBytes.wrap(one), SigHashExtend.hashForSignature(transaction(1), 1,
+                connectedScript, BsvAmount.valueOf(900), 3, false, false));
+    }
+
+    /** 独立序列化原始交易前像；不调用 SDK 的前像编码器或生产摘要方法。 */
+    private static BsvHashBytes referenceLegacyDigest(Transaction tx, int selected, byte[] script,
+                                                      int type, boolean anyoneCanPay) throws Exception {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        write32(out, tx.version);
+        out.write(anyoneCanPay ? 1 : tx.inputs.size());
+        for (int i = 0; i < tx.inputs.size(); i++) {
+            if (anyoneCanPay && i != selected) continue;
+            TransactionInput input = tx.inputs.get(i);
+            out.write(outpointBytes(input.sourceTXID));
+            write32(out, input.sourceOutputIndex);
+            out.write(i == selected ? script.length : 0);
+            if (i == selected) out.write(script);
+            write32(out, i != selected && type != 1 ? 0 : sequenceOf(input));
+        }
+        out.write(type == 2 ? 0 : type == 3 ? selected + 1 : tx.outputs.size());
+        if (type != 2) {
+            for (int i = 0; i < (type == 3 ? selected + 1 : tx.outputs.size()); i++) {
+                if (type == 3 && i < selected) writeOutput(out, -1, new Script());
+                else writeOutput(out, satoshisOf(tx.outputs.get(i)), tx.outputs.get(i).lockingScript);
+            }
+        }
+        write32(out, tx.lockTime);
+        write32(out, type | (anyoneCanPay ? 128 : 0));
+        return BsvHashBytes.wrap(twice(out.toByteArray()));
+    }
+
+    @Test
     void forkIdDigestMatchesIndependentPreimageAcrossFlags() throws Exception {
         Transaction tx = transaction(2);
         byte[] connectedScript = script(new byte[] {7, 8});
@@ -150,7 +194,7 @@ class SigHashExtendContractTest {
         write32(preimage, (int) tx.lockTime);
         int flag = type | TransactionSignature.SIGHASH_FORKID;
         write32(preimage, anyoneCanPay ? flag | TransactionSignature.SIGHASH_ANYONECANPAY : flag);
-        return BsvHashBytes.of(twice(preimage.toByteArray()));
+        return BsvHashBytes.wrap(twice(preimage.toByteArray()));
     }
 
     /** sourceTXID 为显示序 hex；前像需要内部字节序。 */

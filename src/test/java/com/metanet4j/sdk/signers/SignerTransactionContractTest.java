@@ -1,6 +1,9 @@
 package com.metanet4j.sdk.signers;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -35,6 +38,21 @@ import org.junit.jupiter.api.Test;
  * 网络参数与旧解析器特性在新 SDK 无对应物（网络在 `AddressEnhance`／`BsvNetwork` 层测试）。
  */
 class SignerTransactionContractTest {
+
+    @Test
+    void batchSigningPreservesLegacyScopesAndValidScripts() {
+        for (int scope : new int[] {1, 2, 3}) {
+            for (boolean anyoneCanPay : new boolean[] {false, true}) {
+                Transaction tx = transactionWithPaymentInput();
+                assertTrue(new OrdinalsTransactionSigner().signInputs(tx, keyProvider,
+                        scope, false, anyoneCanPay));
+                assertEquals(scope | (anyoneCanPay ? 128 : 0), signatureHashType(tx, 0));
+                com.metanet4j.sdk.TransactionScriptAssertions.assertInputScriptValid(tx, 0);
+                assertTrue(tx.inputs.get(0).unlockingScriptTemplate.estimateLength(tx, 0)
+                        .toCompletableFuture().join() >= 100);
+            }
+        }
+    }
 
     private final BapBase bap = BapBase.fromOnlyMasterPrivateKey(TestData.masterPrivateKey);
     private final SigningKeyProvider keyProvider = new BapBase.BapProviderKeyBag(bap);
@@ -83,9 +101,44 @@ class SignerTransactionContractTest {
                 () -> OrdinalsTransactionSigner.signInput(orphan, 0, keyProvider,
                         TransactionSignature.SIGHASH_ALL, false),
                 "单输入签名遇到缺失连接输出应显式报错");
-        assertTrue(new RemoteTransactionSigner().signInputs(orphan, keyProvider,
+        assertFalse(new RemoteTransactionSigner().signInputs(orphan, keyProvider,
                         TransactionSignature.SIGHASH_ALL, true),
-                "批量签名遇到缺失连接输出应跳过该输入而非整体失败");
+                "全部输入都被跳过时不能报告签名成功");
+        byte[] before = ((Script) orphan.inputs.get(0).unlockingScript).toUint8Array();
+        assertFalse(new OrdinalsTransactionSigner().signInputs(orphan, null,
+                TransactionSignature.SIGHASH_ALL, false));
+        assertArrayEquals(before, ((Script) orphan.inputs.get(0).unlockingScript).toUint8Array());
+    }
+
+    @Test
+    void batchSigningSkipsDisconnectedInputsAndSignsTheRemainingInput() {
+        Transaction tx = transactionWithPaymentInput();
+        tx.inputs.add(new TransactionInput(new BsvHashBytes(new byte[32]).toString(), 0, new Script()));
+        assertTrue(new OrdinalsTransactionSigner().signInputs(tx, keyProvider,
+                TransactionSignature.SIGHASH_ALL, false));
+        assertEquals(0, ((Script) tx.inputs.get(1).unlockingScript).toUint8Array().length);
+        com.metanet4j.sdk.TransactionScriptAssertions.assertInputScriptValid(tx, 0);
+    }
+
+    @Test
+    void directSigningRejectsInvalidAmountsBeforeInstallingATemplate() {
+        for (Object amount : new Object[] {null, "1", -1, 0.5, Double.NaN, Double.POSITIVE_INFINITY,
+                9_007_199_254_740_992d}) {
+            for (boolean useForkId : new boolean[] {false, true}) {
+                Transaction tx = transactionWithPaymentInput();
+                com.metanet4j.sdk.utils.TxHelperExtend.sourceOutputOf(tx.inputs.get(0)).satoshis = amount;
+                assertThrows(IllegalArgumentException.class, () -> OrdinalsTransactionSigner.signInput(
+                        tx, 0, keyProvider, TransactionSignature.SIGHASH_ALL, useForkId, false));
+                assertNull(tx.inputs.get(0).unlockingScriptTemplate);
+            }
+        }
+        for (double amount : new double[] {0, 9_007_199_254_740_991d}) {
+            Transaction tx = transactionWithPaymentInput();
+            com.metanet4j.sdk.utils.TxHelperExtend.sourceOutputOf(tx.inputs.get(0)).satoshis = amount;
+            assertTrue(OrdinalsTransactionSigner.signInput(tx, 0, keyProvider,
+                    TransactionSignature.SIGHASH_ALL, false));
+            assertNotNull(tx.inputs.get(0).unlockingScriptTemplate);
+        }
     }
 
     @Test
@@ -94,10 +147,7 @@ class SignerTransactionContractTest {
         //   :97—98  `if (!signInput(...)) { log.warn("Skip input {} during batch signing", i); }`
         //           —— 某个输入签不了时**记警告后继续**，而非中断整批；
         //   :103—105 `tx.sign()` 抛错时 → log.warn + **返回 false**（把失败如实上报）。
-        // **实测所得的构造要点**：并非任何"签不了的输入"都能走到 :97—98 的跳过分支——
-        // 例如"缺连接输出"的输入会让 signInput **抛 SignErrorException**、直接越过循环传出，
-        // 于是 :97—98 根本不被求值。**能被"记警告后继续"的，是 signInput 返回 false 的那些情形**，
-        // 如"提供者找不到密钥"（§264 已实测其返回 false，而非抛错）。
+        // 批量跳过缺连接输出、无可用密钥或不识别的脚本；单输入仍显式报告缺连接输出。
         Transaction tx = transactionWithPaymentInput();
         SigningKeyProvider noKeys = pubkeyHash -> {
             throw new IllegalStateException("模拟提供者找不到密钥");
@@ -106,9 +156,31 @@ class SignerTransactionContractTest {
         // 关键：**不应抛错**——批量的契约是"跳过签不了的、继续处理其余"
         boolean allSigned = new OrdinalsTransactionSigner().signInputs(tx, noKeys,
                 TransactionSignature.SIGHASH_ALL, false);
-        // allSigned 的真假取决于 `tx.sign()` 是否容忍"无模板的输入"（§93 已实测其**容忍**）——
-        // 两种取值都合法，故此处只断言"调用正常返回"，并把它记入日志便于观察实际取值
-        System.out.println("[§272 观察] signInputs 返回：" + allSigned);
+        assertFalse(allSigned, "没有任何输入签成时应报告失败");
+    }
+
+    @Test
+    void partialBatchSigningKeepsTheSignableInput() {
+        Transaction tx = transactionWithPaymentInput();
+        Transaction unsupported = new Transaction();
+        unsupported.outputs.add(new TransactionOutput(null, 1d));
+        TransactionInput input = new TransactionInput(new BsvHashBytes(new byte[32]).toString(), 0,
+                new Script());
+        input.sourceTransaction = unsupported;
+        tx.inputs.add(input);
+
+        assertTrue(new OrdinalsTransactionSigner().signInputs(tx, keyProvider,
+                TransactionSignature.SIGHASH_ALL, false), "保留已有部分成功语义");
+        assertEquals(TransactionSignature.SIGHASH_ALL | TransactionSignature.SIGHASH_FORKID,
+                signatureHashType(tx, 0));
+    }
+
+    @Test
+    void emptyBatchesNeedNoSignatures() {
+        assertTrue(new OrdinalsTransactionSigner().signInputs(new Transaction(), null,
+                TransactionSignature.SIGHASH_ALL, false));
+        assertTrue(new RemoteTransactionSigner().signInputs(new Transaction(), null,
+                TransactionSignature.SIGHASH_ALL, false));
     }
 
     @Test
@@ -218,8 +290,8 @@ class SignerTransactionContractTest {
 
         assertFalse(OrdinalsTransactionSigner.signInput(tx, 0, noKeys,
                 TransactionSignature.SIGHASH_ALL, false), "单输入遇到无法解析的密钥应返回 false");
-        assertTrue(new RemoteTransactionSigner().signInputs(tx, noKeys,
-                TransactionSignature.SIGHASH_ALL, true), "批量签名应跳过无法解析的输入");
+        assertFalse(new RemoteTransactionSigner().signInputs(tx, noKeys,
+                TransactionSignature.SIGHASH_ALL, true), "全部输入都无法解析时应报告失败");
     }
 
     /** 单输入交易：连接输出为标准 P2PKH，供签名使用。 */

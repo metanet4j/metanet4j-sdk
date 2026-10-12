@@ -32,13 +32,11 @@ public class RemoteOrdTransactionBuilder extends RemoteTransactionBuilder {
     public RemoteOrdTransactionBuilder addOrdInput(BsvUtxo utxo) {
         Script lockingScript = utxo.getScript() == null
                 ? new Script() : Script.fromBinary(utxo.getScript());
-        TransactionOutput sourceOutput = new TransactionOutput(lockingScript, utxo.getSatoshis());
+        TransactionOutput sourceOutput = new TransactionOutput(lockingScript, utxo.getValue().toSdkValue());
         TransactionInput input = new TransactionInput(utxo.getHash().toString(), (int) utxo.getIndex(),
                 new Script());
         input.sequence = 0xffff_ffffL;
-        Transaction source = new Transaction();
-        source.outputs = com.google.common.collect.Lists.newArrayList(sourceOutput);
-        input.sourceTransaction = source;
+        attachSourceOutput(input, sourceOutput);
         this.getTargetTransaction().addInput(input);
         return this;
     }
@@ -79,7 +77,7 @@ public class RemoteOrdTransactionBuilder extends RemoteTransactionBuilder {
                                               boolean useForkId, boolean anyoneCanPay)
             throws SignErrorException {
         if (!this.getRemoteTransactionSigner().signInputs(this.getTargetTransaction(), keyProvider,
-                hashFlags, anyoneCanPay)) {
+                hashFlags, useForkId, anyoneCanPay)) {
             throw new SignErrorException();
         }
         return this;
