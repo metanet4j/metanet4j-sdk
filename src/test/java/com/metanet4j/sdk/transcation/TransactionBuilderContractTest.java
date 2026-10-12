@@ -59,6 +59,19 @@ class TransactionBuilderContractTest {
     }
 
     @Test
+    void defaultPreparationOverloadProducesAForkIdSignature() {
+        TransactionBuilder builder = new TransactionBuilder(bap, keyProvider);
+        builder.addInput(utxo(9, 0, 20_000)).addOutput(BsvAmount.valueOf(777), paymentAddress);
+        Transaction tx = builder.getTargetTransaction();
+        builder.prepareInputsForSigning(tx, keyProvider);
+        tx.sign().toCompletableFuture().join();
+        var signature = ScriptHelper.chunksOf((Script) tx.inputs.get(0).unlockingScript).get(0).data;
+        assertEquals(TransactionSignature.SIGHASH_ALL | TransactionSignature.SIGHASH_FORKID,
+                signature.get(signature.size() - 1));
+        assertUnlockingScriptValid(tx, 0);
+    }
+
+    @Test
     void addsProviderUtxoDataAndChangeWithoutLosingValue() {
         BsvUtxo utxo = utxo(1, 0, 20_000);
         UTXOProvider<AddressEnhance, BsvUtxo> provider = addresses -> {

@@ -60,6 +60,19 @@ class RemoteTransactionContractTest {
         assertUnlockingScriptValid(builder.build(), 0);
     }
 
+    @Test
+    void remotePreparationOverloadDefaultsToForkId() {
+        SigningKeyProvider forbidden = hash -> { throw new AssertionError("不能查询私钥"); };
+        RemoteTransactionBuilder builder = new RemoteTransactionBuilder(remoteBap, forbidden);
+        builder.addInput(paymentUtxo(9)).addOutput(BsvAmount.valueOf(777), paymentAddress);
+        sign(builder.getTxInputSignHash(false, remoteBap).get(0), paymentKey);
+        builder.prepareInputsForSigning(builder.getTargetTransaction(), forbidden,
+                TransactionSignature.SIGHASH_ALL, false);
+        assertEquals(TransactionSignature.SIGHASH_ALL | TransactionSignature.SIGHASH_FORKID,
+                signatureHashType(builder.getTargetTransaction(), 0));
+        assertUnlockingScriptValid(builder.getTargetTransaction(), 0);
+    }
+
     private final BapBase bap = BapBase.fromOnlyMasterPrivateKey(TestData.masterPrivateKey);
     private final RemoteBapBase remoteBap = new RemoteBapBase(bap.getRootAddress(),
             bap.getPreviouAddress(), bap.getCurrentAddress(), bap.getPayAccountAddress(),
