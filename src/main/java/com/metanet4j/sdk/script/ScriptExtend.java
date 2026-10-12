@@ -24,6 +24,43 @@ import java.util.List;
  */
 public final class ScriptExtend {
 
+    /** 用原生前像编码器承接原 API 的 legacy 签名；正常 ForkID 路径复用原生 P2PKH 模板。 */
+    public static com.metanet4j.bsv.script.ScriptTemplateUnlock unlockingTemplate(
+            com.metanet4j.sdk.PrivateKey key, int flags, boolean useForkId, boolean anyoneCanPay,
+            Double satoshis) {
+        if (useForkId) {
+            return new com.metanet4j.bsv.script.templates.P2PKH().unlock(key.getKey(),
+                    signOutputsOf(flags), anyoneCanPay, satoshis);
+        }
+        return new com.metanet4j.bsv.script.ScriptTemplateUnlock() {
+            @Override
+            public java.util.concurrent.CompletionStage<com.metanet4j.bsv.script.UnlockingScript> sign(
+                    Object transaction, int inputIndex) {
+                com.metanet4j.bsv.transaction.Transaction tx = (com.metanet4j.bsv.transaction.Transaction) transaction;
+                var source = TxHelperExtend.sourceOutputOf(tx.inputs.get(inputIndex));
+                var digest = SigHashExtend.hashForSignature(tx, inputIndex,
+                        source.lockingScript.toUint8Array(), com.metanet4j.base.bsv.BsvAmount.fromSdkValue(source.satoshis),
+                        flags, anyoneCanPay, false);
+                var signature = key.sign(digest);
+                int scope = flags | (anyoneCanPay ? com.metanet4j.bsv.primitives.TransactionSignature.SIGHASH_ANYONECANPAY : 0);
+                List<Integer> encoded = new com.metanet4j.bsv.primitives.TransactionSignature(
+                        signature.r, signature.s, scope).toChecksigFormat();
+                List<Integer> publicKey = new ArrayList<>();
+                for (byte value : key.getPubKey()) {
+                    publicKey.add(value & 255);
+                }
+                return java.util.concurrent.CompletableFuture.completedFuture(
+                        new com.metanet4j.bsv.script.UnlockingScript(List.of(
+                                new ScriptChunk(encoded.size(), encoded), new ScriptChunk(publicKey.size(), publicKey))));
+            }
+
+            @Override
+            public java.util.concurrent.CompletionStage<Integer> estimateLength(Object transaction, int inputIndex) {
+                return java.util.concurrent.CompletableFuture.completedFuture(SIG_SIZE + key.getPubKey().length);
+            }
+        };
+    }
+
     /**
      * SIGHASH 基础类型映射为解锁模板的 {@code signOutputs} 取值（all／none／single）。
      *

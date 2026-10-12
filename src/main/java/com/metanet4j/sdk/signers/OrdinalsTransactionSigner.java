@@ -44,6 +44,11 @@ public class OrdinalsTransactionSigner {
             SigningKeyProvider keyProvider,
             int hashFlags,
             boolean anyoneCanPay) {
+        return signInput(tx, inputIndex, keyProvider, hashFlags, true, anyoneCanPay);
+    }
+
+    public static boolean signInput(Transaction tx, int inputIndex, SigningKeyProvider keyProvider,
+                                   int hashFlags, boolean useForkId, boolean anyoneCanPay) {
         if (tx == null || inputIndex < 0 || inputIndex >= tx.inputs.size()) {
             throw new SignErrorException(StrUtil.format("when signInput,invalid input index {}", inputIndex));
         }
@@ -78,8 +83,8 @@ public class OrdinalsTransactionSigner {
             log.warn("No local key found for input {}", inputIndex);
             return false;
         }
-        txIn.unlockingScriptTemplate = new P2PKH().unlock(key.getKey(), ScriptExtend.signOutputsOf(hashFlags), anyoneCanPay,
-                satoshisOf(sourceOutput));
+        txIn.unlockingScriptTemplate = ScriptExtend.unlockingTemplate(key, hashFlags, useForkId,
+                anyoneCanPay, satoshisOf(sourceOutput));
         return true;
     }
 
@@ -90,12 +95,17 @@ public class OrdinalsTransactionSigner {
      */
     public boolean signInputs(Transaction tx, SigningKeyProvider keyProvider, int hashFlags,
                               boolean anyoneCanPay) {
+        return signInputs(tx, keyProvider, hashFlags, true, anyoneCanPay);
+    }
+
+    public boolean signInputs(Transaction tx, SigningKeyProvider keyProvider, int hashFlags,
+                              boolean useForkId, boolean anyoneCanPay) {
         if (tx == null) {
             return false;
         }
         boolean signedAny = false;
         for (int i = 0; i < tx.inputs.size(); i++) {
-            if (!signInput(tx, i, keyProvider, hashFlags, anyoneCanPay)) {
+            if (!signInput(tx, i, keyProvider, hashFlags, useForkId, anyoneCanPay)) {
                 log.warn("Skip input {} during batch signing", i);
             } else {
                 signedAny = true;

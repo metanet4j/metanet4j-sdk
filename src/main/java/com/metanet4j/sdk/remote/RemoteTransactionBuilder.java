@@ -72,7 +72,13 @@ public class RemoteTransactionBuilder extends TransactionBuilder implements Tran
     @Override
     protected void prepareInputsForSigning(Transaction transaction, SigningKeyProvider provider,
                                            int hashFlags, boolean anyoneCanPay) {
-        if (!getRemoteTransactionSigner().signInputs(transaction, provider, hashFlags, anyoneCanPay)) {
+        prepareInputsForSigning(transaction, provider, hashFlags, true, anyoneCanPay);
+    }
+
+    @Override
+    protected void prepareInputsForSigning(Transaction transaction, SigningKeyProvider provider,
+                                           int hashFlags, boolean useForkId, boolean anyoneCanPay) {
+        if (!getRemoteTransactionSigner().signInputs(transaction, provider, hashFlags, useForkId, anyoneCanPay)) {
             throw new SignErrorException("没有输入完成远程签名回填");
         }
     }
@@ -95,6 +101,11 @@ public class RemoteTransactionBuilder extends TransactionBuilder implements Tran
      */
     public List<PreSignHashContext> getTxInputSignHash(int hashFlags, boolean anyoneCanPay,
                                                        BapBaseCore bapBase) {
+        return getTxInputSignHash(hashFlags, true, anyoneCanPay, bapBase);
+    }
+
+    public List<PreSignHashContext> getTxInputSignHash(int hashFlags, boolean useForkId,
+                                                       boolean anyoneCanPay, BapBaseCore bapBase) {
         List<PreSignHashContext> preSignHashContexts = Lists.newArrayList();
         int numInputs = this.targetTransaction.inputs.size();
         for (int i = 0; i < numInputs; i++) {
@@ -107,9 +118,9 @@ public class RemoteTransactionBuilder extends TransactionBuilder implements Tran
             }
             Script scriptPubKey = sourceOutput.lockingScript == null
                     ? new Script() : sourceOutput.lockingScript;
-            BsvHashBytes hash = SigHashExtend.hashForForkIdSignature(this.targetTransaction, i,
+            BsvHashBytes hash = SigHashExtend.hashForSignature(this.targetTransaction, i,
                     scriptPubKey.toUint8Array(), BsvAmount.fromSdkValue(sourceOutput.satoshis),
-                    hashFlags, anyoneCanPay);
+                    hashFlags, anyoneCanPay, useForkId);
             preSignHashContext.setPreSignHash(hash);
 
             if (TxHelperExtend.isSentToOrdinals(scriptPubKey)) {

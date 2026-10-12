@@ -45,6 +45,14 @@ public class SigHashExtend {
                                                       BsvAmount prevValue,
                                                       int type,
                                                       boolean anyoneCanPay) {
+        return hashForSignature(transaction, inputIndex, connectedScript, prevValue, type,
+                anyoneCanPay, true);
+    }
+
+    /** 统一计算 ForkID 与原 API 的 legacy／OTDA 摘要。 */
+    public static BsvHashBytes hashForSignature(Transaction transaction, int inputIndex,
+            byte[] connectedScript, BsvAmount prevValue, int type, boolean anyoneCanPay,
+            boolean useForkId) {
         if (transaction == null) {
             throw new IllegalArgumentException("交易不能为空");
         }
@@ -55,7 +63,8 @@ public class SigHashExtend {
         }
         TransactionInput indexedInput = inputs.get(inputIndex);
 
-        int scope = type | (anyoneCanPay ? TransactionSignature.SIGHASH_ANYONECANPAY : 0) | SIGHASH_FORKID;
+        int scope = type | (anyoneCanPay ? TransactionSignature.SIGHASH_ANYONECANPAY : 0)
+                | (useForkId ? SIGHASH_FORKID : 0);
 
         TransactionSignature.Params params = new TransactionSignature.Params();
         params.sourceTXID = txidOf(indexedInput.sourceTXID);
@@ -70,7 +79,12 @@ public class SigHashExtend {
         params.lockTime = transaction.lockTime;
         params.scope = scope;
 
-        byte[] preimage = TransactionSignature.formatBip143(params);
+        if (TransactionSignature.usesOtdaSingleBug(params)) {
+            byte[] one = new byte[32];
+            one[0] = 1;
+            return BsvHashBytes.wrap(one);
+        }
+        byte[] preimage = TransactionSignature.formatBytes(params);
         // 摘要已执行双 SHA-256；wrap 直接承载内部字节，of 会错误地再哈希一次。
         return BsvHashBytes.wrap(toBytes(Hash.hash256(toBoxed(preimage), null)));
     }

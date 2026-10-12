@@ -37,6 +37,11 @@ public class RemoteTransactionSigner {
      */
     public boolean signInputs(Transaction tx, SigningKeyProvider keyProvider, int hashFlags,
                               boolean anyoneCanPay) {
+        return signInputs(tx, keyProvider, hashFlags, true, anyoneCanPay);
+    }
+
+    public boolean signInputs(Transaction tx, SigningKeyProvider keyProvider, int hashFlags,
+                              boolean useForkId, boolean anyoneCanPay) {
         if (tx == null) {
             return false;
         }
@@ -67,10 +72,10 @@ public class RemoteTransactionSigner {
                 // 按与 RemoteTransactionBuilder.getTxInputSignHash 相同的口径重算该输入的前像哈希，
                 // 再查预签名上下文；此前用 ZERO_HASH 查询，永远匹配不到任何上下文。
                 preSignHash =
-                        com.metanet4j.sdk.script.SigHashExtend.hashForForkIdSignature(tx, i,
+                        com.metanet4j.sdk.script.SigHashExtend.hashForSignature(tx, i,
                                 scriptPubKey.toUint8Array(),
                                 com.metanet4j.base.bsv.BsvAmount.fromSdkValue(sourceOutput.satoshis),
-                                hashFlags, anyoneCanPay);
+                                hashFlags, anyoneCanPay, useForkId);
                 context = PreSignHashUtils.getSignedHashContext(preSignHash);
             } catch (RuntimeException e) {
                 log.warn("输入 {} 缺少预签名上下文：{}", i, e.getMessage());
@@ -107,7 +112,7 @@ public class RemoteTransactionSigner {
             for (Double b : signature.toDER()) {
                 checksig.add(b.intValue());
             }
-            checksig.add((hashFlags & 31) | TransactionSignature.SIGHASH_FORKID
+            checksig.add((hashFlags & 31) | (useForkId ? TransactionSignature.SIGHASH_FORKID : 0)
                     | (anyoneCanPay ? TransactionSignature.SIGHASH_ANYONECANPAY : 0));
             txIn.unlockingScript = new Script().writeBin(checksig)
                     .writeBin(toBoxed(pubKeyBytes));

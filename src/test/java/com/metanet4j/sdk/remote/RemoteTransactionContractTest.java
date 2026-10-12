@@ -46,6 +46,20 @@ import org.mockito.ArgumentCaptor;
 
 class RemoteTransactionContractTest {
 
+    @ParameterizedTest
+    @CsvSource({"1,false", "1,true", "2,false", "2,true", "3,false", "3,true"})
+    void remoteBuildersPreserveLegacyScopesWithoutPrivateKeyLookup(int scope, boolean anyoneCanPay) {
+        SigningKeyProvider forbidden = hash -> { throw new AssertionError("不能查询私钥"); };
+        RemoteOrdTransactionBuilder builder = new RemoteOrdTransactionBuilder(remoteBap, forbidden);
+        builder.addInput(paymentUtxo(8)).addOutput(BsvAmount.valueOf(777), paymentAddress);
+        sign(builder.getTxInputSignHash(scope, false, anyoneCanPay, remoteBap).get(0), paymentKey);
+        builder.signTx(forbidden, scope, false, anyoneCanPay);
+        assertEquals(scope | (anyoneCanPay ? 128 : 0), signatureHashType(builder.build(), 0));
+        assertUnlockingScriptValid(builder.build(), 0);
+        assertSame(builder.build(), builder.completeAndSignTx(forbidden, scope, false, anyoneCanPay));
+        assertUnlockingScriptValid(builder.build(), 0);
+    }
+
     private final BapBase bap = BapBase.fromOnlyMasterPrivateKey(TestData.masterPrivateKey);
     private final RemoteBapBase remoteBap = new RemoteBapBase(bap.getRootAddress(),
             bap.getPreviouAddress(), bap.getCurrentAddress(), bap.getPayAccountAddress(),

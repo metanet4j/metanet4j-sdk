@@ -104,8 +104,9 @@ class OrdTransactionBuilderContractTest {
 
         builder.signTx(keyProvider, false);
 
-        assertEquals(TransactionSignature.SIGHASH_ALL | TransactionSignature.SIGHASH_FORKID,
+        assertEquals(TransactionSignature.SIGHASH_ALL,
                 signatureHashType(builder.build().inputs.get(0)), "便捷重载应使用 SIGHASH_ALL");
+        com.metanet4j.sdk.TransactionScriptAssertions.assertInputScriptValid(builder.build(), 0);
     }
 
     /** 余额支付输入的 UTXO（锁定脚本为标准 P2PKH）。 */

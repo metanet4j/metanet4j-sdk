@@ -220,7 +220,7 @@ public class TransactionBuilder {
      */
     public Transaction completeAndSignTx(SigningKeyProvider provider, boolean useForkId)
             throws SignErrorException {
-        return completeAndSignTx(provider, TransactionSignature.SIGHASH_ALL, false);
+        return completeAndSignTx(provider, TransactionSignature.SIGHASH_ALL, useForkId, false);
     }
 
     /**
@@ -231,10 +231,15 @@ public class TransactionBuilder {
      */
     public Transaction completeAndSignTx(SigningKeyProvider provider, int hashFlags,
                                          boolean anyoneCanPay) throws SignErrorException {
+        return completeAndSignTx(provider, hashFlags, true, anyoneCanPay);
+    }
+
+    public Transaction completeAndSignTx(SigningKeyProvider provider, int hashFlags,
+                                         boolean useForkId, boolean anyoneCanPay) throws SignErrorException {
         for (TransactionOutput output : targetTransaction.outputs) {
             BsvAmount.fromSdkValue(output.satoshis);
         }
-        prepareInputsForSigning(targetTransaction, provider, hashFlags, anyoneCanPay);
+        prepareInputsForSigning(targetTransaction, provider, hashFlags, useForkId, anyoneCanPay);
         try {
             targetTransaction.sign().toCompletableFuture().join();
         } catch (RuntimeException e) {
@@ -259,10 +264,14 @@ public class TransactionBuilder {
      */
     protected void prepareInputsForSigning(Transaction transaction, SigningKeyProvider provider,
                                            int hashFlags, boolean anyoneCanPay) {
+        prepareInputsForSigning(transaction, provider, hashFlags, true, anyoneCanPay);
+    }
+
+    protected void prepareInputsForSigning(Transaction transaction, SigningKeyProvider provider,
+                                           int hashFlags, boolean useForkId, boolean anyoneCanPay) {
         if (provider == null) {
             throw new IllegalArgumentException("签名密钥提供者不能为空");
         }
-        String signOutputs = signOutputsOf(hashFlags);
         for (int i = 0; i < transaction.inputs.size(); i++) {
             TransactionInput input = transaction.inputs.get(i);
             byte[] pubKeyHash = pubKeyHashWithOrdinalsFallback(lockingScriptOf(input));
@@ -283,14 +292,9 @@ public class TransactionBuilder {
             if (key == null) {
                 throw new SignErrorException("交易输入 " + i + " 找不到可签名密钥");
             }
-            input.unlockingScriptTemplate = new P2PKH().unlock(key.getKey(), signOutputs,
-                    anyoneCanPay, sourceSatoshis);
+            input.unlockingScriptTemplate = ScriptExtend.unlockingTemplate(key, hashFlags,
+                    useForkId, anyoneCanPay, sourceSatoshis);
         }
-    }
-
-    /** SIGHASH 基础类型映射为解锁模板的 {@code signOutputs} 取值（与 ScriptExtend 共用同一实现）。 */
-    private static String signOutputsOf(int hashFlags) {
-        return ScriptExtend.signOutputsOf(hashFlags);
     }
 
     public static String broadcast(String raw, Broadcaster broadcaster) {

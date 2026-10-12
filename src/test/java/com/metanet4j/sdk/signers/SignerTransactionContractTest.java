@@ -36,6 +36,21 @@ import org.junit.jupiter.api.Test;
  */
 class SignerTransactionContractTest {
 
+    @Test
+    void batchSigningPreservesLegacyScopesAndValidScripts() {
+        for (int scope : new int[] {1, 2, 3}) {
+            for (boolean anyoneCanPay : new boolean[] {false, true}) {
+                Transaction tx = transactionWithPaymentInput();
+                assertTrue(new OrdinalsTransactionSigner().signInputs(tx, keyProvider,
+                        scope, false, anyoneCanPay));
+                assertEquals(scope | (anyoneCanPay ? 128 : 0), signatureHashType(tx, 0));
+                com.metanet4j.sdk.TransactionScriptAssertions.assertInputScriptValid(tx, 0);
+                assertTrue(tx.inputs.get(0).unlockingScriptTemplate.estimateLength(tx, 0)
+                        .toCompletableFuture().join() >= 100);
+            }
+        }
+    }
+
     private final BapBase bap = BapBase.fromOnlyMasterPrivateKey(TestData.masterPrivateKey);
     private final SigningKeyProvider keyProvider = new BapBase.BapProviderKeyBag(bap);
     private final AddressEnhance payAddress = bap.getPayAccountAddress();

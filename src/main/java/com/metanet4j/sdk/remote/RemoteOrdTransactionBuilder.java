@@ -77,7 +77,7 @@ public class RemoteOrdTransactionBuilder extends RemoteTransactionBuilder {
                                               boolean useForkId, boolean anyoneCanPay)
             throws SignErrorException {
         if (!this.getRemoteTransactionSigner().signInputs(this.getTargetTransaction(), keyProvider,
-                hashFlags, anyoneCanPay)) {
+                hashFlags, useForkId, anyoneCanPay)) {
             throw new SignErrorException();
         }
         return this;

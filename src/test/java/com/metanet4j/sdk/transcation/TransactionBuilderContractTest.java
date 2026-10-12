@@ -15,6 +15,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 
 import com.metanet4j.sdk.TestData;
+import com.metanet4j.sdk.utils.ScriptHelper;
 import com.metanet4j.sdk.bap.BapBase;
 import com.metanet4j.sdk.exception.SignErrorException;
 import com.metanet4j.sdk.sigma.Sigma;
@@ -45,6 +46,17 @@ class TransactionBuilderContractTest {
     private final BapBase bap = BapBase.fromOnlyMasterPrivateKey(TestData.masterPrivateKey);
     private final SigningKeyProvider keyProvider = new BapBase.BapProviderKeyBag(bap);
     private final AddressEnhance paymentAddress = bap.getPayAccountAddress();
+
+    @Test
+    void completionHonoursTheLegacyHashingSwitch() {
+        TransactionBuilder builder = new TransactionBuilder(bap, keyProvider);
+        builder.addInput(utxo(8, 0, 20_000)).addOutput(BsvAmount.valueOf(777), paymentAddress);
+        Transaction signed = builder.completeAndSignTx(keyProvider, false);
+        java.util.List<Integer> signature = ScriptHelper.chunksOf(
+                (Script) signed.inputs.get(0).unlockingScript).get(0).data;
+        assertEquals(TransactionSignature.SIGHASH_ALL, signature.get(signature.size() - 1));
+        assertUnlockingScriptValid(signed, 0);
+    }
 
     @Test
     void addsProviderUtxoDataAndChangeWithoutLosingValue() {

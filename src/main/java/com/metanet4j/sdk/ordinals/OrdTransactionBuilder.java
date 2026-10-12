@@ -71,19 +71,12 @@ public class OrdTransactionBuilder extends TransactionBuilder {
     public OrdTransactionBuilder signTx(SigningKeyProvider keyProvider, int hashFlags,
                                         boolean useForkId, boolean anyoneCanPay)
             throws SignErrorException {
-        setEmptyInputScriptHaveOrdinals(this.getTargetTransaction(), keyProvider);
-        completeAndSignTx(keyProvider, hashFlags, anyoneCanPay);
+        completeAndSignTx(keyProvider, hashFlags, useForkId, anyoneCanPay);
         return this;
     }
 
     public Transaction build() {
         return this.getTargetTransaction();
-    }
-
-    /** 为每个输入注入解锁模板（取代旧 {@code createEmptyInputScript}）。 */
-    protected void setEmptyInputScriptHaveOrdinals(final Transaction outputTransaction,
-                                                   final SigningKeyProvider provider) {
-        prepareInputsForSigning(outputTransaction, provider);
     }
 
 }
