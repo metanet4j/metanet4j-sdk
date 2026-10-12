@@ -111,10 +111,12 @@ class RemoteOrdTransactionTemplateContractTest {
         assertTrue(template.isDoInputSign());
         assertFalse(template.isDoBsmSign());
 
-        // 覆盖迁移（migration-rules §23）：旧用例注入 mock 的 RemoteTransactionSigner 并期望
-        // SignErrorException；新架构按 §3 取消了可注入的签名器抽象（远程签名器是普通业务组件，
-        // 且远程流程不本地签名），故该路径不存在。改为断言开关对产物的**实际影响**：
-        // 未注册预签名上下文时，开启输入签名也不会产出解锁脚本（远程流程依赖外部回填）。
+        // 开启签名必须尝试回填；缺少远程材料时应向调用方报错。
+        org.junit.jupiter.api.Assertions.assertThrows(SignErrorException.class, () -> template.createOrdinal(
+                List.of(bap.getPayAccountAddress()), provider, destination, paymentAddress,
+                500, inscription("switch"), null, remoteBap,
+                new RemoteTransactionSigner(), RemoteSignType.CURRENT));
+        template.setDoInputSign(false);
         RemoteOrdTransactionBuilder builder = template.createOrdinal(
                 List.of(bap.getPayAccountAddress()), provider, destination, paymentAddress,
                 500, inscription("switch"), null, remoteBap,
