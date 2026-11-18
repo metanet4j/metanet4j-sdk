@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<!DOCTYPE suppressions PUBLIC
+        "-//Checkstyle//DTD SuppressionFilter Configuration 1.2//EN"
+        "https://checkstyle.org/dtds/suppressions_1_2.dtd">
+<!-- 与 checkstyle 14.4.0 内置 google_checks.xml 的 SuppressionFilter 配合使用；
+     以下三类 Javadoc 检查不做强制校验，其余 Google 规则照常检查 -->
+<suppressions>
+    <suppress checks="SummaryJavadocCheck"/>
+    <suppress checks="MissingJavadocMethodCheck"/>
+    <suppress checks="MissingJavadocTypeCheck"/>
+</suppressions>
