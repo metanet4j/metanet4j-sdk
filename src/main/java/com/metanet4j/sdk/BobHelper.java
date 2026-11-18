@@ -16,7 +16,11 @@ import com.metanet4j.bsv.transaction.TransactionInput;
 import com.metanet4j.bsv.transaction.TransactionOutput;
 import com.metanet4j.sdk.utils.ScriptHelper;
 import java.nio.charset.Charset;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 public class BobHelper {
@@ -91,7 +95,7 @@ public class BobHelper {
       Map<String, Object> outItem = new LinkedHashMap<>();
       TransactionOutput txOutput = outputs.get(i);
       Script script = txOutput.lockingScript;
-      List<ScriptChunk> chunks = com.metanet4j.sdk.utils.ScriptHelper.chunksOf(script);
+      final List<ScriptChunk> chunks = com.metanet4j.sdk.utils.ScriptHelper.chunksOf(script);
       outItem.put("i", i);
 
       JSONObject e = new JSONObject();

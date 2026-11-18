@@ -64,17 +64,18 @@ public class AddressEnhance {
     return fromPublicKey(BsvNetwork.MAINNET, privateKey.getPublicKey());
   }
 
+  /** 由新 SDK 私钥构造。 */
+  public static AddressEnhance fromPrivateKey(
+      BsvNetwork network, com.metanet4j.bsv.primitives.PrivateKey key) {
+    return fromPublicKey(network, key.toPublicKey());
+  }
+
   public static AddressEnhance fromPublicKey(PublicKey key) {
     return fromPublicKey(BsvNetwork.MAINNET, key);
   }
 
   public static AddressEnhance fromPublicKey(BsvNetwork network, PublicKey key) {
     return fromPubKeyHash(network, key.getPubKeyHash());
-  }
-
-  /** 由业务私钥构造（主网）。 */
-  public static AddressEnhance fromECkeyLite(com.metanet4j.sdk.PrivateKey key) {
-    return fromPublicKey(BsvNetwork.MAINNET, key.getPublicKey());
   }
 
   /** 由新 SDK 公钥构造（主网）。 */
@@ -88,10 +89,9 @@ public class AddressEnhance {
     return fromPubKeyHash(network, toBytes(key.toHash()));
   }
 
-  /** 由新 SDK 私钥构造。 */
-  public static AddressEnhance fromPrivateKey(
-      BsvNetwork network, com.metanet4j.bsv.primitives.PrivateKey key) {
-    return fromPublicKey(network, key.toPublicKey());
+  /** 由业务私钥构造（主网）。 */
+  public static AddressEnhance fromECkeyLite(com.metanet4j.sdk.PrivateKey key) {
+    return fromPublicKey(BsvNetwork.MAINNET, key.getPublicKey());
   }
 
   /** 由公钥构造（原 {@code fromECkey} 的替代）。 */

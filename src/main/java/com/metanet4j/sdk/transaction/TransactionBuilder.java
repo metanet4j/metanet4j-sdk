@@ -66,17 +66,6 @@ public class TransactionBuilder {
     return this;
   }
 
-  public TransactionBuilder addInputs(
-      List<AddressEnhance> addressList, UTXOProvider<AddressEnhance, BsvUtxo> utxoProvider) {
-    addInputs(utxoProvider.listUxtos(addressList));
-    return this;
-  }
-
-  public TransactionBuilder addInputs(List<BsvUtxo> utxoList) {
-    utxoList.forEach(this::addInput);
-    return this;
-  }
-
   /**
    * 由 UTXO 追加输入：锁定脚本按 UTXO 地址生成 P2PKH（无地址时取脚本，均无则留空）。 金额与 outpoint 直接取自 UTXO（整数 satoshi + 显示序
    * txid）。
@@ -108,6 +97,17 @@ public class TransactionBuilder {
     input.sequence = 0xffff_ffffL;
     attachSourceOutput(input, output);
     targetTransaction.addInput(input);
+    return this;
+  }
+
+  public TransactionBuilder addInputs(
+      List<AddressEnhance> addressList, UTXOProvider<AddressEnhance, BsvUtxo> utxoProvider) {
+    addInputs(utxoProvider.listUxtos(addressList));
+    return this;
+  }
+
+  public TransactionBuilder addInputs(List<BsvUtxo> utxoList) {
+    utxoList.forEach(this::addInput);
     return this;
   }
 
@@ -145,7 +145,7 @@ public class TransactionBuilder {
   public BsvAmount calculateChangeAmount(
       Transaction transaction, AddressEnhance address, BsvAmount feePerKb) {
     feePerKb.toSdkValue();
-    BsvAmount available = inputSum(transaction).subtract(outputSum(transaction));
+    final BsvAmount available = inputSum(transaction).subtract(outputSum(transaction));
     long size = 0;
     size += outputSize(new TransactionOutput(new P2PKH().lock(address.toBase58()), 0d));
     size += Writer.varIntNum(transaction.outputs.size() + 1).size();

@@ -74,6 +74,17 @@ public class EcKeyLiteExtend {
     return signHash(hash.getBytes());
   }
 
+  /** 对摘要字节签名，返回 Base64 compact 签名。 */
+  public String signHash(byte[] digest) {
+    requirePrivate();
+    requireConsistentKeys();
+    com.metanet4j.bsv.primitives.BigNumber messageHash =
+        new com.metanet4j.bsv.primitives.BigNumber(Utils.toArray(digest));
+    Signature signature = ECDSA.sign(messageHash, privateKey, true);
+    int recovery = signature.CalculateRecoveryFactor(publicKey, messageHash);
+    return (String) signature.toCompact(recovery, compressed, "base64");
+  }
+
   /**
    * 校验 65 字节 compact 签名是否由本实例公钥对给定摘要签署。
    *
@@ -98,17 +109,6 @@ public class EcKeyLiteExtend {
   public boolean verify(BsvHashBytes hash, String base64CompactSignature) {
     return base64CompactSignature != null
         && verify(hash, java.util.Base64.getDecoder().decode(base64CompactSignature));
-  }
-
-  /** 对摘要字节签名，返回 Base64 compact 签名。 */
-  public String signHash(byte[] digest) {
-    requirePrivate();
-    requireConsistentKeys();
-    com.metanet4j.bsv.primitives.BigNumber messageHash =
-        new com.metanet4j.bsv.primitives.BigNumber(Utils.toArray(digest));
-    Signature signature = ECDSA.sign(messageHash, privateKey, true);
-    int recovery = signature.CalculateRecoveryFactor(publicKey, messageHash);
-    return (String) signature.toCompact(recovery, compressed, "base64");
   }
 
   /** BSM 消息签名（前缀 + CompactSize 长度 + 消息体，双 SHA-256）。 */

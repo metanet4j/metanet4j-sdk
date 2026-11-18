@@ -61,13 +61,13 @@ public class SigHashExtend {
       throw new IllegalArgumentException("交易不能为空");
     }
     List<TransactionInput> inputs = transaction.inputs;
-    List<TransactionOutput> outputs = transaction.outputs;
+    final List<TransactionOutput> outputs = transaction.outputs;
     if (inputIndex < 0 || inputIndex >= inputs.size()) {
       throw new IllegalArgumentException("输入下标越界：" + inputIndex + "（输入数 " + inputs.size() + "）");
     }
     TransactionInput indexedInput = inputs.get(inputIndex);
 
-    int scope =
+    final int scope =
         type
             | (anyoneCanPay ? TransactionSignature.SIGHASH_ANYONECANPAY : 0)
             | (useForkId ? SIGHASH_FORKID : 0);

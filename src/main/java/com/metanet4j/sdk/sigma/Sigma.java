@@ -210,7 +210,7 @@ public class Sigma implements PreSignHash {
       }
       if (HexUtil.encodeHexStr(ScriptHelper.getPushData(chunks.get(i)))
           .equalsIgnoreCase(SIGMA_PREFIX)) {
-        // TODO
+        // TODO: 校验 SIGMA 推送数据长度，避免 i + 4 越界
         String algorithm = ScriptHelper.getPushDataAsString(chunks.get(i + 1));
         String address = ScriptHelper.getPushDataAsString(chunks.get(i + 2));
         String signature = Base64.encode(ScriptHelper.getPushData(chunks.get(i + 3)));

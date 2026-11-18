@@ -48,7 +48,7 @@ public class PrivateKey {
     }
 
     BsvNetwork networkType = decodeNetworkType(wif);
-    boolean isCompressed = wif.length() == 52;
+    final boolean isCompressed = wif.length() == 52;
 
     List<Double> payload;
     try {

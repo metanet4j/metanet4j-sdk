@@ -106,15 +106,21 @@ public class ScriptHelper {
       } else if (op <= 75) {
         len = op;
       } else if (op == 76) {
-        if (i >= raw.length) break;
+        if (i >= raw.length) {
+          break;
+        }
         len = raw[i] & 0xFF;
         i++;
       } else if (op == 77) {
-        if (i + 1 >= raw.length) break;
+        if (i + 1 >= raw.length) {
+          break;
+        }
         len = (raw[i] & 0xFF) | ((raw[i + 1] & 0xFF) << 8);
         i += 2;
       } else if (op == 78) {
-        if (i + 3 >= raw.length) break;
+        if (i + 3 >= raw.length) {
+          break;
+        }
         len =
             (raw[i] & 0xFF)
                 | ((raw[i + 1] & 0xFF) << 8)

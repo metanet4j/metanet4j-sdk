@@ -58,7 +58,7 @@ public class TxoHelper {
       TransactionInput txInput = inputs.get(i);
       Script script = toScript(txInput.unlockingScript);
 
-      List<ScriptChunk> chunks = com.metanet4j.sdk.utils.ScriptHelper.chunksOf(script);
+      final List<ScriptChunk> chunks = com.metanet4j.sdk.utils.ScriptHelper.chunksOf(script);
       inputItem.put("i", i);
       inputItem.put("seq", txInput.sequence);
 

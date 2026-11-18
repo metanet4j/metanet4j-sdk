@@ -94,30 +94,6 @@ public class RemoteOrdTransactionTemplate {
         resolveKeyProvider(transactionSigner, bapBase));
   }
 
-  public Transaction sendOrdinal(
-      RemoteBapBase bapBase,
-      BsvUtxo ordinalUtxo,
-      BsvUtxo paymentUtxo,
-      AddressEnhance destinationAddress,
-      AddressEnhance changeAddress,
-      long feePerKb,
-      OrdScriptBuilder.Inscription reInscription,
-      OrdScriptBuilder.ORDMap metaData,
-      RemoteSignType remoteSignType) {
-    return prepareSendOrdinal(
-            bapBase,
-            ordinalUtxo,
-            paymentUtxo,
-            destinationAddress,
-            changeAddress,
-            feePerKb,
-            reInscription,
-            metaData,
-            new RemoteTransactionSigner(),
-            remoteSignType)
-        .build();
-  }
-
   public RemoteOrdTransactionBuilder prepareSendOrdinal(
       RemoteBapBase bapBase,
       BsvUtxo ordinalUtxo,
@@ -181,6 +157,30 @@ public class RemoteOrdTransactionTemplate {
         this.doInputSign,
         transactionBuilder,
         resolveKeyProvider(transactionSigner, bapBase));
+  }
+
+  public Transaction sendOrdinal(
+      RemoteBapBase bapBase,
+      BsvUtxo ordinalUtxo,
+      BsvUtxo paymentUtxo,
+      AddressEnhance destinationAddress,
+      AddressEnhance changeAddress,
+      long feePerKb,
+      OrdScriptBuilder.Inscription reInscription,
+      OrdScriptBuilder.ORDMap metaData,
+      RemoteSignType remoteSignType) {
+    return prepareSendOrdinal(
+            bapBase,
+            ordinalUtxo,
+            paymentUtxo,
+            destinationAddress,
+            changeAddress,
+            feePerKb,
+            reInscription,
+            metaData,
+            new RemoteTransactionSigner(),
+            remoteSignType)
+        .build();
   }
 
   public Transaction sendOrdinal(
