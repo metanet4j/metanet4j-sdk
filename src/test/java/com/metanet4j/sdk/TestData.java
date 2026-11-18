@@ -1,65 +1,59 @@
 package com.metanet4j.sdk;
 
 import cn.hutool.core.io.FileUtil;
-import tools.jackson.core.type.TypeReference;
 import com.google.common.base.Charsets;
 import com.metanet4j.base.util.JacksonUtil;
 import com.metanet4j.sdk.crypto.MasterPrivateKey;
-import org.junit.jupiter.api.Test;
-
 import java.util.LinkedHashMap;
 import java.util.List;
+import org.junit.jupiter.api.Test;
+import tools.jackson.core.type.TypeReference;
 
 public class TestData {
 
-    // prd test
-    public static String xprv =
-            "xprv9s21ZrQH143K4Jwwrru5PWNenNredeQQdhxTLUx6ESBNCxiZtGbhAQGjpWz2gVY45xgXZiBg4V8Kqu3ELnQXw92p8wNHQCWVgk3gxU8zxUp";
+  // prd test
+  public static String xprv =
+      "xprv9s21ZrQH143K4Jwwrru5PWNenNredeQQdhxTLUx6ESBNCxiZtGbhAQGjpWz2gVY45xgXZiBg4V8Kqu3ELnQXw92p8wNHQCWVgk3gxU8zxUp";
 
+  public static MasterPrivateKey masterPrivateKey = MasterPrivateKey.fromXprv(TestData.xprv);
 
-    public static MasterPrivateKey masterPrivateKey = MasterPrivateKey.fromXprv(TestData.xprv);
+  public static String utxoAddress = "1DBzoExEs6StRztgudb82UviC1Wr12DpQk";
 
+  public List<LinkedHashMap> parseRoot() {
+    return JacksonUtil.string2Obj(
+        FileUtil.readString("bap_root.json", Charsets.UTF_8),
+        new TypeReference<List<LinkedHashMap>>() {});
+  }
 
+  public List<LinkedHashMap> parseId() {
+    return JacksonUtil.string2Obj(
+        FileUtil.readString("bap_id.json", Charsets.UTF_8),
+        new TypeReference<List<LinkedHashMap>>() {});
+  }
 
-    public static String utxoAddress = "1DBzoExEs6StRztgudb82UviC1Wr12DpQk";
+  public List<LinkedHashMap> parseBob() {
+    return JacksonUtil.string2Obj(
+        FileUtil.readString("bsocial_bob.json", Charsets.UTF_8),
+        new TypeReference<List<LinkedHashMap>>() {});
+  }
 
-    public List<LinkedHashMap> parseRoot() {
-        return JacksonUtil
-                .string2Obj(FileUtil.readString("bap_root.json", Charsets.UTF_8),
-                        new TypeReference<List<LinkedHashMap>>(){});
-    }
+  @Test
+  public void testParse() {
+    List<LinkedHashMap> parseRoot = parseRoot();
+    System.out.println(parseRoot);
 
-    public List<LinkedHashMap> parseId() {
-        return JacksonUtil
-                .string2Obj(FileUtil.readString("bap_id.json", Charsets.UTF_8),
-                        new TypeReference<List<LinkedHashMap>>(){});
-    }
+    List<LinkedHashMap> parseId = parseId();
+    System.out.println(parseId);
 
-    public List<LinkedHashMap> parseBob() {
-        return JacksonUtil
-                .string2Obj(FileUtil.readString("bsocial_bob.json", Charsets.UTF_8),
-                        new TypeReference<List<LinkedHashMap>>(){});
-    }
+    List<LinkedHashMap> parseBob = parseBob();
+    System.out.println(parseBob);
+  }
 
-    @Test
-    public void testParse(){
-        List<LinkedHashMap> parseRoot = parseRoot();
-        System.out.println(parseRoot);
+  @Test
+  public void testContentType() {
 
-        List<LinkedHashMap> parseId = parseId();
-        System.out.println(parseId);
-
-        List<LinkedHashMap> parseBob = parseBob();
-        System.out.println(parseBob);
-    }
-
-    @Test
-    public void testContentType(){
-
-        String mimeType = FileUtil.getMimeType("bsv1.jpeg");
-        System.out.println(mimeType);
-        System.out.println(mimeType);
-    }
-
-
+    String mimeType = FileUtil.getMimeType("bsv1.jpeg");
+    System.out.println(mimeType);
+    System.out.println(mimeType);
+  }
 }

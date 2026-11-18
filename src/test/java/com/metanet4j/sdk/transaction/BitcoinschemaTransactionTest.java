@@ -4,265 +4,274 @@ import cn.hutool.core.io.FileUtil;
 import com.google.common.base.Charsets;
 import com.google.common.collect.Lists;
 import com.google.common.net.MediaType;
+import com.metanet4j.base.bsv.BsvAmount;
 import com.metanet4j.base.model.B;
-import com.metanet4j.sdk.EcKeyLiteExtend;
+import com.metanet4j.bsv.transaction.Transaction;
 import com.metanet4j.sdk.TestData;
+import com.metanet4j.sdk.address.AddressEnhance;
 import com.metanet4j.sdk.bap.BapBase.BapProviderKeyBag;
 import com.metanet4j.sdk.exception.SignErrorException;
 import com.metanet4j.sdk.utxo.impl.bitails.BitailsUtxoProvider;
-import com.metanet4j.sdk.address.AddressEnhance;
-import com.metanet4j.base.bsv.BsvAmount;
-import com.metanet4j.bsv.transaction.Transaction;
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-
-
 /**
- * 外部服务/链上数据依赖：本类通过公网 API（Bitails / GorillaPool）拉取实时 UTXO 并广播交易，
- * 且 fixture 引用 2023 年的主网 outpoint，链上状态早已变化 → 不适合放进常规门禁。
- * 执行方式：mvn clean test -DexcludedGroups=external（默认排除）；需人工验证时去掉该参数。
+ * 外部服务/链上数据依赖：本类通过公网 API（Bitails / GorillaPool）拉取实时 UTXO 并广播交易， 且 fixture 引用 2023 年的主网
+ * outpoint，链上状态早已变化 → 不适合放进常规门禁。 执行方式：mvn clean test -DexcludedGroups=external（默认排除）；需人工验证时去掉该参数。
  */
 @Tag("external")
 public class BitcoinschemaTransactionTest extends TransactionContextTest {
 
+  @Test
+  public void testBapRootTransaction() {
 
-    @Test
-    public void testBapRootTransaction() {
-
-        try {
-            BapDataLockBuilder bapDataLockBuilder = new BapDataLockBuilder(bapBase);
-            buildTxThenBroadcast(bapDataLockBuilder.buildId());
-            System.out.println("you can view your bitcoin schema tx on https://blockpost.network/profile/" + bapBase.getIdentityKey());
-        } catch (SignErrorException e) {
-            e.printStackTrace();
-        }
+    try {
+      BapDataLockBuilder bapDataLockBuilder = new BapDataLockBuilder(bapBase);
+      buildTxThenBroadcast(bapDataLockBuilder.buildId());
+      System.out.println(
+          "you can view your bitcoin schema tx on https://blockpost.network/profile/"
+              + bapBase.getIdentityKey());
+    } catch (SignErrorException e) {
+      e.printStackTrace();
     }
+  }
 
+  @Test
+  public void testBapAliasTransaction() {
 
-    @Test
-    public void testBapAliasTransaction() {
-
-        try {
-            BapDataLockBuilder bapDataLockBuilder = new BapDataLockBuilder(bapBase);
-            buildTxThenBroadcast(bapDataLockBuilder.buildAlias(FileUtil.readString("identity.json",
-                    Charsets.UTF_8)).sign());
-            System.out.println("you can view your bitcoin schema tx on https://blockpost.network/profile/" + bapBase.getIdentityKey());
-        } catch (SignErrorException e) {
-            e.printStackTrace();
-        }
+    try {
+      BapDataLockBuilder bapDataLockBuilder = new BapDataLockBuilder(bapBase);
+      buildTxThenBroadcast(
+          bapDataLockBuilder
+              .buildAlias(FileUtil.readString("identity.json", Charsets.UTF_8))
+              .sign());
+      System.out.println(
+          "you can view your bitcoin schema tx on https://blockpost.network/profile/"
+              + bapBase.getIdentityKey());
+    } catch (SignErrorException e) {
+      e.printStackTrace();
     }
+  }
 
-    @Test
-    public void testBsocialUnFollowTransaction() {
-        try {
-            BsocialDataLockBuilder bsocialDataLockBuilder = new BsocialDataLockBuilder(bapBase);
-            String identityKey = "TFXCK2wPgfBAB1VKWUPyjKQ6FQy";
-            buildTxThenBroadcast(bsocialDataLockBuilder.buildUnFollow(identityKey).sign());
-            System.out.println("you can view your bitcoin schema tx on https://blockpost.network/profile/" + bapBase.getIdentityKey());
-        } catch (SignErrorException e) {
-            e.printStackTrace();
-        }
+  @Test
+  public void testBsocialUnFollowTransaction() {
+    try {
+      BsocialDataLockBuilder bsocialDataLockBuilder = new BsocialDataLockBuilder(bapBase);
+      String identityKey = "TFXCK2wPgfBAB1VKWUPyjKQ6FQy";
+      buildTxThenBroadcast(bsocialDataLockBuilder.buildUnFollow(identityKey).sign());
+      System.out.println(
+          "you can view your bitcoin schema tx on https://blockpost.network/profile/"
+              + bapBase.getIdentityKey());
+    } catch (SignErrorException e) {
+      e.printStackTrace();
     }
+  }
 
-
-    @Test
-    public void testBsocialFollowTransaction() {
-        try {
-            BsocialDataLockBuilder bsocialDataLockBuilder = new BsocialDataLockBuilder(bapBase);
-            String identityKey = "TFXCK2wPgfBAB1VKWUPyjKQ6FQy";
-            buildTxThenBroadcast(bsocialDataLockBuilder.buildFollow(identityKey).sign());
-            System.out.println("you can view your bitcoin schema tx on https://blockpost.network/profile/" + bapBase.getIdentityKey());
-        } catch (SignErrorException e) {
-            e.printStackTrace();
-        }
+  @Test
+  public void testBsocialFollowTransaction() {
+    try {
+      BsocialDataLockBuilder bsocialDataLockBuilder = new BsocialDataLockBuilder(bapBase);
+      String identityKey = "TFXCK2wPgfBAB1VKWUPyjKQ6FQy";
+      buildTxThenBroadcast(bsocialDataLockBuilder.buildFollow(identityKey).sign());
+      System.out.println(
+          "you can view your bitcoin schema tx on https://blockpost.network/profile/"
+              + bapBase.getIdentityKey());
+    } catch (SignErrorException e) {
+      e.printStackTrace();
     }
+  }
 
+  @Test
+  public void testBsocialPostTransaction() {
+    try {
+      B b = new B();
+      b.setContent(
+          "test from metanet4j-sdk .1019-1,view it on https://github.com/metanet4j/metanet4j-sdk ");
+      b.setByteBuffer(ByteBuffer.wrap(b.getContent().getBytes(Charsets.UTF_8)));
+      b.setContentType("text/markdown");
+      b.setEncoding("UTF-8");
+      b.setIndex(1);
 
-    @Test
-    public void testBsocialPostTransaction() {
-        try {
-            B b = new B();
-            b.setContent("test from metanet4j-sdk .1019-1,view it on https://github.com/metanet4j/metanet4j-sdk ");
-            b.setByteBuffer(ByteBuffer.wrap(b.getContent().getBytes(Charsets.UTF_8)));
-            b.setContentType("text/markdown");
-            b.setEncoding("UTF-8");
-            b.setIndex(1);
-
-            BsocialDataLockBuilder bsocialDataLockBuilder = new BsocialDataLockBuilder(bapBase);
-            buildTxThenBroadcast(bsocialDataLockBuilder.buildPost(Lists.newArrayList(b)).sign());
-            System.out.println("you can view your bitcoin schema tx on https://blockpost.network/profile/" + bapBase.getIdentityKey());
-        } catch (SignErrorException e) {
-            e.printStackTrace();
-        }
+      BsocialDataLockBuilder bsocialDataLockBuilder = new BsocialDataLockBuilder(bapBase);
+      buildTxThenBroadcast(bsocialDataLockBuilder.buildPost(Lists.newArrayList(b)).sign());
+      System.out.println(
+          "you can view your bitcoin schema tx on https://blockpost.network/profile/"
+              + bapBase.getIdentityKey());
+    } catch (SignErrorException e) {
+      e.printStackTrace();
     }
+  }
 
+  @Test
+  public void testBsocialRePostTransaction() {
+    try {
+      B b = new B();
+      b.setContent("it is  metanet4j-sdk");
+      b.setByteBuffer(ByteBuffer.wrap(b.getContent().getBytes(Charsets.UTF_8)));
+      b.setContentType("text/markdown");
+      b.setEncoding("UTF-8");
+      b.setIndex(1);
 
-    @Test
-    public void testBsocialRePostTransaction() {
-        try {
-            B b = new B();
-            b.setContent("it is  metanet4j-sdk");
-            b.setByteBuffer(ByteBuffer.wrap(b.getContent().getBytes(Charsets.UTF_8)));
-            b.setContentType("text/markdown");
-            b.setEncoding("UTF-8");
-            b.setIndex(1);
-
-            String txId = "a1f3a65d5830d0018cdbe28436eca380a171d11c1799a8a322da74575e1bc1f0";
-            BsocialDataLockBuilder bsocialDataLockBuilder = new BsocialDataLockBuilder(bapBase);
-            buildTxThenBroadcast(bsocialDataLockBuilder.buildRepost(Lists.newArrayList(b), txId).sign());
-            System.out.println("you can view your bitcoin schema tx on https://blockpost.network/profile/" + bapBase.getIdentityKey());
-        } catch (SignErrorException e) {
-            e.printStackTrace();
-        }
+      String txId = "a1f3a65d5830d0018cdbe28436eca380a171d11c1799a8a322da74575e1bc1f0";
+      BsocialDataLockBuilder bsocialDataLockBuilder = new BsocialDataLockBuilder(bapBase);
+      buildTxThenBroadcast(bsocialDataLockBuilder.buildRepost(Lists.newArrayList(b), txId).sign());
+      System.out.println(
+          "you can view your bitcoin schema tx on https://blockpost.network/profile/"
+              + bapBase.getIdentityKey());
+    } catch (SignErrorException e) {
+      e.printStackTrace();
     }
+  }
 
-    @Test
-    public void testBsocialReply() {
-        try {
-            B b = new B();
-            b.setContent("it will be published on 2024-04-17");
-            b.setByteBuffer(ByteBuffer.wrap(b.getContent().getBytes(Charsets.UTF_8)));
-            b.setContentType("text/markdown");
-            b.setEncoding("UTF-8");
-            b.setIndex(1);
+  @Test
+  public void testBsocialReply() {
+    try {
+      B b = new B();
+      b.setContent("it will be published on 2024-04-17");
+      b.setByteBuffer(ByteBuffer.wrap(b.getContent().getBytes(Charsets.UTF_8)));
+      b.setContentType("text/markdown");
+      b.setEncoding("UTF-8");
+      b.setIndex(1);
 
-            String txId = "ff5299b196dc5170db17ecf1bb7387d295e02e08a0fbcb8bf96873c9eccbbf2a";
-            BsocialDataLockBuilder bsocialDataLockBuilder = new BsocialDataLockBuilder(bapBase);
-            buildTxThenBroadcast(bsocialDataLockBuilder.buildReply(Lists.newArrayList(b), txId).sign());
-            System.out.println("you can view your bitcoin schema tx on https://blockpost.network/profile/" + bapBase.getIdentityKey());
-        } catch (SignErrorException e) {
-            e.printStackTrace();
-        }
+      String txId = "ff5299b196dc5170db17ecf1bb7387d295e02e08a0fbcb8bf96873c9eccbbf2a";
+      BsocialDataLockBuilder bsocialDataLockBuilder = new BsocialDataLockBuilder(bapBase);
+      buildTxThenBroadcast(bsocialDataLockBuilder.buildReply(Lists.newArrayList(b), txId).sign());
+      System.out.println(
+          "you can view your bitcoin schema tx on https://blockpost.network/profile/"
+              + bapBase.getIdentityKey());
+    } catch (SignErrorException e) {
+      e.printStackTrace();
     }
+  }
 
-    /**
-     * 994b08e0aea2afa475c27ff48ac7c39fe5d49d50bbce38481ac931bdec2f1eb7
-     *
-     * @throws IOException
-     */
-    @Test
-    public void testBsocialImapgePostTransaction() throws IOException {
-        try {
-            B bText = new B();
-            bText.setContent("image test from metanet4j-sdk. date 2023-10-08");
-            bText.setByteBuffer(ByteBuffer.wrap(bText.getContent().getBytes(Charsets.UTF_8)));
-            bText.setContentType("text/markdown");
-            bText.setEncoding("UTF-8");
-            bText.setIndex(1);
+  /**
+   * 994b08e0aea2afa475c27ff48ac7c39fe5d49d50bbce38481ac931bdec2f1eb7
+   *
+   * @throws IOException
+   */
+  @Test
+  public void testBsocialImapgePostTransaction() throws IOException {
+    try {
+      B bText = new B();
+      bText.setContent("image test from metanet4j-sdk. date 2023-10-08");
+      bText.setByteBuffer(ByteBuffer.wrap(bText.getContent().getBytes(Charsets.UTF_8)));
+      bText.setContentType("text/markdown");
+      bText.setEncoding("UTF-8");
+      bText.setIndex(1);
 
-            B bImage = new B();
-            bImage.setContentType("image/jpeg");
-            bImage.setFilename("bsv1.jpeg");
-            bImage.setByteBuffer(ByteBuffer.wrap(FileUtil.getInputStream("bsv1.jpeg").readAllBytes()));
-            bImage.setIndex(1);
-            BsocialDataLockBuilder bsocialDataLockBuilder = new BsocialDataLockBuilder(bapBase);
-            buildTxThenBroadcast(bsocialDataLockBuilder.buildPost(Lists.newArrayList(bImage)).sign());
-            System.out.println("you can view your bitcoin schema tx on https://blockpost.network/profile/" + bapBase.getIdentityKey());
-        } catch (SignErrorException e) {
-            e.printStackTrace();
-        }
+      B bImage = new B();
+      bImage.setContentType("image/jpeg");
+      bImage.setFilename("bsv1.jpeg");
+      bImage.setByteBuffer(ByteBuffer.wrap(FileUtil.getInputStream("bsv1.jpeg").readAllBytes()));
+      bImage.setIndex(1);
+      BsocialDataLockBuilder bsocialDataLockBuilder = new BsocialDataLockBuilder(bapBase);
+      buildTxThenBroadcast(bsocialDataLockBuilder.buildPost(Lists.newArrayList(bImage)).sign());
+      System.out.println(
+          "you can view your bitcoin schema tx on https://blockpost.network/profile/"
+              + bapBase.getIdentityKey());
+    } catch (SignErrorException e) {
+      e.printStackTrace();
     }
+  }
 
-    @Test
-    public void testBsocialPdfTransaction() throws IOException {
-        try {
-            B bText = new B();
-            bText.setContent("MMS 吉姆第一本书：21世纪的神奇矿物质溶液MMS（全版2011年）pdf");
-            bText.setByteBuffer(ByteBuffer.wrap(bText.getContent().getBytes(Charsets.UTF_8)));
-            bText.setContentType("text/markdown");
-            bText.setEncoding("UTF-8");
-            bText.setIndex(1);
+  @Test
+  public void testBsocialPdfTransaction() throws IOException {
+    try {
+      B bText = new B();
+      bText.setContent("MMS 吉姆第一本书：21世纪的神奇矿物质溶液MMS（全版2011年）pdf");
+      bText.setByteBuffer(ByteBuffer.wrap(bText.getContent().getBytes(Charsets.UTF_8)));
+      bText.setContentType("text/markdown");
+      bText.setEncoding("UTF-8");
+      bText.setIndex(1);
 
-            B bpdf = new B();
-            bpdf.setContentType(MediaType.PDF.toString());
-            bpdf.setFilename("吉姆第一本书：21世纪的神奇矿物质溶液MMS（全版2011年).pdf");
-            bpdf.setByteBuffer(ByteBuffer.wrap(FileUtil.getInputStream("MMS/吉姆第一本书：21世纪的神奇矿物质溶液MMS（全版2011年）.pdf").readAllBytes()));
-            bpdf.setIndex(1);
-            BsocialDataLockBuilder bsocialDataLockBuilder = new BsocialDataLockBuilder(bapBase);
-            buildTxThenBroadcast(bsocialDataLockBuilder.buildPost(Lists.newArrayList(bpdf)).sign());
-            System.out.println("you can view your bitcoin schema tx on https://blockpost.network/profile/" + bapBase.getIdentityKey());
-        } catch (SignErrorException e) {
-            e.printStackTrace();
-        }
+      B bpdf = new B();
+      bpdf.setContentType(MediaType.PDF.toString());
+      bpdf.setFilename("吉姆第一本书：21世纪的神奇矿物质溶液MMS（全版2011年).pdf");
+      bpdf.setByteBuffer(
+          ByteBuffer.wrap(
+              FileUtil.getInputStream("MMS/吉姆第一本书：21世纪的神奇矿物质溶液MMS（全版2011年）.pdf").readAllBytes()));
+      bpdf.setIndex(1);
+      BsocialDataLockBuilder bsocialDataLockBuilder = new BsocialDataLockBuilder(bapBase);
+      buildTxThenBroadcast(bsocialDataLockBuilder.buildPost(Lists.newArrayList(bpdf)).sign());
+      System.out.println(
+          "you can view your bitcoin schema tx on https://blockpost.network/profile/"
+              + bapBase.getIdentityKey());
+    } catch (SignErrorException e) {
+      e.printStackTrace();
     }
+  }
 
-    @Test
-    public void testBsocialLikeTransaction() throws IOException {
-        try {
-            String txId = "8e3faaf18418440fed963f5ce01fbe6d82195302d38daa30f8d1473b6197b418";
-            BsocialDataLockBuilder bsocialDataLockBuilder = new BsocialDataLockBuilder(bapBase);
-            buildTxThenBroadcast(bsocialDataLockBuilder.buildLike(txId, "").sign());
-            System.out.println("you can view your bitcoin schema tx on https://blockpost.network/profile/" + bapBase.getIdentityKey());
-        } catch (SignErrorException e) {
-            e.printStackTrace();
-        }
+  @Test
+  public void testBsocialLikeTransaction() throws IOException {
+    try {
+      String txId = "8e3faaf18418440fed963f5ce01fbe6d82195302d38daa30f8d1473b6197b418";
+      BsocialDataLockBuilder bsocialDataLockBuilder = new BsocialDataLockBuilder(bapBase);
+      buildTxThenBroadcast(bsocialDataLockBuilder.buildLike(txId, "").sign());
+      System.out.println(
+          "you can view your bitcoin schema tx on https://blockpost.network/profile/"
+              + bapBase.getIdentityKey());
+    } catch (SignErrorException e) {
+      e.printStackTrace();
     }
+  }
 
+  @Test
+  public void testSendUtxo() {
+    TransactionBuilder transactionBuilder =
+        new TransactionBuilder(this.bapBase, new BapProviderKeyBag(TestData.masterPrivateKey, 100));
+    Transaction transaction =
+        transactionBuilder
+            .addInputs(java.util.List.<AddressEnhance>of(paymentAddress), new BitailsUtxoProvider())
+            .withFeeKb(BsvAmount.valueOf(500L))
+            .changeAddress(changeAddress)
+            .completeAndSignTx(transactionBuilder.getKeyProvider(), true);
 
-    @Test
-    public void testSendUtxo() {
-        TransactionBuilder transactionBuilder = new TransactionBuilder(this.bapBase, new BapProviderKeyBag(TestData.masterPrivateKey
-                , 100));
-        Transaction transaction = transactionBuilder
-                .addInputs(java.util.List.<AddressEnhance>of(paymentAddress),
-                        new BitailsUtxoProvider())
+    correctlySpends(transaction);
+    broadcast(transaction);
+    parseTx(transaction);
+  }
 
-                .withFeeKb(BsvAmount.valueOf(500L))
-                .changeAddress(changeAddress)
-                .completeAndSignTx(transactionBuilder.getKeyProvider(), true);
+  @Test
+  public void testSendUtxos() throws SignErrorException {
+    TransactionBuilder transactionBuilder =
+        new TransactionBuilder(this.bapBase, new BapProviderKeyBag(TestData.masterPrivateKey, 100));
+    Transaction transaction =
+        transactionBuilder
+            .addInputs(java.util.List.<AddressEnhance>of(paymentAddress), new BitailsUtxoProvider())
+            .withFeeKb(BsvAmount.valueOf(500L))
+            .addOutput(BsvAmount.valueOf(777L), AddressEnhance.fromBase58(bapBase.getRootAddress()))
+            .addOutput(BsvAmount.valueOf(888L), AddressEnhance.fromBase58(bapBase.getRootAddress()))
+            .addOutput(BsvAmount.valueOf(999L), AddressEnhance.fromBase58(bapBase.getRootAddress()))
+            .changeAddress(changeAddress)
+            .completeAndSignTx(transactionBuilder.getKeyProvider(), true);
+    correctlySpends(transaction);
+    broadcast(transaction);
+    parseTx(transaction);
+  }
 
-        correctlySpends(transaction);
-        broadcast(transaction);
-        parseTx(transaction);
-    }
+  @Test
+  public void testEckeyLiteExtend() {
+    String s1 = bapBase.getOrdAddress().toBase58();
+    String s2 = AddressEnhance.fromPrivateKey(bapBase.getOrdPrivateKey()).toBase58();
+    Assertions.assertEquals(s1, s2);
+  }
 
-
-    @Test
-    public void testSendUtxos() throws SignErrorException {
-        TransactionBuilder transactionBuilder = new TransactionBuilder(this.bapBase, new BapProviderKeyBag(TestData.masterPrivateKey
-                , 100));
-        Transaction transaction = transactionBuilder
-                .addInputs(java.util.List.<AddressEnhance>of(paymentAddress),
-                        new BitailsUtxoProvider())
-                .withFeeKb(BsvAmount.valueOf(500L))
-                .addOutput(BsvAmount.valueOf(777L), AddressEnhance.fromBase58(bapBase.getRootAddress()))
-                .addOutput(BsvAmount.valueOf(888L), AddressEnhance.fromBase58(bapBase.getRootAddress()))
-                .addOutput(BsvAmount.valueOf(999L), AddressEnhance.fromBase58(bapBase.getRootAddress()))
-                .changeAddress(changeAddress)
-                .completeAndSignTx(transactionBuilder.getKeyProvider(), true);
-        correctlySpends(transaction);
-        broadcast(transaction);
-        parseTx(transaction);
-
-    }
-
-    @Test
-    public void testEckeyLiteExtend() {
-        String s1 = bapBase.getOrdAddress().toBase58();
-        String s2 = AddressEnhance.fromPrivateKey(bapBase.getOrdPrivateKey()).toBase58();
-        Assertions.assertEquals(s1, s2);
-    }
-
-    private void buildTxThenBroadcast(UnSpendableDataLockBuilder dataLockBuilder) throws SignErrorException {
-        TransactionBuilder transactionBuilder = new TransactionBuilder(this.bapBase, new BapProviderKeyBag(TestData.masterPrivateKey
-                , 100));
-        Transaction transaction = transactionBuilder
-                .addInputs(java.util.List.<AddressEnhance>of(paymentAddress),
-                        new BitailsUtxoProvider())
-                .addDataOutput(dataLockBuilder)
-                .withFeeKb(BsvAmount.valueOf(5L))
-                .changeAddress(changeAddress)
-                .completeAndSignTx(transactionBuilder.getKeyProvider(), true);
-        correctlySpends(transaction);
-        broadcast(transaction);
-        parseTx(transaction);
-
-
-    }
-
-
+  private void buildTxThenBroadcast(UnSpendableDataLockBuilder dataLockBuilder)
+      throws SignErrorException {
+    TransactionBuilder transactionBuilder =
+        new TransactionBuilder(this.bapBase, new BapProviderKeyBag(TestData.masterPrivateKey, 100));
+    Transaction transaction =
+        transactionBuilder
+            .addInputs(java.util.List.<AddressEnhance>of(paymentAddress), new BitailsUtxoProvider())
+            .addDataOutput(dataLockBuilder)
+            .withFeeKb(BsvAmount.valueOf(5L))
+            .changeAddress(changeAddress)
+            .completeAndSignTx(transactionBuilder.getKeyProvider(), true);
+    correctlySpends(transaction);
+    broadcast(transaction);
+    parseTx(transaction);
+  }
 }

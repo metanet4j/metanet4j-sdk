@@ -5,9 +5,9 @@ import org.junit.jupiter.api.Test;
 
 public class CommonTest {
 
-    @Test
-    public void testMediaType() {
-        MediaType mediaType = MediaType.PDF;
-        System.out.println(mediaType.toString());
-    }
+  @Test
+  public void testMediaType() {
+    MediaType mediaType = MediaType.PDF;
+    System.out.println(mediaType.toString());
+  }
 }
