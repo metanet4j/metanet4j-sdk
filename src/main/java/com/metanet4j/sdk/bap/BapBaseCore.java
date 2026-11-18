@@ -13,14 +13,14 @@ public interface BapBaseCore {
   /**
    * Get the root private key for signing.
    *
-   * @return
+   * @return 根私钥
    */
   PrivateKey getRootPrivateKey();
 
   /**
    * Get the current private key for signing.
    *
-   * @return
+   * @return 当前私钥
    */
   PrivateKey getCurrentPrivateKey();
 
@@ -28,35 +28,35 @@ public interface BapBaseCore {
    * Get the previous private key for signing, often used for signing the "new ID" operation in the
    * BAP protocol.
    *
-   * @return
+   * @return 上一把私钥
    */
   PrivateKey getPreviousPrivateKey();
 
   /**
    * Get the encryption private key for encryption
    *
-   * @return
+   * @return 加密私钥
    */
   PrivateKey getEncryptKey();
 
   /**
    * Get the ordinals private key for sending ordinals UTXO.
    *
-   * @return
+   * @return ordinals 私钥
    */
   PrivateKey getOrdPrivateKey();
 
   /**
    * Get the payment account private key for making payments
    *
-   * @return
+   * @return 支付账户私钥
    */
   PrivateKey getPayAccountKey();
 
   /**
    * Get the public key of a friend for adding as a friend.
    *
-   * @return
+   * @return 好友公钥
    */
   PublicKey getFriendPublicKey();
 

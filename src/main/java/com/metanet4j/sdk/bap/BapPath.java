@@ -122,7 +122,6 @@ public final class BapPath {
     return indices;
   }
 
-  /** 标准小写路径串（{@code m/44'/236'/1'/0/0}）；空路径输出 {@code m}。 */
   /**
    * 以**上限 M/H 形式**渲染（如 {@code M/0H/236H/0H/0/0}），等价旧库 {@code HDUtils.formatPath}。
    *

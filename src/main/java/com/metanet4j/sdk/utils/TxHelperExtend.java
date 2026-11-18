@@ -138,7 +138,6 @@ public final class TxHelperExtend {
     return RedeemDataExtend.of(key, lockingScript);
   }
 
-  /** P2PKH 锁定脚本的公钥哈希；非 P2PKH 返回空数组。 */
   /**
    * 取输入的「连接输出」（来源交易的第 0 个输出）；无法取得时返回 {@code null}。
    *

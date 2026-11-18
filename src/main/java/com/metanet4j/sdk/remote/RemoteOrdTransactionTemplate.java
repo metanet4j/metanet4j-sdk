@@ -264,13 +264,15 @@ public class RemoteOrdTransactionTemplate {
   /**
    * bap + 1sat ordinal content-type:application/bap
    *
-   * @param payAddressEnhanceList
-   * @param utxoProvider
-   * @param destinationAddress
-   * @param changeAddress
-   * @param feePerKb
-   * @param bapBase
-   * @return
+   * @param payAddressEnhanceList 用于支付输入的地址列表
+   * @param utxoProvider UTXO 提供者
+   * @param destinationAddress 接收 ordinal 的目标地址
+   * @param changeAddress 找零地址
+   * @param feePerKb 每 KB 手续费（satoshi）
+   * @param bapBase 远程 BAP 基础对象
+   * @param transactionSigner 远程交易签名器
+   * @param remoteSignType 远程签名类型
+   * @return 已签名交易
    */
   public Transaction createBapOrdinal(
       List<AddressEnhance> payAddressEnhanceList,

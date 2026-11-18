@@ -87,7 +87,7 @@ public class BobHelper {
     JSONArray outArray = new JSONArray();
     List<TransactionOutput> outputs = txBean.outputs;
 
-    /**
+    /*
      * One output corresponds to one tape. One tape contains multiple tape items. One tape item
      * corresponds to one cell. One cell contains multiple cell items.
      */

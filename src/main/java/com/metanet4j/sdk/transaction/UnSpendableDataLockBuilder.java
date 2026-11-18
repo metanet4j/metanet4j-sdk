@@ -118,9 +118,11 @@ public abstract class UnSpendableDataLockBuilder<T extends UnSpendableDataLockBu
   }
 
   /**
-   * @param bapBase
-   * @param signType signType
-   * @return
+   * 用 AIP 对 OP_RETURN 数据签名。
+   *
+   * @param bapBase 用于签名的 BAP 基础对象
+   * @param signType 签名类型
+   * @return 当前构建器，便于链式调用
    */
   private T signOpReturnWithAIP(BapBaseCore bapBase, SignType signType) {
     Assert.notNull(bapBase, "sign bapBase not allow null when signOpReturnWithAIP");
@@ -249,8 +251,8 @@ public abstract class UnSpendableDataLockBuilder<T extends UnSpendableDataLockBu
   /**
    * 通过hash获取签名 子类可以重写这个方法，自定义获取签名的方式
    *
-   * @param hash
-   * @return
+   * @param hash 待签名哈希
+   * @return 待签上下文
    */
   public PreSignHashContext getSig(BsvHashBytes hash) {
     return PreSignHashUtils.getSignedHashContext(hash);

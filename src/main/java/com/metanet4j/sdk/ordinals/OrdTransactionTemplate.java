@@ -97,18 +97,6 @@ public class OrdTransactionTemplate {
     return transactionBuilder.build();
   }
 
-  /**
-   * bap + 1sat ordinal content-type:application/bap
-   *
-   * @param payAddressEnhanceList
-   * @param utxoProvider
-   * @param destinationAddress
-   * @param changeAddress
-   * @param feePerKb
-   * @param bapBase
-   * @param keyBag
-   * @return
-   */
   // 说明：此处原有一个收 `BapBase` 的便捷重载，它只是转调收 `BapBaseCore` 的实现。
   // 但 `BapBase` 是 `BapBaseCore` 的子类，Java 重载解析对 7 参调用**永远选中更具体的它自己**，
   // 于是转调变成**无限递归**（实测 StackOverflowError，栈内全部是 createBapOrdinal 本行）。
@@ -117,14 +105,14 @@ public class OrdTransactionTemplate {
   /**
    * bap + 1sat ordinal content-type:application/bap
    *
-   * @param payAddressEnhanceList
-   * @param utxoProvider
-   * @param destinationAddress
-   * @param changeAddress
-   * @param feePerKb
-   * @param bapBase
-   * @param keyBag
-   * @return
+   * @param payAddressEnhanceList 用于支付输入的地址列表
+   * @param utxoProvider UTXO 提供者
+   * @param destinationAddress 接收 ordinal 的目标地址
+   * @param changeAddress 找零地址
+   * @param feePerKb 每 KB 手续费（satoshi）
+   * @param bapBase BAP 基础对象
+   * @param keyProvider 签名密钥提供者
+   * @return 已签名交易
    */
   public Transaction createBapOrdinal(
       List<AddressEnhance> payAddressEnhanceList,

@@ -367,7 +367,7 @@ public class Sigma implements PreSignHash {
   /**
    * Override this method to implement remote signature.
    *
-   * @return
+   * @return 待签上下文
    */
   public PreSignHashContext getSigByRemote(BsvHashBytes hash) {
     return PreSignHashUtils.getSignedHashContext(hash);
