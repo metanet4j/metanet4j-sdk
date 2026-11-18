@@ -3,7 +3,7 @@ package com.metanet4j.sdk.remote;
 import com.metanet4j.sdk.context.PreSignHashContext;
 
 public interface PreSignHash {
-    PreSignHashContext getPreSignHashContext();
+  PreSignHashContext getPreSignHashContext();
 
-    boolean isHaveSign();
+  boolean isHaveSign();
 }

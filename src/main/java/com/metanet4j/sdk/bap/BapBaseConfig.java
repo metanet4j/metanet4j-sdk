@@ -2,14 +2,13 @@ package com.metanet4j.sdk.bap;
 
 public interface BapBaseConfig {
 
+  String getDefaultRootPath();
 
-    String getDefaultRootPath();
+  String getDefaultEncryptPath();
 
-    String getDefaultEncryptPath();
+  String getDefaultPayAccountPath();
 
-    String getDefaultPayAccountPath();
+  String getDefaultOrdPath();
 
-    String getDefaultOrdPath();
-
-    String getAppName();
+  String getAppName();
 }

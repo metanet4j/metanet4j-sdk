@@ -1,6 +1,5 @@
 package com.metanet4j.sdk.sigma;
 
-
 import lombok.Data;
 
 @Data
@@ -12,10 +11,7 @@ public class Sig {
   int vin;
   int targetVout;
 
-  public Sig() {
-
-  }
-
+  public Sig() {}
 
   public Sig(String address, String signature, String algorithm, int vin, int targetVout) {
     this.address = address;
@@ -24,6 +20,4 @@ public class Sig {
     this.vin = vin;
     this.targetVout = targetVout;
   }
-
 }
-

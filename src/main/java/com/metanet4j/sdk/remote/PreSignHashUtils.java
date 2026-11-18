@@ -1,36 +1,36 @@
 package com.metanet4j.sdk.remote;
 
 import com.google.common.collect.Lists;
-import com.metanet4j.sdk.context.PreSignHashContext;
 import com.metanet4j.base.bsv.BsvHashBytes;
-import lombok.experimental.UtilityClass;
-
+import com.metanet4j.sdk.context.PreSignHashContext;
 import java.util.List;
+import lombok.experimental.UtilityClass;
 
 @UtilityClass
 public class PreSignHashUtils {
 
-    private static final ThreadLocal<List<PreSignHashContext>> STORE = new ThreadLocal<List<PreSignHashContext>>() {
+  private static final ThreadLocal<List<PreSignHashContext>> STORE =
+      new ThreadLocal<List<PreSignHashContext>>() {
         protected List<PreSignHashContext> initialValue() {
-            return Lists.newArrayList();
+          return Lists.newArrayList();
         }
-    };
+      };
 
-    public static void setPreSignHashContext(PreSignHashContext preSignHashContext) {
-        STORE.get().add(preSignHashContext);
+  public static void setPreSignHashContext(PreSignHashContext preSignHashContext) {
+    STORE.get().add(preSignHashContext);
+  }
+
+  public static PreSignHashContext getSignedHashContext(BsvHashBytes hash) {
+    PreSignHashContext preSignHashContext =
+        STORE.get().stream().filter(o -> o.getPreSignHash().equals(hash)).findFirst().orElse(null);
+    if (preSignHashContext == null) {
+      throw new RuntimeException("get preSignHashContext is null,the hash is " + hash.toString());
     }
+    return preSignHashContext;
+  }
 
-    public static PreSignHashContext getSignedHashContext(BsvHashBytes hash) {
-        PreSignHashContext preSignHashContext = STORE.get().stream().filter(o -> o.getPreSignHash().equals(hash)).findFirst().orElse(null);
-        if (preSignHashContext == null) {
-            throw new RuntimeException("get preSignHashContext is null,the hash is " + hash.toString());
-        }
-        return preSignHashContext;
-    }
-
-    public static void clear() {
-        STORE.get().clear();
-        STORE.remove();
-
-    }
+  public static void clear() {
+    STORE.get().clear();
+    STORE.remove();
+  }
 }

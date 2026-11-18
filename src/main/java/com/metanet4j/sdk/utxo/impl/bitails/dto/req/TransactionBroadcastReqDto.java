@@ -5,5 +5,5 @@ import lombok.Data;
 @Data
 public class TransactionBroadcastReqDto {
 
-    private String raw;
+  private String raw;
 }

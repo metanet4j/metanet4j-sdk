@@ -1,11 +1,11 @@
 package com.metanet4j.sdk.exception;
 
-public class InvalidKeyException extends Exception{
-    public InvalidKeyException(String message){
-        super(message);
-    }
+public class InvalidKeyException extends Exception {
+  public InvalidKeyException(String message) {
+    super(message);
+  }
 
-    public InvalidKeyException(String message, Throwable cause){
-        super(message, cause);
-    }
+  public InvalidKeyException(String message, Throwable cause) {
+    super(message, cause);
+  }
 }

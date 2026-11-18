@@ -11,39 +11,40 @@ import lombok.Data;
  */
 public class TaggedDerivation {
 
-    public static void main(String[] args) {
+  public static void main(String[] args) {
 
-        DerivationTag tag = new DerivationTag("BAP", "1QBoVKLwVpttbDx9BwFrLMTi2zdmLMVKCd");
-        System.out.println(getTaggedDerivation(tag));
+    DerivationTag tag = new DerivationTag("BAP", "1QBoVKLwVpttbDx9BwFrLMTi2zdmLMVKCd");
+    System.out.println(getTaggedDerivation(tag));
+  }
+
+  public static String getTaggedDerivation(DerivationTag tag) {
+    String labelHex = HexUtil.encodeHexStr(sha256(tag.getLabel().getBytes(StandardCharsets.UTF_8)));
+    String idHex = HexUtil.encodeHexStr(sha256(tag.getId().getBytes(StandardCharsets.UTF_8)));
+    long labelNumber =
+        Long.parseLong(labelHex.substring(labelHex.length() - 8), 16) % (long) Math.pow(2, 31);
+    long idNumber =
+        Long.parseLong(idHex.substring(idHex.length() - 8), 16) % (long) Math.pow(2, 31);
+    // "M/424150H/0H/0H/0H/0H/0H";
+    return String.format("M/44H/236H/218H/%d/%d", labelNumber, idNumber);
+  }
+
+  /** 单次 SHA-256（旧库 {@code Sha256Hash.hash} 的等价实现）。 */
+  private static byte[] sha256(byte[] data) {
+    try {
+      return MessageDigest.getInstance("SHA-256").digest(data);
+    } catch (NoSuchAlgorithmException e) {
+      throw new IllegalStateException("JVM 不支持 SHA-256", e);
     }
+  }
 
-    public static String getTaggedDerivation(DerivationTag tag) {
-        String labelHex = HexUtil.encodeHexStr(sha256(tag.getLabel().getBytes(StandardCharsets.UTF_8)));
-        String idHex = HexUtil.encodeHexStr(sha256(tag.getId().getBytes(StandardCharsets.UTF_8)));
-        long labelNumber = Long.parseLong(labelHex.substring(labelHex.length() - 8), 16) % (long) Math.pow(2, 31);
-        long idNumber = Long.parseLong(idHex.substring(idHex.length() - 8), 16) % (long) Math.pow(2, 31);
-        //"M/424150H/0H/0H/0H/0H/0H";
-        return String.format("M/44H/236H/218H/%d/%d", labelNumber, idNumber);
+  @Data
+  public static class DerivationTag {
+    String label;
+    String id;
+
+    public DerivationTag(String label, String id) {
+      this.label = label;
+      this.id = id;
     }
-
-    /** 单次 SHA-256（旧库 {@code Sha256Hash.hash} 的等价实现）。 */
-    private static byte[] sha256(byte[] data) {
-        try {
-            return MessageDigest.getInstance("SHA-256").digest(data);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("JVM 不支持 SHA-256", e);
-        }
-    }
-
-    @Data
-    public static class DerivationTag {
-        String label;
-        String id;
-
-        public DerivationTag(String label, String id) {
-            this.label = label;
-            this.id = id;
-        }
-    }
-
+  }
 }
