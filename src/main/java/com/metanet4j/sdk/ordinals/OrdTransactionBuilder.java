@@ -11,7 +11,7 @@ import com.metanet4j.sdk.address.AddressEnhance;
 import com.metanet4j.sdk.bap.BapBaseCore;
 import com.metanet4j.sdk.bap.SigningKeyProvider;
 import com.metanet4j.sdk.exception.SignErrorException;
-import com.metanet4j.sdk.transcation.TransactionBuilder;
+import com.metanet4j.sdk.transaction.TransactionBuilder;
 
 /**
  * Ordinals 交易构建：追加铭文输入／输出并签名。

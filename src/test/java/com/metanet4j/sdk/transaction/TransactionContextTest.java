@@ -1,4 +1,4 @@
-package com.metanet4j.sdk.transcation;
+package com.metanet4j.sdk.transaction;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;

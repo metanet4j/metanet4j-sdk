@@ -23,7 +23,7 @@ import com.metanet4j.sdk.context.PreSignHashContext;
 import com.metanet4j.sdk.exception.SignErrorException;
 import com.metanet4j.sdk.ordinals.OrdScriptBuilder;
 import com.metanet4j.sdk.signers.ExtendForSignTransaction;
-import com.metanet4j.sdk.transcation.LockingScriptBuilder;
+import com.metanet4j.sdk.transaction.LockingScriptBuilder;
 import com.metanet4j.sdk.address.AddressEnhance;
 import com.metanet4j.base.bsv.BsvHashBytes;
 import com.metanet4j.base.bsv.BsvAmount;

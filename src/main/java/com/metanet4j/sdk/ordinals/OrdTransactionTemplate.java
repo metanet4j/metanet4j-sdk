@@ -5,7 +5,7 @@ import cn.hutool.core.util.StrUtil;
 import com.metanet4j.sdk.bap.BapBase;
 import com.metanet4j.sdk.bap.BapBaseCore;
 import com.metanet4j.sdk.signers.OrdinalsTransactionSigner;
-import com.metanet4j.sdk.transcation.BapDataLockBuilder;
+import com.metanet4j.sdk.transaction.BapDataLockBuilder;
 import com.metanet4j.sdk.utxo.UTXOProvider;
 import com.metanet4j.sdk.address.AddressEnhance;
 import com.metanet4j.base.bsv.BsvAmount;

@@ -1,6 +1,6 @@
 
 
-package com.metanet4j.sdk.transcation;
+package com.metanet4j.sdk.transaction;
 
 
 import com.metanet4j.sdk.remote.PreSignHash;

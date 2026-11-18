@@ -9,7 +9,7 @@ import com.metanet4j.sdk.bap.RemoteBapBase;
 import com.metanet4j.sdk.ordinals.OrdScriptBuilder;
 import com.metanet4j.sdk.ordinals.OrdTransactionBuilder;
 import com.metanet4j.sdk.signers.OrdinalsTransactionSigner;
-import com.metanet4j.sdk.transcation.BapDataLockBuilder;
+import com.metanet4j.sdk.transaction.BapDataLockBuilder;
 import com.metanet4j.sdk.utxo.UTXOProvider;
 import com.metanet4j.sdk.address.AddressEnhance;
 import com.metanet4j.base.bsv.BsvAmount;

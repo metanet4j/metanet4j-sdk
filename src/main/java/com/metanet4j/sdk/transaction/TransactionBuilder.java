@@ -1,4 +1,4 @@
-package com.metanet4j.sdk.transcation;
+package com.metanet4j.sdk.transaction;
 
 import com.google.common.collect.Lists;
 import com.metanet4j.base.bsv.BsvAmount;

@@ -47,11 +47,11 @@ such as uploading large files to the blockchain.
 
 2. Support for signing transactions with the private key corresponding to a BAP identity.
 
-   code see :com.metanet4j.sdk.transcation.UnSpendableDataLockBuilder
+   code see :com.metanet4j.sdk.transaction.UnSpendableDataLockBuilder
 
 3. BapDataLockBuilder.
 
-   test case see:com.metanet4j.sdk.transcation.BitcoinschemaTransactionTest
+   test case see:com.metanet4j.sdk.transaction.BitcoinschemaTransactionTest
 
     - [x] buildId
 
@@ -61,7 +61,7 @@ such as uploading large files to the blockchain.
 
 4. BsocialDataLockBuilder.
 
-   test case see: com.metanet4j.sdk.transcation.BitcoinschemaTransactionTest
+   test case see: com.metanet4j.sdk.transaction.BitcoinschemaTransactionTest
 
     - [x] buildPost
 
@@ -89,7 +89,7 @@ such as uploading large files to the blockchain.
 
 6. TransactionBuilder
 
-   test case see: com.metanet4j.sdk.transcation.BitcoinschemaTransactionTest#buildTxThenBroadcast
+   test case see: com.metanet4j.sdk.transaction.BitcoinschemaTransactionTest#buildTxThenBroadcast
 
 7. OrdTransactionBuilder
 
@@ -101,7 +101,7 @@ such as uploading large files to the blockchain.
 
 8. parse tx to txo and bob
 
-​ test case see :com.metanet4j.sdk.transcation.TransactionContextTest#parseTx(java.lang.String)
+​ test case see :com.metanet4j.sdk.transaction.TransactionContextTest#parseTx(java.lang.String)
 
 9. UTXOProvider FunctionalInterface
 
